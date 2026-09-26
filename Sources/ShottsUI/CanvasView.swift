@@ -354,7 +354,7 @@ public final class CanvasView: NSView {
 
     /// Opens typing for a callout's words. While typing, the callout shows its arrow only and
     /// the live text; the words land in the callout on commit.
-    private func editCalloutText(_ id: Annotation.ID, from: CGPoint, to: CGPoint, initial: String, style: Style) {
+    func editCalloutText(_ id: Annotation.ID, from: CGPoint, to: CGPoint, initial: String, style: Style) {
         var d = document
         if let a = d.annotation(id) { d.replace(relaid(a, from: from, to: to, string: "")) }
         history = History(history: history, replacingCurrent: d)
@@ -367,7 +367,7 @@ public final class CanvasView: NSView {
 
     /// Typing happens on the picture: the canvas draws the text in its final style as a live
     /// annotation, and an invisible text view under it only supplies the caret and keystrokes.
-    fileprivate func beginTextEntry(at origin: CGPoint, initial: String, style: Style, layout: CalloutLayout? = nil) {
+    func beginTextEntry(at origin: CGPoint, initial: String, style: Style, layout: CalloutLayout? = nil) {
         let entry = TextEntry(style: style, origin: origin, zoom: zoom, scale: document.scale)
         entry.layout = layout
         switch layout?.alignment {
@@ -602,52 +602,5 @@ extension History {
     init(history: History, replacingCurrent state: State) {
         self = history
         self.replaceCurrent(state)
-    }
-}
-
-/// Opens text entry on a canvas in a window that is never shown, types into it, and commits,
-/// so the entry's construction and commit path can be checked without a display.
-public enum TextEntryCheck {
-    public static func run() -> Bool {
-        guard let ctx = CGContext(data: nil, width: 400, height: 300, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
-              let source = ctx.makeImage() else { return false }
-        let canvas = CanvasView(document: Document(width: 400, height: 300, scale: 2), source: source, zoom: 0.5)
-        let window = NSWindow(contentRect: canvas.frame, styleMask: .borderless, backing: .buffered, defer: false)
-        window.contentView = canvas
-        canvas.check_beginText(at: CGPoint(x: 40, y: 40), initial: "Hello")
-        canvas.check_typed("Hello there")
-        canvas.endTextEntry(commit: true)
-        guard canvas.document.annotations.count == 1, case let .text(_, string, size, _) = canvas.document.annotations[0].shape,
-              string == "Hello there", size.width > 0, size.height > 0 else { return false }
-        // A callout: its words land in it, right-justified against the tail.
-        let callout = Annotation(shape: .callout(from: CGPoint(x: 300, y: 150), to: CGPoint(x: 380, y: 100),
-                                                 text: Annotation.TextBox(origin: .zero, string: "", size: .zero, alignment: .left)), style: canvas.style)
-        var d = canvas.document
-        d.add(callout)
-        canvas.commit(d)
-        canvas.check_editCallout(callout.id, from: CGPoint(x: 300, y: 150), to: CGPoint(x: 380, y: 100))
-        canvas.check_typed("wrapped words beside the tail of the arrow")
-        canvas.endTextEntry(commit: true)
-        guard canvas.document.annotations.count == 2, case let .callout(from, _, text) = canvas.document.annotations[1].shape,
-              from == CGPoint(x: 300, y: 150), text.string.hasPrefix("wrapped"), text.alignment == .right, text.size.width > 0,
-              text.frame.maxX <= 300 else { return false }
-        return true
-    }
-}
-
-extension CanvasView {
-    func check_beginText(at origin: CGPoint, initial: String, layout: CalloutLayout? = nil) {
-        beginTextEntry(at: origin, initial: initial, style: style, layout: layout)
-    }
-
-    func check_editCallout(_ id: Annotation.ID, from: CGPoint, to: CGPoint) {
-        editCalloutText(id, from: from, to: to, initial: "", style: style)
-    }
-
-    func check_typed(_ string: String) {
-        textField?.string = string
-        textField?.didChangeText()
     }
 }

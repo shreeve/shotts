@@ -60,14 +60,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let (document, cg) = Self.sample(from: URL(fileURLWithPath: arguments[i + 1])) else { exit(1) }
             exit(EditorWindowController.printPDF(document, source: cg, to: URL(fileURLWithPath: arguments[i + 2])) ? 0 : 1)
         }
-        if arguments.contains("--check-resize") {
-            // Developer check: the editor's zoom follows its window.
-            exit(ResizeCheck.run() ? 0 : 1)
-        }
-        if arguments.contains("--check-text-entry") {
-            // Developer check: text entry can open and take a string without a display.
-            exit(TextEntryCheck.run() ? 0 : 1)
-        }
         if let i = arguments.firstIndex(of: "--preview-style"), i + 1 < arguments.count {
             // Developer check of the style popover's layout, drawn off screen.
             exit(StylePopoverPreview.write(to: URL(fileURLWithPath: arguments[i + 1])) ? 0 : 1)

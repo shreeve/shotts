@@ -379,44 +379,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     }
 }
 
-/// The handle you drag to put the picture somewhere: a file promise the drop target reads.
-/// Resizes an editor in a window that is never shown and checks that the picture's zoom follows
-/// the window: down when it shrinks, keeping the picture's proportions, and never past its
-/// on-screen size.
-public enum ResizeCheck {
-    public static func run() -> Bool {
-        guard let ctx = CGContext(data: nil, width: 1600, height: 1000, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
-              let source = ctx.makeImage() else { return false }
-        let controller = EditorWindowController(document: Document(width: 1600, height: 1000, scale: 2), source: source)
-        guard let window = controller.window else { return false }
-        let natural = controller.canvas.zoom
-        guard natural == 0.5 else { fputs("opened at zoom \(natural), not the on-screen size\n", stderr); return false }
-
-        // A user drag to a content area of 1000 by 400: the height limits, the width floor holds.
-        let asked = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 1000, height: 400)).size
-        let snug = window.contentRect(forFrameRect: NSRect(origin: .zero, size: controller.windowWillResize(window, to: asked))).size
-        let zoom = (snug.height - controller.barHeight - CanvasView.inset * 2) / 1000
-        guard zoom < natural, snug.width == EditorWindowController.minimumWidth,
-              abs(snug.height - (controller.barHeight + 1000 * zoom + CanvasView.inset * 2)) < 1 else {
-            fputs("snug size \(snug) does not fit the picture at zoom \(zoom)\n", stderr); return false
-        }
-        window.setContentSize(snug)
-        guard abs(controller.canvas.zoom - zoom) < 0.001 else {
-            fputs("after shrinking, zoom is \(controller.canvas.zoom), not \(zoom)\n", stderr); return false
-        }
-        guard controller.canvas.pictureRect.width < 1600 * natural else { return false }
-
-        // Growing past the on-screen size stops there.
-        window.setContentSize(NSSize(width: 3000, height: 2000))
-        guard controller.canvas.zoom == natural else {
-            fputs("grew past the on-screen size to zoom \(controller.canvas.zoom)\n", stderr); return false
-        }
-        return true
-    }
-}
-
 /// The page's content: the rendered picture at its natural size in points, which pagination
 /// scales to fit the paper.
 private final class PrintSheet: NSView {
@@ -435,6 +397,7 @@ private final class PrintSheet: NSView {
     }
 }
 
+/// The handle you drag to put the picture somewhere: a PNG file the drop target reads.
 final class DragGrip: NSImageView {
     private weak var controller: EditorWindowController?
 
