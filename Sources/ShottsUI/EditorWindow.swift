@@ -19,6 +19,10 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     private var closing = false
     /// Wide enough for every control in the bar, whatever the picture's size.
     static let minimumWidth: CGFloat = 880
+    /// The shortest the picture's longer side may be made by resizing, in points.
+    static let minimumPicture: CGFloat = 160
+    fileprivate(set) var barHeight: CGFloat = 44
+    private var canvasHeight: NSLayoutConstraint?
 
     public init(document: Document, source: CGImage, on screen: NSScreen? = NSScreen.main) {
         let visible = (screen ?? NSScreen.screens[0]).visibleFrame
@@ -27,7 +31,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         let zoom = fit / document.scale
         canvas = CanvasView(document: document, source: source, zoom: zoom)
 
-        let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable],
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
         window.title = "Shotts"
         window.appearance = NSAppearance(named: .darkAqua) // the editor is dark whatever the system is
@@ -40,8 +44,10 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         // `fittingSize`, which a stack view answers before it has laid out.
         content.layoutSubtreeIfNeeded()
         let barSize = content.subviews.first?.fittingSize ?? NSSize(width: 0, height: 44)
+        barHeight = barSize.height
         let width = max(canvas.frame.width, barSize.width, Self.minimumWidth)
         window.setContentSize(NSSize(width: width, height: barSize.height + canvas.frame.height))
+        window.contentMinSize = contentSize(forZoom: minimumZoom)
         window.center()
         canvas.style = Self.rememberedStyle
         showStyle(canvas.style)
@@ -148,7 +154,9 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         column.spacing = 0
         column.alignment = .width // the bar and the field both span the window
 
-        canvas.heightAnchor.constraint(equalToConstant: canvas.frame.height).isActive = true
+        let height = canvas.heightAnchor.constraint(equalToConstant: canvas.frame.height)
+        height.isActive = true
+        canvasHeight = height
         column.setHuggingPriority(.required, for: .horizontal)
         column.setHuggingPriority(.required, for: .vertical)
         column.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
@@ -295,6 +303,62 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         close()
     }
 
+    // MARK: - Resizing
+
+    // Resizing changes only how big the picture is drawn, never the picture: the zoom, in points
+    // per pixel, follows the window, up to the picture's on-screen size and down to a small one.
+    // Annotations are in picture pixels, so they scale with it, old and new alike, stay editable,
+    // and export exactly as before. The window keeps the picture's proportions (plus the bar).
+
+    private var naturalZoom: CGFloat { 1 / canvas.document.scale }
+
+    private var minimumZoom: CGFloat {
+        min(naturalZoom, Self.minimumPicture / CGFloat(max(canvas.document.width, canvas.document.height)))
+    }
+
+    /// The zoom at which the picture fits a content area of this size.
+    private func zoom(forContentSize size: NSSize) -> CGFloat {
+        let inset = CanvasView.inset * 2
+        let fit = min((size.width - inset) / CGFloat(canvas.document.width),
+                      (size.height - barHeight - inset) / CGFloat(canvas.document.height))
+        return min(naturalZoom, max(minimumZoom, fit))
+    }
+
+    /// The content size that holds the picture at this zoom: snug around it, no narrower than the bar.
+    private func contentSize(forZoom zoom: CGFloat) -> NSSize {
+        let inset = CanvasView.inset * 2
+        return NSSize(width: max(Self.minimumWidth, (CGFloat(canvas.document.width) * zoom + inset).rounded()),
+                      height: (barHeight + CGFloat(canvas.document.height) * zoom + inset).rounded())
+    }
+
+    public func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        let content = sender.contentRect(forFrameRect: NSRect(origin: .zero, size: frameSize)).size
+        let snug = contentSize(forZoom: zoom(forContentSize: content))
+        return sender.frameRect(forContentRect: NSRect(origin: .zero, size: snug)).size
+    }
+
+    public func windowWillStartLiveResize(_ notification: Notification) {
+        canvas.endTextEntry(commit: true) // the entry is placed at one zoom
+    }
+
+    public func windowDidResize(_ notification: Notification) {
+        guard let window else { return }
+        let zoom = zoom(forContentSize: window.contentRect(forFrameRect: window.frame).size)
+        guard zoom != canvas.zoom else { return }
+        canvas.endTextEntry(commit: true)
+        canvas.zoom = zoom
+        canvasHeight?.constant = CGFloat(canvas.document.height) * zoom + CanvasView.inset * 2
+    }
+
+    /// The green button: the picture at its on-screen size, or as large as the screen allows.
+    public func windowWillUseStandardFrame(_ window: NSWindow, defaultFrame: NSRect) -> NSRect {
+        let room = window.contentRect(forFrameRect: defaultFrame).size
+        let content = contentSize(forZoom: zoom(forContentSize: room))
+        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: content))
+        frame.origin = NSPoint(x: defaultFrame.midX - frame.width / 2, y: defaultFrame.maxY - frame.height)
+        return frame
+    }
+
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
         if closing || canvas.document.isBlank { return true }
         let alert = NSAlert()
@@ -316,6 +380,43 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 }
 
 /// The handle you drag to put the picture somewhere: a file promise the drop target reads.
+/// Resizes an editor in a window that is never shown and checks that the picture's zoom follows
+/// the window: down when it shrinks, keeping the picture's proportions, and never past its
+/// on-screen size.
+public enum ResizeCheck {
+    public static func run() -> Bool {
+        guard let ctx = CGContext(data: nil, width: 1600, height: 1000, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
+              let source = ctx.makeImage() else { return false }
+        let controller = EditorWindowController(document: Document(width: 1600, height: 1000, scale: 2), source: source)
+        guard let window = controller.window else { return false }
+        let natural = controller.canvas.zoom
+        guard natural == 0.5 else { fputs("opened at zoom \(natural), not the on-screen size\n", stderr); return false }
+
+        // A user drag to a content area of 1000 by 400: the height limits, the width floor holds.
+        let asked = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 1000, height: 400)).size
+        let snug = window.contentRect(forFrameRect: NSRect(origin: .zero, size: controller.windowWillResize(window, to: asked))).size
+        let zoom = (snug.height - controller.barHeight - CanvasView.inset * 2) / 1000
+        guard zoom < natural, snug.width == EditorWindowController.minimumWidth,
+              abs(snug.height - (controller.barHeight + 1000 * zoom + CanvasView.inset * 2)) < 1 else {
+            fputs("snug size \(snug) does not fit the picture at zoom \(zoom)\n", stderr); return false
+        }
+        window.setContentSize(snug)
+        guard abs(controller.canvas.zoom - zoom) < 0.001 else {
+            fputs("after shrinking, zoom is \(controller.canvas.zoom), not \(zoom)\n", stderr); return false
+        }
+        guard controller.canvas.pictureRect.width < 1600 * natural else { return false }
+
+        // Growing past the on-screen size stops there.
+        window.setContentSize(NSSize(width: 3000, height: 2000))
+        guard controller.canvas.zoom == natural else {
+            fputs("grew past the on-screen size to zoom \(controller.canvas.zoom)\n", stderr); return false
+        }
+        return true
+    }
+}
+
 /// The page's content: the rendered picture at its natural size in points, which pagination
 /// scales to fit the paper.
 private final class PrintSheet: NSView {
