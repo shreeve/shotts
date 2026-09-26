@@ -34,7 +34,8 @@ cd "$root"
 fail() { echo "error: $*" >&2; exit 1; }
 warn() { echo "warning: $*" >&2; }
 
-version="${1:?usage: Scripts/release.sh <version> [--dry-run | --notes]}"
+[ $# -ge 1 ] || fail "usage: Scripts/release.sh <version> [--dry-run | --notes]"
+version="$1"
 mode="${2:-publish}"
 case "$mode" in publish | --dry-run | --notes) ;; *) fail "unknown option $mode" ;; esac
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "version must look like 1.2.3, not $version"
@@ -115,7 +116,7 @@ xcrun notarytool history --keychain-profile "$profile" >/dev/null 2>&1 \
     || fail "notarytool cannot sign in with keychain profile \"$profile\"; see docs/RELEASING.md"
 
 # The feed must be signed with the private half of the key the app trusts.
-swift package resolve >/dev/null
+swift package resolve --scratch-path "$scratch" >/dev/null
 bin="$(dirname "$(find "$scratch/artifacts" -path '*Sparkle/bin/generate_appcast' -type f | head -1)")"
 [ -x "$bin/generate_appcast" ] || fail "Sparkle's tools are missing; run swift build once"
 public_key=$(plutil -extract SUPublicEDKey raw "$plist" 2>/dev/null || true)

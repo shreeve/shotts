@@ -25,7 +25,14 @@ trap 'rm -rf "$tmp"' EXIT
 curl -fsSL -o "$tmp/Shotts.zip" "$url" || fail "cannot download $url; is v$version published?"
 sha=$(shasum -a 256 "$tmp/Shotts.zip" | cut -d' ' -f1)
 
-cask="$tap/Casks/shotts.rb"
+# A fresh branch from the tap's main first, so the cask is written there and nowhere else.
+cd "$tap"
+[ -z "$(git status --porcelain --untracked-files=no)" ] || fail "the tap checkout has uncommitted changes"
+git fetch -q origin main
+branch="shotts-$version"
+git checkout -q -B "$branch" origin/main
+
+cask="Casks/shotts.rb"
 new=1; [ ! -f "$cask" ] || new=0
 cat > "$cask" <<CASK
 cask "shotts" do
@@ -57,12 +64,7 @@ cask "shotts" do
 end
 CASK
 
-cd "$tap"
-[ -z "$(git status --porcelain --untracked-files=no -- . ':!Casks/shotts.rb')" ] || fail "the tap checkout has other changes"
-git fetch -q origin main
-branch="shotts-$version"
-git checkout -q -B "$branch" origin/main
-git add Casks/shotts.rb
+git add "$cask"
 if [ "$new" = 1 ]; then title="Add shotts $version"; else title="Update shotts to $version"; fi
 git commit -q -m "$title"
 git push -q -u origin "$branch"
