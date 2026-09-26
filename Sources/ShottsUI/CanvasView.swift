@@ -520,18 +520,26 @@ final class TextEntry: NSTextView {
         let outline = Renderer.outlineWidth(style, scale: scale)
         let pad = outline * zoom
         var width: CGFloat = 0
+        var x = origin.x * zoom + picture.minX + pad
         if let layout {
-            // The measured box less the outline's room on each side, so the caret sits against
-            // the words' edge whichever way they align. A couple of points of slack cover the
-            // zoomed font's rounding; the wrap width caps it so lines break where the renderer's do.
-            width = min((box.width - outline * 2) * zoom + 2, (layout.width - outline * 2) * zoom)
+            // Wrap where the renderer will: the full wrap width, never the measured box, whose
+            // width at the zoomed font's rounding could be a hair short and fold the last word
+            // onto a phantom line. The view is as wide as the wrap and is slid so the edge the
+            // words align to sits on the measured box's edge; only the caret is drawn, and it
+            // is always inside the box.
+            width = (layout.width - outline * 2) * zoom
             textContainer?.containerSize = NSSize(width: width, height: 4000)
+            let inner = (box.width - outline * 2) * zoom
+            switch layout.alignment {
+            case .left: break
+            case .right: x += inner - width
+            case .center: x += (inner - width) / 2
+            }
         }
         layoutManager?.ensureLayout(for: textContainer!)
         let used = layoutManager?.usedRect(for: textContainer!) ?? .zero
         if layout == nil { width = max(used.width, 4) + 4 }
-        frame = CGRect(x: origin.x * zoom + picture.minX + pad, y: origin.y * zoom + picture.minY,
-                       width: width, height: max(used.height, font?.pointSize ?? 20))
+        frame = CGRect(x: x, y: origin.y * zoom + picture.minY, width: width, height: max(used.height, font?.pointSize ?? 20))
     }
 
     override func didChangeText() {
