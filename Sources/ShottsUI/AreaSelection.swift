@@ -374,13 +374,19 @@ final class OverlayView: NSView {
         // very pixels being looked at.
         let centerCell = CGRect(x: pixels.minX + CGFloat(half) * cell, y: pixels.minY + CGFloat(half) * cell, width: cell, height: cell)
         if selection == nil {
-            // Four arms that stop two cells short of the center box, leaving it clear.
-            let gap = cell * 2
-            ctx.setFillColor(CGColor(gray: 1, alpha: 0.5))
-            ctx.fill(CGRect(x: centerCell.minX, y: pixels.minY, width: cell, height: centerCell.minY - gap - pixels.minY))
-            ctx.fill(CGRect(x: centerCell.minX, y: centerCell.maxY + gap, width: cell, height: pixels.maxY - centerCell.maxY - gap))
-            ctx.fill(CGRect(x: pixels.minX, y: centerCell.minY, width: centerCell.minX - gap - pixels.minX, height: cell))
-            ctx.fill(CGRect(x: centerCell.maxX + gap, y: centerCell.minY, width: pixels.maxX - centerCell.maxX - gap, height: cell))
+            // Four arms that stop two cells short of the center box, leaving it clear. Each cell
+            // of an arm is white or black by the pixel under it, at half opacity either way, so
+            // the arms read on any picture.
+            let colors = PixelSampler.colors(in: wanted, of: display.image)
+            func arm(_ i: Int, _ j: Int) {
+                let under = colors[j][i]
+                ctx.setFillColor(CGColor(gray: under.map { $0.isLight ? 0 : 1 } ?? 1, alpha: 0.5))
+                ctx.fill(CGRect(x: pixels.minX + CGFloat(i) * cell, y: pixels.minY + CGFloat(j) * cell, width: cell, height: cell))
+            }
+            for k in 0..<(half - 2) {
+                arm(half, k); arm(half, cells - 1 - k)  // above and below
+                arm(k, half); arm(cells - 1 - k, half)  // left and right
+            }
         }
         // The pixel under the pointer: a white box with a dark edge, like the crosshair itself.
         ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.8)); ctx.setLineWidth(3); ctx.stroke(centerCell.insetBy(dx: -1, dy: -1))
@@ -459,9 +465,34 @@ final class OverlayView: NSView {
     }
 }
 
-/// Reads one pixel of a bitmap by drawing it into a one-pixel context, so it works for any
-/// pixel format the capture comes in.
+/// Reads pixels of a bitmap by drawing them into a small context, so it works for any pixel
+/// format the capture comes in.
 public enum PixelSampler {
+    /// The colors in a pixel rectangle, row by row from the top; `nil` outside the bitmap.
+    public static func colors(in rect: CGRect, of image: CGImage) -> [[RGBA?]] {
+        let w = Int(rect.width), h = Int(rect.height)
+        var result = Array(repeating: Array(repeating: RGBA?.none, count: w), count: h)
+        guard w > 0, h > 0,
+              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return result }
+        ctx.interpolationQuality = .none
+        // Place the image so the rectangle's top-left lands at the context's top-left.
+        ctx.draw(image, in: CGRect(x: -rect.minX, y: -(CGFloat(image.height) - rect.maxY), width: CGFloat(image.width), height: CGFloat(image.height)))
+        guard let data = ctx.data else { return result }
+        let p = data.bindMemory(to: UInt8.self, capacity: w * h * 4)
+        for row in 0..<h {
+            for col in 0..<w {
+                let x = Int(rect.minX) + col, y = Int(rect.minY) + row
+                guard x >= 0, y >= 0, x < image.width, y < image.height else { continue }
+                let o = (row * w + col) * 4 // a bitmap context's first row in memory is its top
+                result[row][col] = RGBA(red: Double(p[o]) / 255, green: Double(p[o + 1]) / 255, blue: Double(p[o + 2]) / 255)
+            }
+        }
+        return result
+    }
+
     public static func color(at x: Int, _ y: Int, in image: CGImage) -> RGBA? {
         guard x >= 0, y >= 0, x < image.width, y < image.height,
               let ctx = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,

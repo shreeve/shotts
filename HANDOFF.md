@@ -92,6 +92,9 @@ they are ten lines each and worth recreating rather than keeping.
   not `delete(_:)` or `undo(_:)` (plain `@objc` actions).
 - A blend mode is the wrong way to make a highlighter: multiply vanishes on the dark
   backgrounds screenshots are full of. It is a translucent stroke.
+- A bitmap context's first row in memory is its top row, even though its drawing coordinates
+  run upward. `PixelSampler.colors` reads row `j` at offset `j * width`; reversing the rows
+  put the magnifier's adaptive arms upside down, which the `--preview-overlay` square showed.
 - `CGContext.setShadow` takes its offset in device space, untouched by the CTM, so in a flipped
   context an offset meant to fall below the shape falls above it. The renderer's shadow has no
   offset, only blur, which looks like macOS's own and cannot flip.
