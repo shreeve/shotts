@@ -29,11 +29,13 @@ public struct RGBA: Hashable, Sendable, Codable {
     public static let green = RGBA(hex: 0x34C759)
     public static let blue = RGBA(hex: 0x007AFF)
     public static let purple = RGBA(hex: 0xAF52DE)
+    public static let pink = RGBA(hex: 0xFF2D55)
+    public static let gray = RGBA(hex: 0x8E8E93)
     public static let white = RGBA(hex: 0xFFFFFF)
     public static let black = RGBA(hex: 0x000000)
 
-    /// The palette the editor offers, in order.
-    public static let palette: [RGBA] = [.red, .orange, .yellow, .green, .blue, .purple, .white, .black]
+    /// The palette the editor offers, in order: two rows of five.
+    public static let palette: [RGBA] = [.red, .orange, .yellow, .green, .blue, .purple, .pink, .gray, .white, .black]
 
     /// `#RRGGBB`, the way design tools and CSS write it.
     public var hex: String {

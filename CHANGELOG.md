@@ -15,7 +15,7 @@ The first milestone: the daily screenshot workflow.
   it is taken. That, dimming before a drag, the magnifier, and the hints are options in the menu
   bar menu.
 - An editor with arrow, text, rectangle, ellipse, pen, highlighter, obscure, and crop tools,
-  undo and redo, single-key tool switching, and remembered color, width, text size, and arrow
-  tapering.
+  undo and redo, single-key tool switching, a color panel with ten colors and a custom color,
+  and remembered color, width, text size, shadow, outline, and arrow tapering.
 - Copy, Save…, and drag out, each closing the editor and returning focus to the previous app.
   An option adds a soft drop shadow on a transparent margin to every exported picture.
