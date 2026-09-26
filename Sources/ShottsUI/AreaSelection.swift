@@ -7,11 +7,11 @@ public struct DisplayImage {
     public var screen: NSScreen
     public var image: CGImage
     public var scale: CGFloat
-    /// The windows on this display when it was pictured, front to back, in points from the
-    /// display's top-left corner. A click on one captures it.
-    public var windows: [CGRect]
+    /// The windows on this display when it was pictured, front to back. A click on one
+    /// captures it.
+    public var windows: [WindowInfo]
 
-    public init(screen: NSScreen, image: CGImage, scale: CGFloat, windows: [CGRect] = []) {
+    public init(screen: NSScreen, image: CGImage, scale: CGFloat, windows: [WindowInfo] = []) {
         self.screen = screen
         self.image = image
         self.scale = scale
@@ -19,10 +19,22 @@ public struct DisplayImage {
     }
 }
 
-/// The windows on screen, from the window server, as rectangles per display in the picker's
-/// coordinates. Only ordinary windows count: no menu bar, Dock, desktop, or Shotts' own.
+/// One window the picker can capture: the window server's id, for capturing it on its own,
+/// and its frame in points from its display's top-left corner.
+public struct WindowInfo: Equatable, Sendable {
+    public var id: CGWindowID
+    public var frame: CGRect
+
+    public init(id: CGWindowID, frame: CGRect) {
+        self.id = id
+        self.frame = frame
+    }
+}
+
+/// The windows on screen, from the window server, per display in the picker's coordinates.
+/// Only ordinary windows count: no menu bar, Dock, desktop, or Shotts' own.
 public enum WindowFinder {
-    public static func windows(on screen: NSScreen, excluding pid: pid_t = ProcessInfo.processInfo.processIdentifier) -> [CGRect] {
+    public static func windows(on screen: NSScreen, excluding pid: pid_t = ProcessInfo.processInfo.processIdentifier) -> [WindowInfo] {
         guard let primary = NSScreen.screens.first,
               let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
         else { return [] }
@@ -30,18 +42,19 @@ public enum WindowFinder {
         // at its bottom-left. This display's rectangle in the window server's space:
         let display = CGRect(x: screen.frame.minX, y: primary.frame.height - screen.frame.maxY,
                              width: screen.frame.width, height: screen.frame.height)
-        var result: [CGRect] = []
+        var result: [WindowInfo] = []
         for w in list {
             guard (w[kCGWindowLayer as String] as? Int) == 0,
                   (w[kCGWindowOwnerPID as String] as? pid_t) != pid,
                   (w[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  let id = w[kCGWindowNumber as String] as? CGWindowID,
                   let b = w[kCGWindowBounds as String] as? [String: CGFloat],
                   let x = b["X"], let y = b["Y"], let width = b["Width"], let height = b["Height"],
                   width >= 40, height >= 40
             else { continue }
             let rect = CGRect(x: x, y: y, width: width, height: height).intersection(display)
             guard !rect.isEmpty else { continue }
-            result.append(rect.offsetBy(dx: -display.minX, dy: -display.minY))
+            result.append(WindowInfo(id: id, frame: rect.offsetBy(dx: -display.minX, dy: -display.minY)))
         }
         return result
     }
@@ -88,6 +101,8 @@ public final class AreaSelection {
         case cancelled
         /// `rect` is in points relative to the display's top-left corner, y downward.
         case selected(display: DisplayImage, rect: CGRect)
+        /// A click on a window: capture that window on its own.
+        case window(display: DisplayImage, window: WindowInfo)
     }
 
     private var windows: [OverlayWindow] = []
@@ -168,7 +183,7 @@ final class OverlayView: NSView {
     /// The frontmost window under the pointer, while nothing is being dragged.
     private var hoveredWindow: CGRect? {
         guard anchor == nil, selection == nil else { return nil }
-        return display.windows.first { $0.contains(pointer) }
+        return display.windows.first { $0.frame.contains(pointer) }?.frame
     }
 
     init(display: DisplayImage, options: SelectionOptions) {
@@ -234,8 +249,8 @@ final class OverlayView: NSView {
         guard let rect = selection, SelectionRule.isUsable(rect) else {
             // A click without a drag captures the window under it, if any.
             selection = nil
-            if let window = display.windows.first(where: { $0.contains(convert(event.locationInWindow, from: nil)) }) {
-                onFinish?(.selected(display: display, rect: window.intersection(bounds)))
+            if let window = display.windows.first(where: { $0.frame.contains(convert(event.locationInWindow, from: nil)) }) {
+                onFinish?(.window(display: display, window: window))
                 return
             }
             needsDisplay = true

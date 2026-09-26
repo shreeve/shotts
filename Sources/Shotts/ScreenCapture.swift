@@ -8,11 +8,13 @@ import ShottsUI
 enum ScreenCapture {
     enum Failure: LocalizedError {
         case noDisplay
+        case noWindow
         case permission
 
         var errorDescription: String? {
             switch self {
             case .noDisplay: "No display could be captured."
+            case .noWindow: "That window is no longer on screen."
             case .permission: "Shotts needs Screen Recording permission to capture the screen."
             }
         }
@@ -46,5 +48,21 @@ enum ScreenCapture {
         }
         guard !result.isEmpty else { throw Failure.noDisplay }
         return result
+    }
+
+    /// One window on its own, whatever covers it, without its shadow, at the display's scale.
+    /// Fails when the window has gone since the displays were pictured.
+    static func captureWindow(_ id: CGWindowID, scale: CGFloat) async throws -> CGImage {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard let window = content.windows.first(where: { $0.windowID == id }) else { throw Failure.noWindow }
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        let configuration = SCStreamConfiguration()
+        configuration.width = Int(window.frame.width * scale)
+        configuration.height = Int(window.frame.height * scale)
+        configuration.captureResolution = .best
+        configuration.showsCursor = false
+        configuration.scalesToFit = false
+        configuration.ignoreShadowsSingleWindow = true
+        return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
     }
 }
