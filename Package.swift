@@ -21,6 +21,6 @@ let package = Package(
             dependencies: ["ShottsUI", "ShottsCore", .product(name: "Sparkle", package: "Sparkle")],
             swiftSettings: [.defaultIsolation(MainActor.self)]
         ),
-        .testTarget(name: "ShottsCoreTests", dependencies: ["ShottsCore"]),
+        .testTarget(name: "ShottsCoreTests", dependencies: ["ShottsCore"], path: "Tests"),
     ]
 )
