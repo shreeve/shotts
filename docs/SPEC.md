@@ -66,9 +66,11 @@ open at once.
 | Obscure | O | Pixelates the area underneath. |
 | Crop | C | Drag the part to keep. Everything outside is left out of the export. |
 
-Every tool but Highlighter and Obscure draws with the chosen color, line width, and a soft
-shadow. Text uses the chosen size. The color, width, size, and Tapered setting are remembered
-across captures. Changing them with an annotation selected restyles it.
+Every tool but Highlighter and Obscure draws with the chosen color and line width. Text uses
+the chosen size. The color swatch in the bar opens a panel with ten colors, a custom color, and
+switches for the soft shadow under annotations, the outline on text, tapered arrows, and the
+shadow around exported pictures. Color, width, size, and the switches are remembered across
+captures. Changing them with an annotation selected restyles it.
 
 ### Editing
 

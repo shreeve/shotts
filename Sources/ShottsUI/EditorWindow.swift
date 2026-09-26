@@ -8,15 +8,16 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     public var onClose: (() -> Void)?
 
     private let tools = NSSegmentedControl()
-    private let colors = NSPopUpButton()
+    private let colorButton = NSButton()
+    private let popover = NSPopover()
+    private var stylePopover: StylePopover?
     private let widths = NSPopUpButton()
     private let sizes = NSPopUpButton()
-    private let tapered = NSButton(checkboxWithTitle: "Tapered", target: nil, action: nil)
     private let undoButton = NSButton()
     private let redoButton = NSButton()
     private var closing = false
     /// Wide enough for every control in the bar, whatever the picture's size.
-    static let minimumWidth: CGFloat = 860
+    static let minimumWidth: CGFloat = 780
 
     public init(document: Document, source: CGImage, on screen: NSScreen? = NSScreen.main) {
         let visible = (screen ?? NSScreen.screens[0]).visibleFrame
@@ -78,15 +79,12 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         tools.target = self
         tools.action = #selector(toolChanged)
 
-        for c in RGBA.palette {
-            let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-            item.image = swatch(c)
-            item.representedObject = [c.red, c.green, c.blue, c.alpha]
-            colors.menu?.addItem(item)
-        }
-        colors.target = self
-        colors.action = #selector(styleChanged)
-        colors.toolTip = "Color"
+        colorButton.bezelStyle = .texturedRounded
+        colorButton.image = StylePopover.swatch(canvas.style.color, size: 18)
+        colorButton.imagePosition = .imageOnly
+        colorButton.target = self
+        colorButton.action = #selector(showStylePopover)
+        colorButton.toolTip = "Color and style"
 
         for w in Style.strokeWidths {
             widths.addItem(withTitle: "\(Int(w)) pt")
@@ -106,10 +104,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         sizes.action = #selector(styleChanged)
         sizes.toolTip = "Text size"
 
-        tapered.target = self
-        tapered.action = #selector(styleChanged)
-        tapered.toolTip = "Arrows taper from a thin tail to the head"
-
         configure(undoButton, symbol: "arrow.uturn.backward", tip: "Undo", action: #selector(undoPressed))
         configure(redoButton, symbol: "arrow.uturn.forward", tip: "Redo", action: #selector(redoPressed))
 
@@ -122,10 +116,9 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         let grip = DragGrip(controller: self)
 
         bar.addArrangedSubview(tools)
-        bar.addArrangedSubview(colors)
+        bar.addArrangedSubview(colorButton)
         bar.addArrangedSubview(widths)
         bar.addArrangedSubview(sizes)
-        bar.addArrangedSubview(tapered)
         bar.addArrangedSubview(undoButton)
         bar.addArrangedSubview(redoButton)
         let spacer = NSView()
@@ -155,18 +148,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         button.action = action
     }
 
-    private func swatch(_ c: RGBA) -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
-            let path = NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1))
-            NSColor(srgbRed: c.red, green: c.green, blue: c.blue, alpha: c.alpha).setFill()
-            path.fill()
-            NSColor.black.withAlphaComponent(0.25).setStroke()
-            path.stroke()
-            return true
-        }
-        return image
-    }
-
     private func refresh() {
         undoButton.isEnabled = canvas.history.canUndo
         redoButton.isEnabled = canvas.history.canRedo
@@ -181,22 +162,33 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 
     @objc private func styleChanged() {
         var style = canvas.style
-        if let parts = colors.selectedItem?.representedObject as? [Double], parts.count == 4 {
-            style.color = RGBA(red: parts[0], green: parts[1], blue: parts[2], alpha: parts[3])
-        }
         if let w = widths.selectedItem?.representedObject as? Double { style.strokeWidth = w }
         if let f = sizes.selectedItem?.representedObject as? Double { style.fontSize = f }
-        style.taperedArrows = tapered.state == .on
+        apply(style)
+    }
+
+    @objc private func showStylePopover() {
+        if popover.isShown { popover.close(); return }
+        let content = StylePopover(style: canvas.style)
+        content.onStyle = { [weak self] style in self?.apply(style) }
+        stylePopover = content
+        popover.contentViewController = content
+        popover.behavior = .transient
+        popover.show(relativeTo: colorButton.bounds, of: colorButton, preferredEdge: .minY)
+    }
+
+    private func apply(_ style: Style) {
         canvas.style = style
         Self.rememberedStyle = style
+        showStyle(style)
     }
 
     /// Sets the bar's controls to show a style.
     private func showStyle(_ style: Style) {
-        if let i = RGBA.palette.firstIndex(of: style.color) { colors.selectItem(at: i) }
+        colorButton.image = StylePopover.swatch(style.color, size: 18)
         if let i = Style.strokeWidths.firstIndex(of: style.strokeWidth) { widths.selectItem(at: i) }
         if let i = Style.fontSizes.firstIndex(of: style.fontSize) { sizes.selectItem(at: i) }
-        tapered.state = style.taperedArrows ? .on : .off
+        stylePopover?.show(style)
     }
 
     /// The style the last edit used, so the next capture starts with the same color and sizes.

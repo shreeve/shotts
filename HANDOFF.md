@@ -65,7 +65,8 @@ same for its block image.
 
 `Shotts --edit file.png` opens a picture in the editor without capturing. `Shotts --render
 in.png out.png [--crop] [--shadow]` draws one of every annotation on a picture and writes the PNG, for
-checking the renderer by eye. `Shotts --select out.txt` runs the picker alone over a drawn
+checking the renderer by eye. `Shotts --preview-style out.png` draws the editor's style popover.
+`Shotts --select out.txt` runs the picker alone over a drawn
 stand-in for each display and writes `selected x,y,w,h on <display>` or `cancelled`, which
 exercises the overlay on a Mac that has not granted Screen Recording. `Shotts --preview-overlay
 out.png [--dragged] [--dim] [--corner]` draws the picker off screen, with the pointer three pixels inside
