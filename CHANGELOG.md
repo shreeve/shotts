@@ -9,7 +9,7 @@ The first milestone: the daily screenshot workflow.
 
 - F10 pictures every display and opens an area selection over it: drag, Shift for a square,
   Space to move, Escape to cancel. A magnifier beside the pointer shows the pixels under the
-  crosshair with their color in hex, and the selection's size; Command-C copies the color. A
+  crosshair, the crosshair itself magnified over them, their color in hex, and the selection's size; Command-C copies the color. A
   list of the keys shows until the first drag. Dimming, the magnifier, the hints, and the
   crosshair's style are options in the menu bar menu.
 - An editor with arrow, text, rectangle, ellipse, pen, highlighter, obscure, and crop tools,
