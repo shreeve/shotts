@@ -7,34 +7,54 @@ public struct DisplayImage {
     public var screen: NSScreen
     public var image: CGImage
     public var scale: CGFloat
+    /// The windows on this display when it was pictured, front to back, in points from the
+    /// display's top-left corner. A click on one captures it.
+    public var windows: [CGRect]
 
-    public init(screen: NSScreen, image: CGImage, scale: CGFloat) {
+    public init(screen: NSScreen, image: CGImage, scale: CGFloat, windows: [CGRect] = []) {
         self.screen = screen
         self.image = image
         self.scale = scale
+        self.windows = windows
+    }
+}
+
+/// The windows on screen, from the window server, as rectangles per display in the picker's
+/// coordinates. Only ordinary windows count: no menu bar, Dock, desktop, or Shotts' own.
+public enum WindowFinder {
+    public static func windows(on screen: NSScreen, excluding pid: pid_t = ProcessInfo.processInfo.processIdentifier) -> [CGRect] {
+        guard let primary = NSScreen.screens.first,
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return [] }
+        // The window server's space has its origin at the primary display's top-left; AppKit's
+        // at its bottom-left. This display's rectangle in the window server's space:
+        let display = CGRect(x: screen.frame.minX, y: primary.frame.height - screen.frame.maxY,
+                             width: screen.frame.width, height: screen.frame.height)
+        var result: [CGRect] = []
+        for w in list {
+            guard (w[kCGWindowLayer as String] as? Int) == 0,
+                  (w[kCGWindowOwnerPID as String] as? pid_t) != pid,
+                  (w[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  let b = w[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = b["X"], let y = b["Y"], let width = b["Width"], let height = b["Height"],
+                  width >= 40, height >= 40
+            else { continue }
+            let rect = CGRect(x: x, y: y, width: width, height: height).intersection(display)
+            guard !rect.isEmpty else { continue }
+            result.append(rect.offsetBy(dx: -display.minX, dy: -display.minY))
+        }
+        return result
     }
 }
 
 /// How the area picker looks. Kept in the defaults; the menu bar menu changes them.
 public struct SelectionOptions: Equatable, Sendable {
-    public enum Crosshair: String, CaseIterable, Sendable {
-        case auto, light, dark
-        public var title: String {
-            switch self {
-            case .auto: "Light and Dark"
-            case .light: "Light"
-            case .dark: "Dark"
-            }
-        }
-    }
-
     /// Dims everything but the selection and a small window at the crosshair.
     public var dims = false
     /// The magnifier beside the pointer, with the color under the crosshair.
     public var magnifies = true
     /// The short list of keys, until the first drag.
     public var showsHints = true
-    public var crosshair = Crosshair.auto
     /// Puts the capture on the clipboard as soon as the area is selected, before any editing.
     public var copiesOnCapture = true
 
@@ -47,7 +67,6 @@ public struct SelectionOptions: Equatable, Sendable {
             o.dims = d.bool(forKey: "selection.dims")
             o.magnifies = d.object(forKey: "selection.magnifies") == nil ? true : d.bool(forKey: "selection.magnifies")
             o.showsHints = d.object(forKey: "selection.hints") == nil ? true : d.bool(forKey: "selection.hints")
-            o.crosshair = Crosshair(rawValue: d.string(forKey: "selection.crosshair") ?? "") ?? .auto
             o.copiesOnCapture = d.object(forKey: "capture.copies") == nil ? true : d.bool(forKey: "capture.copies")
             return o
         }
@@ -56,7 +75,6 @@ public struct SelectionOptions: Equatable, Sendable {
             d.set(newValue.dims, forKey: "selection.dims")
             d.set(newValue.magnifies, forKey: "selection.magnifies")
             d.set(newValue.showsHints, forKey: "selection.hints")
-            d.set(newValue.crosshair.rawValue, forKey: "selection.crosshair")
             d.set(newValue.copiesOnCapture, forKey: "capture.copies")
         }
     }
@@ -147,6 +165,12 @@ final class OverlayView: NSView {
     private var hasDragged = false
     private var tracking: NSTrackingArea?
 
+    /// The frontmost window under the pointer, while nothing is being dragged.
+    private var hoveredWindow: CGRect? {
+        guard anchor == nil, selection == nil else { return nil }
+        return display.windows.first { $0.contains(pointer) }
+    }
+
     init(display: DisplayImage, options: SelectionOptions) {
         self.display = display
         self.options = options
@@ -208,7 +232,12 @@ final class OverlayView: NSView {
     override func mouseUp(with event: NSEvent) {
         defer { anchor = nil }
         guard let rect = selection, SelectionRule.isUsable(rect) else {
+            // A click without a drag captures the window under it, if any.
             selection = nil
+            if let window = display.windows.first(where: { $0.contains(convert(event.locationInWindow, from: nil)) }) {
+                onFinish?(.selected(display: display, rect: window.intersection(bounds)))
+                return
+            }
             needsDisplay = true
             return
         }
@@ -269,13 +298,27 @@ final class OverlayView: NSView {
         ctx.draw(display.image, in: bounds)
         ctx.restoreGState()
 
-        if options.dims {
+        // Everything outside a selection being dragged is dimmed; before that, only when the
+        // option asks for it, and then never the pixel at the crosshair.
+        if let selection {
             ctx.setFillColor(CGColor(gray: 0, alpha: 0.35))
             ctx.addRect(bounds)
-            if let selection { ctx.addRect(selection) }
-            // A small clear window at the crosshair, so the color there is never dimmed.
+            ctx.addRect(selection)
+            ctx.fillPath(using: .evenOdd)
+        } else if options.dims {
+            ctx.setFillColor(CGColor(gray: 0, alpha: 0.35))
+            ctx.addRect(bounds)
             ctx.addRect(CGRect(x: floor(pointer.x) - 2, y: floor(pointer.y) - 2, width: 5, height: 5))
             ctx.fillPath(using: .evenOdd)
+        }
+
+        if let window = hoveredWindow {
+            // The window a click would capture.
+            let path = CGPath(roundedRect: window.insetBy(dx: 1, dy: 1), cornerWidth: 10, cornerHeight: 10, transform: nil)
+            ctx.setStrokeColor(NSColor.controlAccentColor.cgColor)
+            ctx.setLineWidth(3)
+            ctx.addPath(path)
+            ctx.strokePath()
         }
 
         if let selection {
@@ -297,16 +340,9 @@ final class OverlayView: NSView {
             ctx.move(to: CGPoint(x: 0, y: y)); ctx.addLine(to: CGPoint(x: bounds.width, y: y))
             ctx.strokePath()
         }
-        switch options.crosshair {
-        case .auto:
-            // A dark edge under a light line: visible on any background.
-            ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.45)); ctx.setLineWidth(3); lines()
-            ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.9)); ctx.setLineWidth(1); lines()
-        case .light:
-            ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.85)); ctx.setLineWidth(1); lines()
-        case .dark:
-            ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.7)); ctx.setLineWidth(1); lines()
-        }
+        // A dark edge under a light line: visible on any background.
+        ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.45)); ctx.setLineWidth(3); lines()
+        ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.9)); ctx.setLineWidth(1); lines()
     }
 
     static let magnifierCells = 15
@@ -425,7 +461,7 @@ final class OverlayView: NSView {
     }
 
     static let hints = [
-        "Drag to capture an area",
+        "Drag an area, or click a window, to capture it",
         "⇧ keeps it square, Space moves it",
         "⌘C copies the color under the crosshair",
         "Esc cancels",

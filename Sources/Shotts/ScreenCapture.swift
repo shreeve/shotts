@@ -42,7 +42,7 @@ enum ScreenCapture {
             configuration.showsCursor = false
             configuration.scalesToFit = false
             let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
-            result.append(DisplayImage(screen: screen, image: image, scale: scale))
+            result.append(DisplayImage(screen: screen, image: image, scale: scale, windows: WindowFinder.windows(on: screen)))
         }
         guard !result.isEmpty else { throw Failure.noDisplay }
         return result
