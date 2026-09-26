@@ -38,8 +38,7 @@ it as `.window`; the flow then captures that window on its own through
 `SCContentFilter(desktopIndependentWindow:)`, so nothing covering it appears. With the option
 on, `ignoreShadowsSingleWindow` is false and the picture is the window with the shadow macOS
 draws around it, on a transparent margin, sized from the filter's `contentRect`; that is the
-system's own look, which no synthesized shadow matched (three tries, compared side by side
-with Monosnap's, before this). A window that has gone since the displays were pictured falls
+system's own look, which no synthesized shadow matched (three tries before this). A window that has gone since the displays were pictured falls
 back to its area of the display picture. `Shotts --capture-window <id> out.png [--no-shadow]`
 exercises it on any window.
 
