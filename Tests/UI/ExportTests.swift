@@ -118,6 +118,27 @@ func patternImage(_ width: Int, _ height: Int) -> CGImage {
         }
     }
 
+    /// A rectangle or ellipse narrower than its stroke still shows, and inside its own bounds.
+    @Test func aShapeSmallerThanItsStrokeStillShows() throws {
+        var style = Style.standard
+        style.strokeWidth = 10
+        style.shadow = false
+        let rect = CGRect(x: 20, y: 10, width: 6, height: 30)
+        for shape in [Annotation.Shape.rectangle(rect), .ellipse(rect)] {
+            let source = blankImage(60, 50)
+            var document = Document(width: 60, height: 50, scale: 2)
+            document.add(Annotation(shape: shape, style: style))
+            let before = rgba(source), after = rgba(try #require(Renderer.image(of: document, source: source)))
+            var inside = 0, outside = 0
+            for y in 0..<50 {
+                for x in 0..<60 where before[(y * 60 + x) * 4..<(y * 60 + x) * 4 + 4] != after[(y * 60 + x) * 4..<(y * 60 + x) * 4 + 4] {
+                    if rect.contains(CGPoint(x: Double(x) + 0.5, y: Double(y) + 0.5)) { inside += 1 } else { outside += 1 }
+                }
+            }
+            #expect(inside > 100 && outside == 0, "\(shape): \(inside) pixels inside, \(outside) outside")
+        }
+    }
+
     /// Nothing drawn means nothing to render: the export is the capture, not a copy of it.
     @Test func anUntouchedCaptureExportsItself() {
         let source = blankImage(60, 40)

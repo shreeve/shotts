@@ -69,26 +69,30 @@ public enum Renderer {
                 drawText(text.string, at: text.origin, size: text.size, alignment: text.alignment, style: a.style, scale: s, shadow: shadow, in: ctx)
             }
 
+        // A stroke is drawn inside the shape. One no wider than its stroke would be all stroke,
+        // and the inset outline would be empty and draw nothing, so it is filled instead.
         case let .rectangle(rect, filled):
+            let r = rect.standardized
             setShadow(ctx, blur: shadow)
-            if filled {
+            if filled || min(r.width, r.height) <= width {
                 ctx.setFillColor(color)
-                ctx.fill(rect.standardized)
+                ctx.fill(r)
             } else {
                 ctx.setStrokeColor(color)
                 ctx.setLineWidth(width)
-                ctx.stroke(rect.standardized.insetBy(dx: width / 2, dy: width / 2))
+                ctx.stroke(r.insetBy(dx: width / 2, dy: width / 2))
             }
 
         case let .ellipse(rect, filled):
+            let r = rect.standardized
             setShadow(ctx, blur: shadow)
-            if filled {
+            if filled || min(r.width, r.height) <= width {
                 ctx.setFillColor(color)
-                ctx.fillEllipse(in: rect.standardized)
+                ctx.fillEllipse(in: r)
             } else {
                 ctx.setStrokeColor(color)
                 ctx.setLineWidth(width)
-                ctx.strokeEllipse(in: rect.standardized.insetBy(dx: width / 2, dy: width / 2))
+                ctx.strokeEllipse(in: r.insetBy(dx: width / 2, dy: width / 2))
             }
 
         case let .pen(points):
