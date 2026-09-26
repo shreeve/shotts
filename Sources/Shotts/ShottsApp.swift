@@ -5,12 +5,12 @@ import Sparkle
 
 /// The menu bar item, the hot key, and the menus that give the editor its key equivalents.
 @main
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemValidation {
     private var statusItem: NSStatusItem?
-    private var hotKey: HotKey?
     private let flow = CaptureFlow()
-    /// Reads SUFeedURL and SUPublicEDKey from Info.plist and checks on its own schedule. Off until
-    /// the plist has a public key, so a build without one never shows the "not configured" alert.
+    /// Reads SUFeedURL and SUPublicEDKey from Info.plist and checks daily, silently
+    /// (SUEnableAutomaticChecks), so it never asks a question of its own. The plist always has
+    /// the key: the release script refuses to build without one.
     private let updater = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
 
     static func main() {
@@ -22,10 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
-        makeStatusItem()
-        hotKey = HotKey(keyCode: HotKey.f10) { [weak self] in self?.flow.begin() }
-        let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? ""
-        if !key.isEmpty { updater.startUpdater() }
+        makeStatusItem(hasHotKey: HotKey.registerF10 { [weak self] in self?.flow.begin() })
+        updater.startUpdater()
         #if DEBUG
         DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
         #endif
@@ -43,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let returnTo = flow.appToReturnTo()
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.png, .jpeg, .tiff]
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true) // see AreaSelection.show()
         guard panel.runModal() == .OK, let url = panel.url else { returnTo?.activate(); return }
         openFile(url, returningTo: returnTo)
     }
@@ -60,11 +58,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         flow.open(image: cg, scale: max(scale, 1), on: NSScreen.main, returningTo: returnTo)
     }
 
-    private func makeStatusItem() {
+    /// Without the hot key, because another app holds F10, Capture Area says so instead of
+    /// showing a key that does nothing.
+    private func makeStatusItem(hasHotKey: Bool) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Shotts")
         let menu = NSMenu()
-        let capture = NSMenuItem(title: "Capture Area", action: #selector(captureArea), keyEquivalent: functionKey(NSF10FunctionKey))
+        let capture = NSMenuItem(title: hasHotKey ? "Capture Area" : "Capture Area (another app has F10)", action: #selector(captureArea),
+                                 keyEquivalent: hasHotKey ? functionKey(NSF10FunctionKey) : "")
         capture.keyEquivalentModifierMask = []
         capture.target = self
         menu.addItem(capture)
