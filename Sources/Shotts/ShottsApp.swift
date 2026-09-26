@@ -145,7 +145,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let layout = CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: 2), maxWidth: w * 0.3, in: document.pixelBounds)
         let words = "A callout wraps its words beside the tail and stays inside the picture"
         let size = Renderer.textSize(words, style: style, scale: 2, width: layout.width)
-        document.add(Annotation(shape: .text(origin: layout.origin(for: size, in: document.pixelBounds), string: words, size: size, alignment: layout.alignment), style: style))
+        document.add(Annotation(shape: .text(origin: layout.origin(for: size), string: words, size: size, alignment: layout.alignment), style: style))
+        // And a vertical one: text centered above the tail of an arrow pointing down.
+        let tail2 = CGPoint(x: w * 0.3, y: h * 0.6), tip2 = CGPoint(x: w * 0.32, y: h * 0.85)
+        document.add(Annotation(shape: .arrow(from: tail2, to: tip2), style: blue))
+        let layout2 = CalloutLayout(tail: tail2, tip: tip2, lineHeight: Renderer.lineHeight(style: blue, scale: 2), maxWidth: w * 0.25, in: document.pixelBounds)
+        let words2 = "centered above, growing up"
+        let size2 = Renderer.textSize(words2, style: blue, scale: 2, width: layout2.width)
+        document.add(Annotation(shape: .text(origin: layout2.origin(for: size2), string: words2, size: size2, alignment: layout2.alignment), style: blue))
         if CommandLine.arguments.contains("--crop") {
             document.setCrop(CGRect(x: w * 0.1, y: h * 0.1, width: w * 0.6, height: h * 0.5))
         }

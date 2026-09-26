@@ -4,7 +4,7 @@ import Foundation
 /// One mark on a capture. Every coordinate is in image pixels with the origin at the top-left,
 /// the same space as the capture's bitmap.
 public enum TextAlignment: Equatable, Sendable {
-    case left, right
+    case left, center, right
 }
 
 public struct Annotation: Identifiable, Equatable, Sendable {
