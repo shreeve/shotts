@@ -52,6 +52,11 @@ The capture opens in a dark window sized to show it at its on-screen size, or sm
 display, on a dark field with a soft shadow. The window is the only Shotts window; several can be
 open at once.
 
+The window can be resized. Only how big the picture is shown changes: it shrinks or grows with
+the window, keeping its proportions, down to a small size and up to its on-screen size but no
+larger. Annotations scale with it, earlier and later ones alike, stay editable at any size, and
+export exactly as before. The green button returns the window to its opening size.
+
 ### Tools
 
 | Tool | Key | What it draws |

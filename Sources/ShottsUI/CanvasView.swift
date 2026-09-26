@@ -56,7 +56,15 @@ public enum Tool: Int, CaseIterable, Sendable {
 public final class CanvasView: NSView {
     public private(set) var history: History<Document>
     public let source: CGImage
-    public var zoom: CGFloat
+    /// Points per picture pixel; the window's resizing sets it.
+    public var zoom: CGFloat {
+        didSet {
+            guard zoom != oldValue else { return }
+            needsDisplay = true
+            invalidateIntrinsicContentSize()
+            window?.invalidateCursorRects(for: self)
+        }
+    }
     public var tool: Tool = .callout { didSet { endTextEntry(commit: true); selectedID = nil; needsDisplay = true; resetCursorRects(); onToolChange?(tool) } }
     public var onToolChange: ((Tool) -> Void)?
     public var style: Style = .standard {

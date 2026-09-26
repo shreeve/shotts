@@ -5,6 +5,11 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- The editor's window can be resized. The picture scales with it, proportions kept, up to its
+  on-screen size; annotations scale along, stay editable, and export unchanged.
+
 ## 0.1.0 — 2026-09-26
 
 The first milestone: the daily screenshot workflow.

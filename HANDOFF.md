@@ -91,6 +91,14 @@ popups for stroke width, text size, and font, undo and redo, the drag grip, and 
 Save. Copy, save, and a drag out finish the edit and close the window; print does not. The
 window sizes itself from `layoutSubtreeIfNeeded()` with a floor of `minimumWidth`.
 
+The window is resizable, and resizing changes only the canvas's `zoom` (points per picture
+pixel), never the document: `windowWillResize` snaps a proposed size to one that holds the
+picture at the zoom that fits it (snug, proportions kept, no narrower than the bar), and
+`windowDidResize` sets the zoom and the canvas's height constraint. The zoom is capped at the
+picture's on-screen size (`1 / scale`) and floored so the picture's longer side stays at least
+`minimumPicture` points. Text entry is committed before the zoom changes, because an entry is
+placed for one zoom. `Shotts --check-resize` exercises it in an unshown window.
+
 `CanvasView` owns the `History<Document>` and the tools' mouse handling. A drag with a drawing
 tool builds a `live` annotation that commits on mouse up; Shift squares a rectangle or
 ellipse and Option fills it, and either may change mid-drag. With the select tool a drag
@@ -169,6 +177,7 @@ All are in `AppDelegate.applicationDidFinishLaunching`, and none needs Screen Re
 | `--render in.png out.png [--crop]` | Draws one of every annotation on a picture and writes the PNG, for checking the renderer by eye. |
 | `--print-pdf in.png out.pdf [--crop]` | Writes the same sample's print page as a PDF, laid out as Command-P would print it. |
 | `--preview-style out.png` | Draws the style popover off screen. |
+| `--check-resize` | Resizes an editor in an unshown window and exits non-zero unless the zoom follows it, proportions kept, capped at the on-screen size. |
 | `--check-text-entry` | Opens text entry in an unshown window, types into it, commits a callout, and exits non-zero if any of that fails. Run it after touching `TextEntry`. |
 | `--select out.txt` | Runs the picker alone over a drawn stand-in for each display and writes `selected x,y,w,h on <display>`, `window <id> at x,y on <display>`, or `cancelled`. |
 | `--preview-overlay out.png [--dragged] [--dim] [--corner]` | Draws the picker off screen with the pointer three pixels inside the corner of the stand-in's square at 1600,1600, so the magnifier's mapping can be checked (`--dim` shows only with `--dragged`). |
