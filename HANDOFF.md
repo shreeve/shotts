@@ -62,7 +62,7 @@ renderer as the user types, so what is typed looks exactly like the export. A te
 but the box is only as wide as the widest line, so it can be centered on the tail and its
 selection outline fits the words. `Renderer.textSize` measures it and `drawText` draws inside
 it. `CalloutLayout` in Core decides where a callout's text goes from the arrow alone: an
-`anchor` half a line out from the tail, and `origin(for:)` hangs a box of any size from that
+`anchor` a quarter of a line out from the tail, and `origin(for:)` hangs a box of any size from that
 anchor, centered along its near edge and kept inside the picture; the entry re-asks it after
 every keystroke. The entry view is as wide as the wrap width, so lines fold exactly where the
 renderer's do, and is slid so the edge its words align to lies on the measured box's edge, so the

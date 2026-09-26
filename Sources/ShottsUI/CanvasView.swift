@@ -111,7 +111,8 @@ public final class CanvasView: NSView {
     public override var intrinsicContentSize: NSSize { frame.size }
 
     public override func resetCursorRects() {
-        addCursorRect(pictureRect, cursor: tool == .select ? .arrow : .crosshair)
+        // The ordinary pointer for every tool: the crosshair belongs to the picker, not the editor.
+        addCursorRect(pictureRect, cursor: .arrow)
     }
 
     public override func layout() {
@@ -523,7 +524,10 @@ final class TextEntry: NSTextView {
         let outline = Renderer.outlineWidth(style, scale: scale)
         let pad = outline * zoom
         var width: CGFloat = 0
-        var x = origin.x * zoom + picture.minX + pad
+        // The caret sits a hair right of where the words end, clear of the outline that
+        // strokes outside the last glyph; the whole view shifts, which moves nothing visible
+        // but the caret.
+        var x = origin.x * zoom + picture.minX + pad * 2 + 2
         if let layout {
             // Wrap where the renderer will: the full wrap width, never the measured box, whose
             // width at the zoomed font's rounding could be a hair short and fold the last word
