@@ -45,7 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let i = arguments.firstIndex(of: "--preview-overlay"), i + 1 < arguments.count {
             // Developer check of the picker's drawing, off screen: the stand-in display with the
             // pointer and a selection placed, written as a PNG.
-            exit(Self.previewOverlay(to: URL(fileURLWithPath: arguments[i + 1]), selected: arguments.contains("--dragged"), dimmed: arguments.contains("--dim")) ? 0 : 1)
+            exit(Self.previewOverlay(to: URL(fileURLWithPath: arguments[i + 1]), selected: arguments.contains("--dragged"),
+                                     dimmed: arguments.contains("--dim"), corner: arguments.contains("--corner")) ? 0 : 1)
         }
         if let i = arguments.firstIndex(of: "--render"), i + 2 < arguments.count {
             // Developer check of the renderer: every kind of annotation on the given picture,
@@ -73,14 +74,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return DisplayImage(screen: screen, image: ctx.makeImage()!, scale: scale)
     }
 
-    static func previewOverlay(to output: URL, selected: Bool, dimmed: Bool) -> Bool {
+    static func previewOverlay(to output: URL, selected: Bool, dimmed: Bool, corner: Bool) -> Bool {
         guard let screen = NSScreen.main else { return false }
         let display = standIn(for: screen)
         var options = SelectionOptions()
         options.dims = dimmed
         // The pointer lands 3 pixels inside the corner of the stand-in's square at 1600,1600,
-        // so the magnifier must show that corner 6 cells up and left of its center.
-        let pointer = CGPoint(x: (1600 + 3) / display.scale + 0.25, y: (1600 + 3) / display.scale + 0.25)
+        // so the magnifier must show that corner 6 cells up and left of its center. With
+        // --corner it sits near the display's top-left instead, where the panels collide.
+        let pointer = corner ? CGPoint(x: 30, y: 40)
+            : CGPoint(x: (1600 + 3) / display.scale + 0.25, y: (1600 + 3) / display.scale + 0.25)
         let view = OverlayPreview.make(display: display, options: options, pointer: pointer,
                                        selection: selected ? CGRect(x: pointer.x - 320, y: pointer.y - 200, width: 320, height: 200) : nil)
         guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return false }
