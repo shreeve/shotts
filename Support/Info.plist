@@ -34,5 +34,11 @@
 	<string>NSApplication</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Shotts captures the area of the screen you select.</string>
+	<key>SUEnableInstallerLauncherService</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/shreeve/shotts/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>NQ5sERjZyBFaATY0NJ8Lz0Bpcasor0N9VpoaA01cAQg=</string>
 </dict>
 </plist>

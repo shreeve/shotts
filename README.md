@@ -15,7 +15,16 @@ app you were in.
 It does one thing, stays small, and keeps its memory in check: one source image, a list of
 editable annotations, and an undo history of edits rather than pixels.
 
-macOS 27 on Apple silicon. Not yet released; see `CHANGELOG.md`.
+macOS 27 on Apple silicon.
+
+## Installing
+
+```bash
+brew install --cask shreeve/tap/shotts
+```
+
+Installed copies update themselves: choose Check for Updates… in the menu bar menu. Not yet
+released; see `CHANGELOG.md`.
 
 ## Building
 
@@ -34,3 +43,4 @@ the same identity so the grant survives rebuilds.
 - `HANDOFF.md`: how the code does it, and the traps.
 - `AGENTS.md`: the rules for changing it.
 - `CHANGELOG.md`: what changed in each release.
+- `docs/RELEASING.md`: how a release is signed, notarized, published, and updated.

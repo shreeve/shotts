@@ -1,7 +1,9 @@
 # Changelog
 
-What changed in each release of Shotts. Changes not yet released collect under Unreleased, whose
-heading becomes the version's when it ships.
+What changed in each release of Shotts. `Scripts/release.sh <version>` publishes that version's
+section as the GitHub release notes and as the notes Sparkle shows in the update dialog, and
+refuses to release a version that has no section here. Changes not yet released collect under
+Unreleased, whose heading becomes the version's when it ships.
 
 ## Unreleased
 
@@ -14,6 +16,8 @@ The first milestone: the daily screenshot workflow.
   list of the keys shows until the first drag. The capture goes to the clipboard as soon as
   it is taken. That, dimming outside a dragged selection, the magnifier, and the hints are
   options in the menu bar menu.
+- Installs with `brew install --cask shreeve/tap/shotts` and updates itself through Sparkle:
+  Check for Updates… in the menu bar menu. Releases are signed with a Developer ID and notarized.
 - An app icon: a camera in a viewfinder, like the menu bar's, on a blue gradient tile with a
   glass lens. `Support/AppIcon.svg` is the master; `Scripts/make-app-icon.sh` packs the `.icns`.
 - An editor with arrow-with-text (drag the arrow, then type beside its tail; the arrow and its

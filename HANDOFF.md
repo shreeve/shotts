@@ -77,6 +77,14 @@ the tail, the head moves the tip, anything else moves the whole. While its words
 document with empty text and the `TextEntry` carries its `calloutID`; `endTextEntry` puts the
 words back, or turns a wordless callout into a plain `.arrow`.
 
+## Releasing
+
+`docs/RELEASING.md` covers it: `Scripts/release.sh` builds, notarizes, signs the Sparkle feed
+with the keychain key under the account `shotts`, and publishes a GitHub release;
+`Scripts/update-cask.sh` opens the Homebrew tap's pull request. `package-app.sh` embeds
+`Sparkle.framework` and signs its pieces inner-first, and the app starts the updater only when
+`Info.plist` carries `SUPublicEDKey`.
+
 ## The app icon
 
 `Support/AppIcon.svg` is the master: a camera in a viewfinder, drawn to look like the menu
