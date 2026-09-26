@@ -19,13 +19,21 @@ and a crop. The editor edits a `Document`; `Renderer` in `ShottsUI` draws one in
 
 ## Capture
 
-`CaptureFlow` (in the app target) runs one capture: it remembers the frontmost app, shows
-`AreaSelection` (one borderless window per display at `.screenSaver` level), and when the user
-releases a usable rectangle it waits 60 ms for the overlay to leave the screen and calls
-`ScreenCapture.capture(rect:on:)`. That reads just that rectangle through ScreenCaptureKit's
-`SCScreenshotManager`, at backing resolution, with Shotts' own application excluded from the
-content filter. The `CGImage` and the display's scale become a `Document` and open in an
-`EditorWindowController`. When the last editor closes the previous app is activated again.
+`CaptureFlow` (in the app target) runs one capture: it remembers the frontmost app, calls
+`ScreenCapture.captureDisplays()`, which reads every display once through ScreenCaptureKit's
+`SCScreenshotManager` at backing resolution with Shotts' own application excluded, and shows
+`AreaSelection` over them (one borderless window per display at `.screenSaver` level, each
+drawing its display's picture). When the user releases a usable rectangle the flow cuts it out
+of that picture with `SelectionRule.pixelRect` and `CGImage.cropping`, and the picture and the
+display's scale become a `Document` in an `EditorWindowController`. The display pictures live in
+the picker's windows and go when it closes. When the last editor closes the previous app is
+activated again.
+
+The picker's magnifier reads the pointer's neighborhood from the display picture and its color
+through `PixelSampler`, which draws one pixel into a one-pixel context rather than parsing the
+capture's pixel format. `SelectionOptions` (dimming, magnifier, hints, crosshair style) live in
+the defaults and are toggled from the menu bar menu, whose check marks are refreshed in
+`menuNeedsUpdate`.
 
 Permission is checked with `CGPreflightScreenCaptureAccess` and asked for with
 `CGRequestScreenCaptureAccess`; macOS records the grant against the app's code signature, which
@@ -47,9 +55,12 @@ same for its block image.
 
 `Shotts --edit file.png` opens a picture in the editor without capturing. `Shotts --render
 in.png out.png [--crop]` draws one of every annotation on a picture and writes the PNG, for
-checking the renderer by eye. `Shotts --select out.txt` runs the area selection alone and
-writes `selected x,y,w,h on <display>` or `cancelled`, which exercises the overlay on a Mac that
-has not granted Screen Recording. All three are in `AppDelegate.applicationDidFinishLaunching`.
+checking the renderer by eye. `Shotts --select out.txt` runs the picker alone over a drawn
+stand-in for each display and writes `selected x,y,w,h on <display>` or `cancelled`, which
+exercises the overlay on a Mac that has not granted Screen Recording. `Shotts --preview-overlay
+out.png [--dragged] [--dim]` draws the picker off screen, with the pointer three pixels inside
+the corner of the stand-in's square at 1600,1600 so the magnifier's mapping can be checked
+without touching the screen. All are in `AppDelegate.applicationDidFinishLaunching`.
 
 ## Exercising the editor
 

@@ -5,7 +5,7 @@ import ShottsUI
 /// The menu bar item, the hot key, the menus that give the editor its key equivalents, and the
 /// developer switches (`--edit file.png` opens a file in the editor).
 @main
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var hotKey: HotKey?
     private let flow = CaptureFlow()
@@ -28,24 +28,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             openFile(URL(fileURLWithPath: arguments[i + 1]))
         }
         if let i = arguments.firstIndex(of: "--select"), i + 1 < arguments.count {
-            // Developer check of the area selection alone: writes the outcome to the file and quits.
+            // Developer check of the area selection alone, on a drawn stand-in for each display
+            // (no Screen Recording needed): writes the outcome to the file and quits.
             let out = URL(fileURLWithPath: arguments[i + 1])
-            selectionCheck = AreaSelection { outcome in
+            selectionCheck = AreaSelection(displays: NSScreen.screens.map(Self.standIn)) { outcome in
                 let line: String
                 switch outcome {
                 case .cancelled: line = "cancelled"
-                case let .selected(screen, rect): line = "selected \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(screen.localizedName)"
+                case let .selected(display, rect): line = "selected \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(display.screen.localizedName)"
                 }
                 try? line.write(to: out, atomically: true, encoding: .utf8)
                 exit(0)
             }
             selectionCheck?.show()
         }
+        if let i = arguments.firstIndex(of: "--preview-overlay"), i + 1 < arguments.count {
+            // Developer check of the picker's drawing, off screen: the stand-in display with the
+            // pointer and a selection placed, written as a PNG.
+            exit(Self.previewOverlay(to: URL(fileURLWithPath: arguments[i + 1]), selected: arguments.contains("--dragged"), dimmed: arguments.contains("--dim")) ? 0 : 1)
+        }
         if let i = arguments.firstIndex(of: "--render"), i + 2 < arguments.count {
             // Developer check of the renderer: every kind of annotation on the given picture,
             // written as a PNG, no window.
             exit(renderSample(from: URL(fileURLWithPath: arguments[i + 1]), to: URL(fileURLWithPath: arguments[i + 2])) ? 0 : 1)
         }
+    }
+
+    /// A picture standing in for a display: a gradient with a few marks, so the magnifier and
+    /// the color readout have something to show.
+    static func standIn(for screen: NSScreen) -> DisplayImage {
+        let scale = screen.backingScaleFactor
+        let w = Int(screen.frame.width * scale), h = Int(screen.frame.height * scale)
+        let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
+        let colors = [CGColor(srgbRed: 0.34, green: 0.63, blue: 0.81, alpha: 1), CGColor(srgbRed: 0.1, green: 0.2, blue: 0.4, alpha: 1)] as CFArray
+        let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!, colors: colors, locations: [0, 1])!
+        ctx.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: w, y: h), options: [])
+        ctx.setFillColor(CGColor(srgbRed: 1, green: 0.8, blue: 0.2, alpha: 1))
+        // The context's y runs upward; place each square so it lands at (i, i) from the top.
+        for i in stride(from: 100, to: min(w, h), by: 300) {
+            ctx.fill(CGRect(x: i, y: h - i - 40, width: 40, height: 40))
+        }
+        return DisplayImage(screen: screen, image: ctx.makeImage()!, scale: scale)
+    }
+
+    static func previewOverlay(to output: URL, selected: Bool, dimmed: Bool) -> Bool {
+        guard let screen = NSScreen.main else { return false }
+        let display = standIn(for: screen)
+        var options = SelectionOptions()
+        options.dims = dimmed
+        // The pointer lands 3 pixels inside the corner of the stand-in's square at 1600,1600,
+        // so the magnifier must show that corner 6 cells up and left of its center.
+        let pointer = CGPoint(x: (1600 + 3) / display.scale + 0.25, y: (1600 + 3) / display.scale + 0.25)
+        let view = OverlayPreview.make(display: display, options: options, pointer: pointer,
+                                       selection: selected ? CGRect(x: pointer.x - 320, y: pointer.y - 200, width: 320, height: 200) : nil)
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return false }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+        do { try png.write(to: output); return true } catch { return false }
     }
 
     private func renderSample(from input: URL, to output: URL) -> Bool {
@@ -101,7 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !(scale.isFinite && scale > 1), let screen = NSScreen.main, Double(cg.width) > screen.frame.width {
             scale = screen.backingScaleFactor
         }
-        flow.open(ScreenCapture.Capture(image: cg, scale: max(scale, 1)), on: NSScreen.main)
+        flow.open(image: cg, scale: max(scale, 1), on: NSScreen.main)
     }
 
     private func makeStatusItem() {
@@ -115,6 +156,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let open = NSMenuItem(title: "Open Image…", action: #selector(openFile as () -> Void), keyEquivalent: "")
         open.target = self
         menu.addItem(open)
+        menu.addItem(.separator())
+        menu.addItem(optionItem("Dim Screen While Selecting", \.dims))
+        menu.addItem(optionItem("Show Magnifier", \.magnifies))
+        menu.addItem(optionItem("Show Hints", \.showsHints))
+        let crosshair = NSMenuItem(title: "Crosshair", action: nil, keyEquivalent: "")
+        let styles = NSMenu()
+        for style in SelectionOptions.Crosshair.allCases {
+            let item = NSMenuItem(title: style.title, action: #selector(crosshairChosen(_:)), keyEquivalent: "")
+            item.representedObject = style.rawValue
+            item.target = self
+            styles.addItem(item)
+        }
+        crosshair.submenu = styles
+        menu.addItem(crosshair)
+        menu.delegate = self
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Shotts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
@@ -154,6 +210,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         edit.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         editItem.submenu = edit
         return main
+    }
+
+    // MARK: - Selection options in the menu
+
+    private func optionItem(_ title: String, _ key: WritableKeyPath<SelectionOptions, Bool>) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: #selector(optionToggled(_:)), keyEquivalent: "")
+        item.representedObject = OptionKey(key)
+        item.target = self
+        return item
+    }
+
+    /// A key path wrapped so a menu item can carry it.
+    private final class OptionKey {
+        let path: WritableKeyPath<SelectionOptions, Bool>
+        init(_ path: WritableKeyPath<SelectionOptions, Bool>) { self.path = path }
+    }
+
+    @objc private func optionToggled(_ sender: NSMenuItem) {
+        guard let key = sender.representedObject as? OptionKey else { return }
+        var options = SelectionOptions.current
+        options[keyPath: key.path].toggle()
+        SelectionOptions.current = options
+    }
+
+    @objc private func crosshairChosen(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let style = SelectionOptions.Crosshair(rawValue: raw) else { return }
+        var options = SelectionOptions.current
+        options.crosshair = style
+        SelectionOptions.current = options
+    }
+
+    /// Check marks follow the saved options each time the menu opens.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        let options = SelectionOptions.current
+        for item in menu.items {
+            if let key = item.representedObject as? OptionKey {
+                item.state = options[keyPath: key.path] ? .on : .off
+            }
+            for sub in item.submenu?.items ?? [] {
+                sub.state = (sub.representedObject as? String) == options.crosshair.rawValue ? .on : .off
+            }
+        }
     }
 
     private func functionKey(_ key: Int) -> String {

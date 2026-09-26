@@ -25,9 +25,10 @@ read it before changing capture, the selection overlay, the editor, or export.
   (`Renderer`) from the same `Document`, so what the user sees is what they paste.
 - One source image per capture. Undo records annotation changes, never a copy of the pixels.
   Nothing caches a second full-size bitmap; obscure effects render from the source on demand.
-- Capture is of the selected area only, read after the overlay has left the screen, with
-  Shotts' own windows excluded from the read. Nothing is captured before the user releases the
-  selection, and the overlay itself is never in a capture.
+- Capture is frozen: every display is pictured once when the user presses the hot key, with
+  Shotts' own windows excluded. The picker shows that picture, the magnifier reads it, and the
+  selection is cut from it; the pictures are released the moment the picker closes, and only
+  the cut-out survives. The picker itself is never in a capture.
 - Coordinates: `Document` and every annotation live in image pixels. Screen points, backing
   scale, and display origins are converted at the edges (capture, overlay, canvas) and nowhere
   else.

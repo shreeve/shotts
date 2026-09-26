@@ -35,6 +35,11 @@ public struct RGBA: Hashable, Sendable, Codable {
     /// The palette the editor offers, in order.
     public static let palette: [RGBA] = [.red, .orange, .yellow, .green, .blue, .purple, .white, .black]
 
+    /// `#RRGGBB`, the way design tools and CSS write it.
+    public var hex: String {
+        String(format: "#%02X%02X%02X", Int((red * 255).rounded()), Int((green * 255).rounded()), Int((blue * 255).rounded()))
+    }
+
     /// Whether text of this color reads better with a dark outline than a light one.
     public var isLight: Bool { 0.299 * red + 0.587 * green + 0.114 * blue > 0.6 }
 }
