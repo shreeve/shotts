@@ -43,6 +43,11 @@ final class CaptureFlow {
                     restoreFocus()
                     return
                 }
+                if SelectionOptions.current.copiesOnCapture {
+                    // The plain capture is on the clipboard at once; Copy in the editor replaces
+                    // it with the annotated one.
+                    _ = Export.copy(Document(width: image.width, height: image.height, scale: display.scale), source: image)
+                }
                 open(image: image, scale: display.scale, on: display.screen)
             }
         }

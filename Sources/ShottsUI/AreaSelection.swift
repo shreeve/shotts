@@ -35,6 +35,8 @@ public struct SelectionOptions: Equatable, Sendable {
     /// The short list of keys, until the first drag.
     public var showsHints = true
     public var crosshair = Crosshair.auto
+    /// Puts the capture on the clipboard as soon as the area is selected, before any editing.
+    public var copiesOnCapture = true
 
     public init() {}
 
@@ -46,6 +48,7 @@ public struct SelectionOptions: Equatable, Sendable {
             o.magnifies = d.object(forKey: "selection.magnifies") == nil ? true : d.bool(forKey: "selection.magnifies")
             o.showsHints = d.object(forKey: "selection.hints") == nil ? true : d.bool(forKey: "selection.hints")
             o.crosshair = Crosshair(rawValue: d.string(forKey: "selection.crosshair") ?? "") ?? .auto
+            o.copiesOnCapture = d.object(forKey: "capture.copies") == nil ? true : d.bool(forKey: "capture.copies")
             return o
         }
         set {
@@ -54,6 +57,7 @@ public struct SelectionOptions: Equatable, Sendable {
             d.set(newValue.magnifies, forKey: "selection.magnifies")
             d.set(newValue.showsHints, forKey: "selection.hints")
             d.set(newValue.crosshair.rawValue, forKey: "selection.crosshair")
+            d.set(newValue.copiesOnCapture, forKey: "capture.copies")
         }
     }
 }
