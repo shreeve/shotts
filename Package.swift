@@ -12,8 +12,8 @@ let package = Package(
     ],
     targets: [
         .target(name: "ShottsCore"),
-        .target(name: "ShottsUI", dependencies: ["ShottsCore"]),
-        .executableTarget(name: "Shotts", dependencies: ["ShottsUI", "ShottsCore"]),
+        .target(name: "ShottsUI", dependencies: ["ShottsCore"], swiftSettings: [.defaultIsolation(MainActor.self)]),
+        .executableTarget(name: "Shotts", dependencies: ["ShottsUI", "ShottsCore"], swiftSettings: [.defaultIsolation(MainActor.self)]),
         .testTarget(name: "ShottsCoreTests", dependencies: ["ShottsCore"]),
     ]
 )
