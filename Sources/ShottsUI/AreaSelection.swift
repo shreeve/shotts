@@ -336,7 +336,7 @@ final class OverlayView: NSView {
         let textSize = (text as NSString).size(withAttributes: attributes)
         // Wide enough for the label, which grows while dragging; the pixels stay centered.
         let width = max(box, ceil(textSize.width) + 16)
-        let panel = Self.panelRect(size: CGSize(width: width, height: box + labelHeight), near: pointer, in: bounds, gap: 24)
+        let panel = magnifierPanel(width: width)
         let pixels = CGRect(x: panel.minX + (width - box) / 2, y: panel.minY, width: box, height: box)
 
         ctx.saveGState()
@@ -405,6 +405,13 @@ final class OverlayView: NSView {
         ctx.strokePath()
     }
 
+    /// Where the magnifier sits for the pointer's position; its width is the pixel box unless a
+    /// wider label is given.
+    private func magnifierPanel(width: CGFloat? = nil) -> CGRect {
+        let box = CGFloat(Self.magnifierCells) * Self.magnifierCell
+        return Self.panelRect(size: CGSize(width: width ?? box, height: box + 22), near: pointer, in: bounds, gap: 24)
+    }
+
     /// Where a panel of `size` goes near the pointer: below and to the right by `gap`, else
     /// flipped to the side that fits.
     static func panelRect(size: CGSize, near p: CGPoint, in bounds: CGRect, gap: CGFloat) -> CGRect {
@@ -438,6 +445,8 @@ final class OverlayView: NSView {
         if origin.x < bounds.minX { origin.x = pointer.x + 24 }
         if origin.y < bounds.minY { origin.y = pointer.y + 24 }
         let box = CGRect(origin: origin, size: size)
+        // Near a corner both panels get pushed into the same quadrant; the magnifier wins.
+        if options.magnifies, box.intersects(magnifierPanel()) { return }
         ctx.setFillColor(CGColor(gray: 0.12, alpha: 0.85))
         ctx.addPath(CGPath(roundedRect: box, cornerWidth: 6, cornerHeight: 6, transform: nil))
         ctx.fillPath()

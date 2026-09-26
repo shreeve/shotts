@@ -27,7 +27,7 @@ The selection stays on one display. Beside the pointer a magnifier shows the pix
 crosshair, fifteen across, with a translucent cross whose arms are white or black by the pixel
 under each one and stop short of the marked pixel under the crosshair, with
 the pixel's position and its color in hex below, or the selection's size while dragging. Until the first drag, a short list of these keys shows on
-the other side of the pointer. Because the picture is taken when F10 is pressed, what you
+the other side of the pointer, except near a corner where it would cover the magnifier. Because the picture is taken when F10 is pressed, what you
 select is exactly what you get, even if the screen changes while you choose.
 
 The menu bar menu holds the picker's options, remembered across launches:
