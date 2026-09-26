@@ -369,14 +369,12 @@ final class OverlayView: NSView {
             ctx.move(to: CGPoint(x: pixels.minX, y: pixels.minY + o + 0.5)); ctx.addLine(to: CGPoint(x: pixels.maxX, y: pixels.minY + o + 0.5))
         }
         ctx.strokePath()
-        // The crosshair, magnified with the pixels: the same light line over a dark edge, one
-        // pixel wide, crossing on the pixel under the pointer.
+        // The crosshair, magnified with the pixels: one translucent white line each way, a
+        // pixel wide, crossing on the pixel under the pointer. No dark edge here: it hid the
+        // very pixels being looked at.
         let centerCell = CGRect(x: pixels.minX + CGFloat(half) * cell, y: pixels.minY + CGFloat(half) * cell, width: cell, height: cell)
         if selection == nil {
-            ctx.setFillColor(CGColor(gray: 0, alpha: 0.3))
-            ctx.fill(CGRect(x: centerCell.minX - cell, y: pixels.minY, width: cell * 3, height: box))
-            ctx.fill(CGRect(x: pixels.minX, y: centerCell.minY - cell, width: box, height: cell * 3))
-            ctx.setFillColor(CGColor(gray: 1, alpha: 0.45))
+            ctx.setFillColor(CGColor(gray: 1, alpha: 0.5))
             ctx.fill(CGRect(x: centerCell.minX, y: pixels.minY, width: cell, height: box))
             ctx.fill(CGRect(x: pixels.minX, y: centerCell.minY, width: box, height: cell))
         }
