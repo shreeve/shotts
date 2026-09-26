@@ -378,7 +378,9 @@ final class OverlayView: NSView {
             ctx.fill(CGRect(x: centerCell.minX, y: pixels.minY, width: cell, height: box))
             ctx.fill(CGRect(x: pixels.minX, y: centerCell.minY, width: box, height: cell))
         }
-        ctx.setStrokeColor(CGColor(gray: 1, alpha: 1)); ctx.setLineWidth(1); ctx.stroke(centerCell.insetBy(dx: 0.5, dy: 0.5))
+        // The pixel under the pointer: a white box with a dark edge, like the crosshair itself.
+        ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.8)); ctx.setLineWidth(3); ctx.stroke(centerCell.insetBy(dx: -1, dy: -1))
+        ctx.setStrokeColor(CGColor(gray: 1, alpha: 1)); ctx.setLineWidth(1); ctx.stroke(centerCell.insetBy(dx: -1, dy: -1))
 
         // The label: the color, and the selection size while dragging.
         let label = CGRect(x: panel.minX, y: pixels.maxY, width: width, height: labelHeight)
