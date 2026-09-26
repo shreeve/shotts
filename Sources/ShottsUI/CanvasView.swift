@@ -271,8 +271,10 @@ public final class CanvasView: NSView {
                 var d = document
                 d.add(live)
                 commit(d)
+                // The text may run to the picture's edge on its side; Return breaks a line
+                // sooner. Only the edge itself wraps.
                 let layout = CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
-                                           maxWidth: max(Double(document.width) * 0.45, 240 * document.scale), in: document.pixelBounds)
+                                           maxWidth: Double(document.width), in: document.pixelBounds)
                 beginTextEntry(at: layout.origin, initial: "", style: style, layout: layout)
             }
         default:
