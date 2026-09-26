@@ -61,17 +61,27 @@ public enum Renderer {
                 drawText(text.string, at: text.origin, size: text.size, alignment: text.alignment, style: a.style, scale: s, in: ctx)
             }
 
-        case let .rectangle(rect):
+        case let .rectangle(rect, filled):
             if a.style.shadow { setShadow(ctx, scale: s) }
-            ctx.setStrokeColor(color)
-            ctx.setLineWidth(width)
-            ctx.stroke(rect.standardized.insetBy(dx: width / 2, dy: width / 2))
+            if filled {
+                ctx.setFillColor(color)
+                ctx.fill(rect.standardized)
+            } else {
+                ctx.setStrokeColor(color)
+                ctx.setLineWidth(width)
+                ctx.stroke(rect.standardized.insetBy(dx: width / 2, dy: width / 2))
+            }
 
-        case let .ellipse(rect):
+        case let .ellipse(rect, filled):
             if a.style.shadow { setShadow(ctx, scale: s) }
-            ctx.setStrokeColor(color)
-            ctx.setLineWidth(width)
-            ctx.strokeEllipse(in: rect.standardized.insetBy(dx: width / 2, dy: width / 2))
+            if filled {
+                ctx.setFillColor(color)
+                ctx.fillEllipse(in: rect.standardized)
+            } else {
+                ctx.setStrokeColor(color)
+                ctx.setLineWidth(width)
+                ctx.strokeEllipse(in: rect.standardized.insetBy(dx: width / 2, dy: width / 2))
+            }
 
         case let .pen(points):
             if a.style.shadow { setShadow(ctx, scale: s) }

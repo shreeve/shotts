@@ -108,6 +108,15 @@ import Testing
         if case let .callout(from, _, text) = moved.shape { #expect(from == CGPoint(x: 110, y: 110) && text.origin == CGPoint(x: 10, y: 90)) }
     }
 
+    @Test func solidShapesAreHitInside() {
+        let box = Annotation(shape: .rectangle(CGRect(x: 10, y: 10, width: 100, height: 100), filled: true), style: style)
+        let disc = Annotation(shape: .ellipse(CGRect(x: 200, y: 10, width: 100, height: 100), filled: true), style: style)
+        let doc = Document(width: 400, height: 200, scale: 1, annotations: [box, disc])
+        #expect(HitTest.annotation(at: CGPoint(x: 60, y: 60), in: doc, tolerance: 4) == box.id)
+        #expect(HitTest.annotation(at: CGPoint(x: 250, y: 60), in: doc, tolerance: 4) == disc.id)
+        #expect(HitTest.annotation(at: CGPoint(x: 205, y: 15), in: doc, tolerance: 4) == nil) // the disc's corner, outside the ellipse
+    }
+
     @Test func arrowOutlineRunsFromTailToTipAndScalesWithStroke() {
         let long = ArrowGeometry(from: .zero, to: CGPoint(x: 100, y: 0), width: 4)
         #expect(long.tip == CGPoint(x: 100, y: 0))

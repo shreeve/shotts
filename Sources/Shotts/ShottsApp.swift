@@ -134,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         document.add(Annotation(shape: .arrow(from: CGPoint(x: w * 0.4, y: h * 0.75), to: CGPoint(x: w * 0.2, y: h * 0.55)), style: even))
         document.add(Annotation(shape: .rectangle(CGRect(x: w * 0.45, y: h * 0.2, width: w * 0.3, height: h * 0.25)), style: blue))
         document.add(Annotation(shape: .ellipse(CGRect(x: w * 0.6, y: h * 0.55, width: w * 0.25, height: h * 0.2)), style: style))
+        document.add(Annotation(shape: .ellipse(CGRect(x: w * 0.88, y: h * 0.3, width: h * 0.1, height: h * 0.1), filled: true), style: yellow))
         document.add(Annotation(shape: .highlighter([CGPoint(x: w * 0.1, y: h * 0.15), CGPoint(x: w * 0.4, y: h * 0.16)]), style: yellow))
         document.add(Annotation(shape: .pen((0...20).map { i in CGPoint(x: w * 0.1 + Double(i) * w * 0.015, y: h * 0.9 + sin(Double(i) / 2) * h * 0.03) }), style: blue))
         document.add(Annotation(shape: .obscure(CGRect(x: w * 0.7, y: h * 0.8, width: w * 0.2, height: h * 0.12)), style: style))

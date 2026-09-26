@@ -48,7 +48,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         canvas.onChange = { [weak self] in self?.refresh() }
         canvas.onToolChange = { [weak self] tool in
             self?.tools.selectedSegment = tool.rawValue
-            Self.rememberedTool = tool
+            // Only a drawing tool is worth coming back to; select and crop are passing states.
+            if tool != .select, tool != .crop { Self.rememberedTool = tool }
         }
         refresh()
     }
@@ -174,9 +175,13 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         canvas.tool = Tool(rawValue: tools.selectedSegment) ?? .callout
     }
 
-    /// The tool the last edit ended on; a new capture starts with it.
+    /// The drawing tool last used; a new capture starts with it.
     static var rememberedTool: Tool {
-        get { Tool(rawValue: UserDefaults.standard.integer(forKey: "editor.tool")) ?? .callout }
+        get {
+            // Nothing remembered yet reads as 0, which would be the select tool.
+            guard UserDefaults.standard.object(forKey: "editor.tool") != nil else { return .callout }
+            return Tool(rawValue: UserDefaults.standard.integer(forKey: "editor.tool")) ?? .callout
+        }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: "editor.tool") }
     }
 

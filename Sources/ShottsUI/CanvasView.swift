@@ -232,6 +232,8 @@ public final class CanvasView: NSView {
         let p = imagePoint(event)
         guard let anchor = dragAnchor else { return }
         let shift = event.modifierFlags.contains(.shift)
+        // Option while drawing makes a rectangle or ellipse solid; either key may change mid-drag.
+        let filled = event.modifierFlags.contains(.option)
         switch tool {
         case .select:
             if let original = dragOriginal {
@@ -242,9 +244,9 @@ public final class CanvasView: NSView {
         case .arrow, .callout:
             live?.shape = .arrow(from: anchor, to: p)
         case .rectangle:
-            live?.shape = .rectangle(SelectionRule.rect(anchor: anchor, pointer: p, square: shift))
+            live?.shape = .rectangle(SelectionRule.rect(anchor: anchor, pointer: p, square: shift), filled: filled)
         case .ellipse:
-            live?.shape = .ellipse(SelectionRule.rect(anchor: anchor, pointer: p, square: shift))
+            live?.shape = .ellipse(SelectionRule.rect(anchor: anchor, pointer: p, square: shift), filled: filled)
         case .obscure:
             live?.shape = .obscure(SelectionRule.rect(anchor: anchor, pointer: p, square: shift))
         case .pen:

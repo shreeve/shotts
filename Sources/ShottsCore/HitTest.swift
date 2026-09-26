@@ -17,17 +17,18 @@ public enum HitTest {
         case let .arrow(from, to):
             return distance(from: p, toSegment: from, to) <= reach
                 || ArrowGeometry(from: from, to: to, width: a.style.strokeWidth, tapered: a.style.taperedArrows).outline.contains(p)
-        case let .rectangle(rect):
+        case let .rectangle(rect, filled):
+            // A stroked shape is hit on its line; a solid one anywhere inside.
             let r = rect.standardized
-            return r.insetBy(dx: -reach, dy: -reach).contains(p) && !r.insetBy(dx: reach, dy: reach).contains(p)
-        case let .ellipse(rect):
+            return r.insetBy(dx: -reach, dy: -reach).contains(p) && (filled || !r.insetBy(dx: reach, dy: reach).contains(p))
+        case let .ellipse(rect, filled):
             let r = rect.standardized
             guard r.width > 0, r.height > 0 else { return false }
             let nx = (p.x - r.midX) / (r.width / 2)
             let ny = (p.y - r.midY) / (r.height / 2)
             let d = sqrt(nx * nx + ny * ny) // 1 on the ellipse
             let band = reach / min(r.width, r.height) * 2
-            return abs(d - 1) <= band
+            return filled ? d <= 1 + band : abs(d - 1) <= band
         case .text, .obscure:
             return a.bounds.insetBy(dx: -tolerance, dy: -tolerance).contains(p)
         case let .pen(points), let .highlighter(points):
