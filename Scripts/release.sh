@@ -210,7 +210,8 @@ stage=drafted
 gh release create "$tag" "$out/feed/$archive" "$out/appcast.xml" \
     --repo "$repo" --title "Shotts $version" --notes-file "$out/notes.md" --draft >/dev/null
 stage=committed
-git commit -q -m "Shotts $version" -- "$plist"
+# The plist already says the version when a release is retried; only a change is committed.
+git diff --quiet -- "$plist" || git commit -q -m "Shotts $version" -- "$plist"
 git tag "$tag"
 git push -q --atomic origin main "$tag"
 stage=pushed
