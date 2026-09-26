@@ -71,7 +71,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for i in stride(from: 100, to: min(w, h), by: 300) {
             ctx.fill(CGRect(x: i, y: h - i - 40, width: 40, height: 40))
         }
-        return DisplayImage(screen: screen, image: ctx.makeImage()!, scale: scale)
+        // One "window" for the picker to outline, at 700,700 points, 600 by 400.
+        return DisplayImage(screen: screen, image: ctx.makeImage()!, scale: scale,
+                            windows: [CGRect(x: 700, y: 700, width: 600, height: 400)])
     }
 
     static func previewOverlay(to output: URL, selected: Bool, dimmed: Bool, corner: Bool) -> Bool {
@@ -83,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // so the magnifier must show that corner 6 cells up and left of its center. With
         // --corner it sits near the display's top-left instead, where the panels collide.
         let pointer = corner ? CGPoint(x: 30, y: 40)
-            : CGPoint(x: (1600 + 3) / display.scale + 0.25, y: (1600 + 3) / display.scale + 0.25)
+            : CGPoint(x: (1600 + 3) / display.scale + 0.25, y: (1600 + 3) / display.scale + 0.25) // inside the stand-in window too
         let view = OverlayPreview.make(display: display, options: options, pointer: pointer,
                                        selection: selected ? CGRect(x: pointer.x - 320, y: pointer.y - 200, width: 320, height: 200) : nil)
         guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return false }
@@ -164,16 +166,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(optionItem("Dim Screen While Selecting", \.dims))
         menu.addItem(optionItem("Show Magnifier", \.magnifies))
         menu.addItem(optionItem("Show Hints", \.showsHints))
-        let crosshair = NSMenuItem(title: "Crosshair", action: nil, keyEquivalent: "")
-        let styles = NSMenu()
-        for style in SelectionOptions.Crosshair.allCases {
-            let item = NSMenuItem(title: style.title, action: #selector(crosshairChosen(_:)), keyEquivalent: "")
-            item.representedObject = style.rawValue
-            item.target = self
-            styles.addItem(item)
-        }
-        crosshair.submenu = styles
-        menu.addItem(crosshair)
         menu.delegate = self
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Shotts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -238,22 +230,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         SelectionOptions.current = options
     }
 
-    @objc private func crosshairChosen(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let style = SelectionOptions.Crosshair(rawValue: raw) else { return }
-        var options = SelectionOptions.current
-        options.crosshair = style
-        SelectionOptions.current = options
-    }
-
     /// Check marks follow the saved options each time the menu opens.
     func menuNeedsUpdate(_ menu: NSMenu) {
         let options = SelectionOptions.current
         for item in menu.items {
             if let key = item.representedObject as? OptionKey {
                 item.state = options[keyPath: key.path] ? .on : .off
-            }
-            for sub in item.submenu?.items ?? [] {
-                sub.state = (sub.representedObject as? String) == options.crosshair.rawValue ? .on : .off
             }
         }
     }
