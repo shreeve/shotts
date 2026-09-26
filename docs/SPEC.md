@@ -15,14 +15,28 @@ user did not copy, save, or drag out.
 
 | Action | Result |
 | --- | --- |
-| F10, or Capture Area in the menu bar | Every display dims and the pointer becomes a crosshair. |
-| Drag | Selects an area. Its size in pixels shows beside it. |
+| F10, or Capture Area in the menu bar | Every display is pictured as it is at that moment, and the pointer becomes a crosshair over that picture. |
+| Drag | Selects an area. Its size in pixels shows in the magnifier. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
-| Release | Captures the area at the display's full resolution and opens the editor. |
-| Escape, or a click without a drag | Cancels. Nothing is captured. |
+| Release | Cuts the area out of the picture at the display's full resolution and opens the editor. |
+| Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
+| Escape, or a click without a drag | Cancels. Nothing is kept. |
 
-The selection stays on one display. The dimming and crosshair are never in the capture.
+The selection stays on one display. Beside the pointer a magnifier shows the pixels under the
+crosshair, fifteen across, the one under the crosshair marked, with its color in hex below and
+the selection's size while dragging. Until the first drag, a short list of these keys shows on
+the other side of the pointer. Because the picture is taken when F10 is pressed, what you
+select is exactly what you get, even if the screen changes while you choose.
+
+The menu bar menu holds the picker's options, remembered across launches:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| Dim Screen While Selecting | off | Darkens everything but the selection and a small window at the crosshair, so the color there is true. |
+| Show Magnifier | on | The magnifier and its color readout. |
+| Show Hints | on | The list of keys until the first drag. |
+| Crosshair | Light and Dark | A light line with a dark edge, visible on any background; or Light, or Dark. |
 
 The first capture asks macOS for Screen Recording permission. Until it is granted, F10 explains
 where to turn it on and captures nothing.

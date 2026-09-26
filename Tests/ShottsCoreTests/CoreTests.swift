@@ -110,6 +110,11 @@ import Testing
         #expect(long.outline[0].y < 1)                              // the tapered tail is a point
     }
 
+    @Test func hexIsUppercaseRRGGBB() {
+        #expect(RGBA.red.hex == "#FF3B30")
+        #expect(RGBA(red: 0, green: 0.5, blue: 1).hex == "#0080FF")
+    }
+
     @Test func styleDecodesOlderSettings() throws {
         let old = Data(#"{"color":{"red":0,"green":0,"blue":1,"alpha":1},"strokeWidth":6,"fontSize":24,"shadow":false,"outline":true}"#.utf8)
         let style = try JSONDecoder().decode(Style.self, from: old)

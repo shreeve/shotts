@@ -2,58 +2,71 @@ import AppKit
 import ShottsCore
 import ShottsUI
 
-/// One capture from key press to editor: pick an area, capture it, edit it, and hand focus back
-/// to the app that had it.
+/// One capture from key press to editor: picture every display, pick an area on it, cut it
+/// out, edit it, and hand focus back to the app that had it.
 final class CaptureFlow {
     private var selection: AreaSelection?
     private var editors: [EditorWindowController] = []
     private var previousApp: NSRunningApplication?
+    private var capturing = false
 
     func begin() {
-        guard selection == nil else { return }
+        guard selection == nil, !capturing else { return }
         guard ScreenCapture.hasPermission else {
             explainPermission()
             return
         }
         previousApp = NSWorkspace.shared.frontmostApplication
-        selection = AreaSelection { [weak self] outcome in
+        capturing = true
+        Task {
+            defer { capturing = false }
+            do {
+                let displays = try await ScreenCapture.captureDisplays()
+                select(from: displays)
+            } catch {
+                fail("Shotts could not capture the screen", error)
+            }
+        }
+    }
+
+    private func select(from displays: [DisplayImage]) {
+        selection = AreaSelection(displays: displays) { [weak self] outcome in
             guard let self else { return }
             selection = nil
             switch outcome {
             case .cancelled:
                 restoreFocus()
-            case let .selected(screen, rect):
-                Task { await self.capture(rect: rect, on: screen) }
+            case let .selected(display, rect):
+                let pixels = SelectionRule.pixelRect(rect, scale: display.scale,
+                                                     within: CGRect(x: 0, y: 0, width: display.image.width, height: display.image.height))
+                guard !pixels.isEmpty, let image = display.image.cropping(to: pixels) else {
+                    restoreFocus()
+                    return
+                }
+                open(image: image, scale: display.scale, on: display.screen)
             }
         }
         selection?.show()
     }
 
-    private func capture(rect: CGRect, on screen: NSScreen) async {
-        // Let the overlay leave the screen before reading it.
-        try? await Task.sleep(for: .milliseconds(60))
-        do {
-            let capture = try await ScreenCapture.capture(rect: rect, on: screen)
-            open(capture, on: screen)
-        } catch {
-            NSApp.activate(ignoringOtherApps: true)
-            let alert = NSAlert()
-            alert.messageText = "Shotts could not capture the screen"
-            alert.informativeText = error.localizedDescription
-            alert.runModal()
-            restoreFocus()
-        }
-    }
-
-    func open(_ capture: ScreenCapture.Capture, on screen: NSScreen?) {
-        let document = Document(width: capture.image.width, height: capture.image.height, scale: capture.scale)
-        let editor = EditorWindowController(document: document, source: capture.image, on: screen)
+    func open(image: CGImage, scale: CGFloat, on screen: NSScreen?) {
+        let document = Document(width: image.width, height: image.height, scale: scale)
+        let editor = EditorWindowController(document: document, source: image, on: screen)
         editor.onClose = { [weak self, weak editor] in
             self?.editors.removeAll { $0 === editor }
             if self?.editors.isEmpty == true { self?.restoreFocus() }
         }
         editors.append(editor)
         editor.present()
+    }
+
+    private func fail(_ message: String, _ error: Error) {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.informativeText = error.localizedDescription
+        alert.runModal()
+        restoreFocus()
     }
 
     private func restoreFocus() {
