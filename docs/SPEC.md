@@ -57,7 +57,7 @@ open at once.
 | Tool | Key | What it draws |
 | --- | --- | --- |
 | Select | V | Click an annotation to select it; drag to move it; Delete removes it. Double-click text to edit it. |
-| Arrow with text | N | Drag from the tail to what the arrow points at, then type. A mostly horizontal arrow puts the text beside the tail on the side away from the tip, right-justified against the tail when to its left and left-justified when to its right. A mostly vertical arrow puts it centered below the tail (arrow pointing up) or above it (pointing down), growing away from the arrow. It wraps before the picture's edge and stays inside the picture. The tool a new capture starts with. |
+| Arrow with text | N | Drag from the tail to what the arrow points at, then type. A mostly horizontal arrow puts the text beside the tail on the side away from the tip, right-justified against the tail when to its left and left-justified when to its right. A mostly vertical arrow puts it centered below the tail (arrow pointing up) or above it (pointing down), growing away from the arrow. A line runs to the picture's edge before it wraps; Return breaks a line sooner. The text stays inside the picture. The tool a new capture starts with. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
 | Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line. Escape, Command-Return, a click elsewhere, or another tool finishes. |
 | Rectangle | R | A stroked rectangle. Shift for a square. |
