@@ -54,7 +54,7 @@ public final class CanvasView: NSView {
     public private(set) var history: History<Document>
     public let source: CGImage
     public var zoom: CGFloat
-    public var tool: Tool = .arrow { didSet { selectedID = nil; needsDisplay = true; resetCursorRects(); onToolChange?(tool) } }
+    public var tool: Tool = .arrow { didSet { endTextEntry(commit: true); selectedID = nil; needsDisplay = true; resetCursorRects(); onToolChange?(tool) } }
     public var onToolChange: ((Tool) -> Void)?
     public var style: Style = .standard {
         didSet {
@@ -143,7 +143,7 @@ public final class CanvasView: NSView {
 
     /// Escape: an entry or drag in progress, then the selection.
     public func cancelCurrent() -> Bool {
-        if textField != nil { endTextEntry(commit: false); return true }
+        if textField != nil { endTextEntry(commit: true); return true }
         if live != nil || liveCrop != nil { live = nil; liveCrop = nil; dragAnchor = nil; needsDisplay = true; return true }
         if selectedID != nil { selectedID = nil; needsDisplay = true; return true }
         return false
@@ -273,35 +273,41 @@ public final class CanvasView: NSView {
 
     // MARK: - Text entry
 
+    /// Typing happens on the picture: the canvas draws the text in its final style as a live
+    /// annotation, and an invisible text view under it only supplies the caret and keystrokes.
     private func beginTextEntry(at origin: CGPoint, initial: String, style: Style) {
-        let field = TextEntry(frame: .zero)
-        field.font = Renderer.font(for: style, scale: document.scale * zoom)
-        field.textColor = NSColor(cgColor: Renderer.cgColor(style.color))
-        field.stringValue = initial
-        field.style = style
-        field.origin = origin
-        field.onCommit = { [weak self] commit in self?.endTextEntry(commit: commit) }
-        field.sizeToFit()
-        let pad = Renderer.outlineWidth(style, scale: document.scale) * zoom
-        field.frame.origin = CGPoint(x: origin.x * zoom + pictureRect.minX + pad, y: origin.y * zoom + pictureRect.minY)
-        field.frame.size.width = max(field.frame.width, 40)
-        addSubview(field)
-        textField = field
-        window?.makeFirstResponder(field)
-        // Editing existing text continues at its end rather than replacing it.
-        field.currentEditor()?.selectedRange = NSRange(location: (initial as NSString).length, length: 0)
+        let entry = TextEntry(style: style, origin: origin, zoom: zoom, scale: document.scale)
+        entry.string = initial
+        entry.onChange = { [weak self] string in self?.updateLiveText(string) }
+        entry.onFinish = { [weak self] in self?.endTextEntry(commit: true) }
+        addSubview(entry)
+        textField = entry
+        entry.place(in: pictureRect)
+        window?.makeFirstResponder(entry)
+        entry.setSelectedRange(NSRange(location: (initial as NSString).length, length: 0))
+        updateLiveText(initial)
+    }
+
+    private func updateLiveText(_ string: String) {
+        guard let entry = textField else { return }
+        let size = Renderer.textSize(string, style: entry.style, scale: document.scale)
+        live = Annotation(shape: .text(origin: entry.origin, string: string, size: size), style: entry.style)
+        entry.place(in: pictureRect)
+        needsDisplay = true
     }
 
     func endTextEntry(commit: Bool) {
-        guard let field = textField else { return }
+        guard let entry = textField else { return }
         textField = nil
-        let string = field.stringValue
-        field.removeFromSuperview()
+        live = nil
+        let string = entry.string.trimmingCharacters(in: .newlines)
+        entry.removeFromSuperview()
         window?.makeFirstResponder(self)
-        guard commit, !string.isEmpty, let origin = field.origin, let style = field.style else { return }
-        let size = Renderer.textSize(string, style: style, scale: document.scale)
+        needsDisplay = true
+        guard commit, !string.isEmpty else { return }
+        let size = Renderer.textSize(string, style: entry.style, scale: document.scale)
         var d = document
-        d.add(Annotation(shape: .text(origin: origin, string: string, size: size), style: style))
+        d.add(Annotation(shape: .text(origin: entry.origin, string: string, size: size), style: entry.style))
         self.commit(d)
     }
 
@@ -347,44 +353,68 @@ public final class CanvasView: NSView {
     }
 }
 
-/// The field a text annotation is typed into, placed on the canvas at the click.
-final class TextEntry: NSTextField {
-    var origin: CGPoint?
-    var style: Style?
-    var onCommit: ((Bool) -> Void)?
+/// The invisible text view a text annotation is typed into. It draws nothing but its caret;
+/// the canvas shows the text. Return adds a line; Escape or Command-Return finishes.
+final class TextEntry: NSTextView {
+    let style: Style
+    let origin: CGPoint
+    private let zoom: CGFloat
+    private let scale: Double
+    var onChange: ((String) -> Void)?
+    var onFinish: (() -> Void)?
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        isBordered = false
-        drawsBackground = true
-        backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.85)
-        focusRingType = .none
-        cell?.wraps = false
-        cell?.isScrollable = true
-        target = self
-        action = #selector(commit)
+    init(style: Style, origin: CGPoint, zoom: CGFloat, scale: Double) {
+        self.style = style
+        self.origin = origin
+        self.zoom = zoom
+        self.scale = scale
+        super.init(frame: .zero)
+        drawsBackground = false
+        isRichText = false
+        allowsUndo = false
+        isAutomaticQuoteSubstitutionEnabled = false
+        isAutomaticDashSubstitutionEnabled = false
+        isAutomaticTextReplacementEnabled = false
+        isAutomaticSpellingCorrectionEnabled = false
+        textContainerInset = .zero
+        textContainer?.lineFragmentPadding = 0
+        textContainer?.widthTracksTextView = false
+        textContainer?.containerSize = NSSize(width: 4000, height: 4000)
+        font = Renderer.font(for: style, scale: scale * zoom)
+        textColor = .clear
+        insertionPointColor = NSColor(cgColor: Renderer.cgColor(style.color)) ?? .red
+        isHorizontallyResizable = true
+        isVerticallyResizable = true
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    override func textDidChange(_ notification: Notification) {
-        super.textDidChange(notification)
-        sizeToFit()
-        frame.size.width = max(frame.width, 40)
+    /// Sits exactly over where the canvas draws the text, and grows with it.
+    func place(in picture: CGRect) {
+        layoutManager?.ensureLayout(for: textContainer!)
+        let used = layoutManager?.usedRect(for: textContainer!) ?? .zero
+        let pad = Renderer.outlineWidth(style, scale: scale) * zoom
+        frame = CGRect(x: origin.x * zoom + picture.minX + pad, y: origin.y * zoom + picture.minY,
+                       width: max(used.width, 4) + 4, height: max(used.height, font?.pointSize ?? 20))
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        onChange?(string)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        let isReturn = event.keyCode == 36 || event.keyCode == 76
+        if event.keyCode == 53 || (isReturn && event.modifierFlags.contains(.command)) {
+            onFinish?()
+            return
+        }
+        super.keyDown(with: event)
     }
 
     override func cancelOperation(_ sender: Any?) {
-        onCommit?(false)
-    }
-
-    override func textDidEndEditing(_ notification: Notification) {
-        super.textDidEndEditing(notification)
-        onCommit?(true)
-    }
-
-    @objc private func commit() {
-        onCommit?(true)
+        onFinish?()
     }
 }
 

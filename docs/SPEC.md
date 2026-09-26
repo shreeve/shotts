@@ -39,7 +39,7 @@ open at once.
 | --- | --- | --- |
 | Select | V | Click an annotation to select it; drag to move it; Delete removes it. Double-click text to edit it. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
-| Text | T | Click, type, press Return. Bold, with a contrasting outline. Escape discards. |
+| Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line. Escape, Command-Return, a click elsewhere, or another tool finishes. |
 | Rectangle | R | A stroked rectangle. Shift for a square. |
 | Ellipse | E | A stroked ellipse. Shift for a circle. |
 | Pen | P | A smooth freehand stroke. |
@@ -56,7 +56,7 @@ across captures. Changing them with an annotation selected restyles it.
 | Action | Key |
 | --- | --- |
 | Undo, Redo | Command-Z, Shift-Command-Z |
-| Cancel the current drag or text, then the selection | Escape |
+| Finish typing, cancel the current drag, then clear the selection | Escape |
 | Close the editor | Command-W, or Escape with nothing to cancel |
 
 Undo covers annotations and the crop, not the capture itself. Closing a window with unsaved
