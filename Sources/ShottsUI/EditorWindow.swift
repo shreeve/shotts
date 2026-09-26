@@ -258,6 +258,37 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         }
     }
 
+    /// Command-P: the picture as it would export, scaled to fit one page, sideways when it is
+    /// wider than tall. The editor stays open: printing is not a way of finishing.
+    @objc public func printPressed() {
+        canvas.endTextEntry(commit: true)
+        guard let window, let (sheet, info) = Self.page(for: canvas.document, source: canvas.source) else { return }
+        let operation = NSPrintOperation(view: sheet, printInfo: info)
+        operation.jobTitle = Export.suggestedName().replacingOccurrences(of: ".png", with: "")
+        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+    }
+
+    /// The page to print: the rendered picture and print settings that fit it to one sheet.
+    private static func page(for document: Document, source: CGImage) -> (NSView, NSPrintInfo)? {
+        guard let image = Renderer.image(of: document, source: source) else { return nil }
+        let info = NSPrintInfo(dictionary: NSPrintInfo.shared.dictionary() as! [NSPrintInfo.AttributeKey: Any])
+        info.horizontalPagination = .fit
+        info.verticalPagination = .fit
+        info.isHorizontallyCentered = true
+        info.isVerticallyCentered = true
+        info.orientation = image.width > image.height ? .landscape : .portrait
+        return (PrintSheet(image: image, scale: document.scale), info)
+    }
+
+    /// Developer check: the page as a PDF, exactly as printing would lay it out.
+    public static func printPDF(_ document: Document, source: CGImage, to url: URL) -> Bool {
+        guard let (sheet, info) = page(for: document, source: source) else { return false }
+        let operation = NSPrintOperation.pdfOperation(with: sheet, inside: sheet.bounds, toPath: url.path, printInfo: info)
+        operation.showsPrintPanel = false
+        operation.showsProgressPanel = false
+        return operation.run()
+    }
+
     /// Closes after a copy, save, or drag out.
     func finish() {
         closing = true
@@ -285,6 +316,24 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 }
 
 /// The handle you drag to put the picture somewhere: a file promise the drop target reads.
+/// The page's content: the rendered picture at its natural size in points, which pagination
+/// scales to fit the paper.
+private final class PrintSheet: NSView {
+    private let image: CGImage
+
+    init(image: CGImage, scale: Double) {
+        self.image = image
+        super.init(frame: NSRect(x: 0, y: 0, width: Double(image.width) / scale, height: Double(image.height) / scale))
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSGraphicsContext.current?.cgContext.draw(image, in: bounds)
+    }
+}
+
 final class DragGrip: NSImageView {
     private weak var controller: EditorWindowController?
 

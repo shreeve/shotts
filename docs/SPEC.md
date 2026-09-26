@@ -92,6 +92,7 @@ annotations asks first.
 | Copy (Command-C) | The picture, with its annotations and crop, goes to the clipboard as PNG and TIFF. The editor closes. |
 | Save… (Command-S) | Asks where; suggests the Desktop and a name like `Shotts 2026-09-26 at 10.12.34.png`. The editor closes. |
 | Drag the hand icon | Drags a PNG file into another app or the Finder. The editor closes when the drop lands. |
+| Print… (Command-P) | Prints the picture, with its annotations and crop, scaled to fit one page and turned sideways when it is wider than tall. The editor stays open. |
 
 The copied, saved, and dragged pictures are identical to what the editor shows.
 

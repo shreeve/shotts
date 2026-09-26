@@ -113,6 +113,7 @@ same for its block image.
 `Shotts --edit file.png` opens a picture in the editor without capturing. `Shotts --render
 in.png out.png [--crop]` draws one of every annotation on a picture and writes the PNG, for
 checking the renderer by eye. `Shotts --preview-style out.png` draws the editor's style popover. `Shotts --check-text-entry`
+`--print-pdf in.png out.pdf [--crop]` writes the sample's print page as a PDF, laid out as Command-P would print it.
 exercises text entry headlessly.
 `Shotts --select out.txt` runs the picker alone over a drawn
 stand-in for each display and writes `selected x,y,w,h on <display>` or `cancelled`, which
