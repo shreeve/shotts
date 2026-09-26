@@ -317,9 +317,16 @@ final class OverlayView: NSView {
             .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
             .foregroundColor: NSColor.white,
         ]
+        // The pointer's pixel while aiming (a comma pair, as coordinates are written), the
+        // selection's size while dragging (with ×, as sizes are), and the color under the pointer.
         let color = colorUnderPointer()
-        var text = color?.hex ?? ""
-        if let selection { text = "\(Int(selection.width * display.scale)) × \(Int(selection.height * display.scale))   " + text }
+        let hex = color?.hex ?? ""
+        let text: String
+        if let selection {
+            text = "\(Int(selection.width * display.scale)) × \(Int(selection.height * display.scale))   " + hex
+        } else {
+            text = "\(pointerPixel.x), \(pointerPixel.y)   " + hex
+        }
         let textSize = (text as NSString).size(withAttributes: attributes)
         // Wide enough for the label, which grows while dragging; the pixels stay centered.
         let width = max(box, ceil(textSize.width) + 16)

@@ -24,8 +24,8 @@ user did not copy, save, or drag out.
 | Escape, or a click without a drag | Cancels. Nothing is kept. |
 
 The selection stays on one display. Beside the pointer a magnifier shows the pixels under the
-crosshair, fifteen across, the one under the crosshair marked, with its color in hex below and
-the selection's size while dragging. Until the first drag, a short list of these keys shows on
+crosshair, fifteen across, the crosshair magnified over them and the pixel under it marked, with
+the pixel's position and its color in hex below, or the selection's size while dragging. Until the first drag, a short list of these keys shows on
 the other side of the pointer. Because the picture is taken when F10 is pressed, what you
 select is exactly what you get, even if the screen changes while you choose.
 
