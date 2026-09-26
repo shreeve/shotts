@@ -83,6 +83,8 @@ public final class CanvasView: NSView {
 
     /// The dark field around the picture, and the room its shadow needs.
     public static let inset: CGFloat = 28
+    /// How close to the picture's edges a callout's text may go, in points.
+    public static let textMargin: Double = 8
 
     public init(document: Document, source: CGImage, zoom: CGFloat) {
         history = History(document)
@@ -271,10 +273,11 @@ public final class CanvasView: NSView {
                 var d = document
                 d.add(live)
                 commit(d)
-                // The text may run to the picture's edge on its side; Return breaks a line
-                // sooner. Only the edge itself wraps.
+                // The text may run to within a small margin of the picture's edge on its side;
+                // Return breaks a line sooner. Only that margin wraps.
+                let margin = Self.textMargin * document.scale
                 let layout = CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
-                                           maxWidth: Double(document.width), in: document.pixelBounds)
+                                           maxWidth: Double(document.width), in: document.pixelBounds.insetBy(dx: margin, dy: margin))
                 beginTextEntry(at: layout.origin, initial: "", style: style, layout: layout)
             }
         default:
