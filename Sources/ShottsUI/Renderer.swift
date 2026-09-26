@@ -117,8 +117,10 @@ public enum Renderer {
         }
     }
 
-    /// The exported image: the visible (cropped) part with every annotation, at pixel size.
+    /// The exported image: the visible (cropped) part with every annotation, at pixel size. An
+    /// untouched capture is the source itself, with nothing to draw and no second bitmap.
     public static func image(of document: Document, source: CGImage) -> CGImage? {
+        if document.isBlank { return source }
         let visible = document.visibleRect
         let width = Int(visible.width), height = Int(visible.height)
         guard width > 0, height > 0,
@@ -136,12 +138,6 @@ public enum Renderer {
         draw(document, source: source, in: ctx)
         NSGraphicsContext.restoreGraphicsState()
         return ctx.makeImage()
-    }
-
-    public static func pngData(of document: Document, source: CGImage) -> Data? {
-        guard let image = image(of: document, source: source) else { return nil }
-        let rep = NSBitmapImageRep(cgImage: image)
-        return rep.representation(using: .png, properties: [:])
     }
 
     /// The style's typeface, bold, at its size scaled to pixels.
