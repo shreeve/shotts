@@ -374,9 +374,13 @@ final class OverlayView: NSView {
         // very pixels being looked at.
         let centerCell = CGRect(x: pixels.minX + CGFloat(half) * cell, y: pixels.minY + CGFloat(half) * cell, width: cell, height: cell)
         if selection == nil {
+            // Four arms that stop two cells short of the center box, leaving it clear.
+            let gap = cell * 2
             ctx.setFillColor(CGColor(gray: 1, alpha: 0.5))
-            ctx.fill(CGRect(x: centerCell.minX, y: pixels.minY, width: cell, height: box))
-            ctx.fill(CGRect(x: pixels.minX, y: centerCell.minY, width: box, height: cell))
+            ctx.fill(CGRect(x: centerCell.minX, y: pixels.minY, width: cell, height: centerCell.minY - gap - pixels.minY))
+            ctx.fill(CGRect(x: centerCell.minX, y: centerCell.maxY + gap, width: cell, height: pixels.maxY - centerCell.maxY - gap))
+            ctx.fill(CGRect(x: pixels.minX, y: centerCell.minY, width: centerCell.minX - gap - pixels.minX, height: cell))
+            ctx.fill(CGRect(x: centerCell.maxX + gap, y: centerCell.minY, width: pixels.maxX - centerCell.maxX - gap, height: cell))
         }
         // The pixel under the pointer: a white box with a dark edge, like the crosshair itself.
         ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.8)); ctx.setLineWidth(3); ctx.stroke(centerCell.insetBy(dx: -1, dy: -1))
