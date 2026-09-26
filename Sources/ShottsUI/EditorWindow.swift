@@ -294,6 +294,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         return (PrintSheet(image: image, scale: document.scale), info)
     }
 
+    #if DEBUG
     /// Developer check: the page as a PDF, exactly as printing would lay it out.
     public static func printPDF(_ document: Document, source: CGImage, to url: URL) -> Bool {
         guard let (sheet, info) = page(for: document, source: source) else { return false }
@@ -302,6 +303,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         operation.showsProgressPanel = false
         return operation.run()
     }
+    #endif
 
     /// Closes after a copy, save, or drag out.
     func finish() {

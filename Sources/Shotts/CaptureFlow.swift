@@ -75,9 +75,9 @@ final class CaptureFlow {
         let returnTo = capture?.returnTo
         capture = nil
         if SelectionOptions.current.copiesOnCapture {
-            // The plain capture is on the clipboard at once; Copy in the editor replaces it
-            // with the annotated one.
-            _ = Export.copy(Document(width: image.width, height: image.height, scale: scale), source: image)
+            // The plain capture reaches the clipboard once it is encoded, off the main thread so
+            // the editor opens at once; a Copy from the editor made before then is left alone.
+            Export.copyInBackground(image, scale: scale)
         }
         open(image: image, scale: scale, on: screen, returningTo: returnTo)
     }

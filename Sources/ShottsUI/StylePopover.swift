@@ -132,6 +132,7 @@ final class StylePopover: NSViewController {
     }
 }
 
+#if DEBUG
 /// The popover's content alone, for drawing it off screen in a check.
 public enum StylePopoverPreview {
     public static func write(to output: URL) -> Bool {
@@ -162,3 +163,4 @@ public enum StylePopoverPreview {
         do { try png.write(to: output); return true } catch { return false }
     }
 }
+#endif
