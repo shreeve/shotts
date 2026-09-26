@@ -114,9 +114,19 @@ public enum Renderer {
         return rep.representation(using: .png, properties: [:])
     }
 
-    /// The font every text annotation uses, at the style's size scaled to pixels.
+    /// The style's typeface, bold, at its size scaled to pixels.
     public static func font(for style: Style, scale: Double) -> NSFont {
-        NSFont.systemFont(ofSize: style.fontSize * scale, weight: .bold)
+        let size = style.fontSize * scale
+        let system = NSFont.systemFont(ofSize: size, weight: .bold)
+        switch style.font {
+        case .system:
+            return system
+        case .rounded:
+            guard let descriptor = system.fontDescriptor.withDesign(.rounded), let font = NSFont(descriptor: descriptor, size: size) else { return system }
+            return font
+        case .trebuchet:
+            return NSFont(name: "TrebuchetMS-Bold", size: size) ?? system
+        }
     }
 
     /// The pixel size the laid-out text will take, for `Annotation.Shape.text`'s `size`. With

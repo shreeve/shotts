@@ -13,11 +13,12 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     private var stylePopover: StylePopover?
     private let widths = NSPopUpButton()
     private let sizes = NSPopUpButton()
+    private let fonts = NSPopUpButton()
     private let undoButton = NSButton()
     private let redoButton = NSButton()
     private var closing = false
     /// Wide enough for every control in the bar, whatever the picture's size.
-    static let minimumWidth: CGFloat = 780
+    static let minimumWidth: CGFloat = 880
 
     public init(document: Document, source: CGImage, on screen: NSScreen? = NSScreen.main) {
         let visible = (screen ?? NSScreen.screens[0]).visibleFrame
@@ -108,6 +109,14 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         sizes.action = #selector(styleChanged)
         sizes.toolTip = "Text size"
 
+        for choice in FontChoice.allCases {
+            fonts.addItem(withTitle: choice.title)
+            fonts.lastItem?.representedObject = choice.rawValue
+        }
+        fonts.target = self
+        fonts.action = #selector(styleChanged)
+        fonts.toolTip = "Text font"
+
         configure(undoButton, symbol: "arrow.uturn.backward", tip: "Undo", action: #selector(undoPressed))
         configure(redoButton, symbol: "arrow.uturn.forward", tip: "Redo", action: #selector(redoPressed))
 
@@ -123,6 +132,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         bar.addArrangedSubview(colorButton)
         bar.addArrangedSubview(widths)
         bar.addArrangedSubview(sizes)
+        bar.addArrangedSubview(fonts)
         bar.addArrangedSubview(undoButton)
         bar.addArrangedSubview(redoButton)
         let spacer = NSView()
@@ -174,6 +184,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         var style = canvas.style
         if let w = widths.selectedItem?.representedObject as? Double { style.strokeWidth = w }
         if let f = sizes.selectedItem?.representedObject as? Double { style.fontSize = f }
+        if let raw = fonts.selectedItem?.representedObject as? String, let choice = FontChoice(rawValue: raw) { style.font = choice }
         apply(style)
     }
 
@@ -198,6 +209,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         colorButton.image = StylePopover.swatch(style.color, size: 18)
         if let i = Style.strokeWidths.firstIndex(of: style.strokeWidth) { widths.selectItem(at: i) }
         if let i = Style.fontSizes.firstIndex(of: style.fontSize) { sizes.selectItem(at: i) }
+        if let i = FontChoice.allCases.firstIndex(of: style.font) { fonts.selectItem(at: i) }
         stylePopover?.show(style)
     }
 
