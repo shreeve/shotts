@@ -21,15 +21,14 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     static let minimumWidth: CGFloat = 880
     /// The shortest the picture's longer side may be made by resizing, in points.
     static let minimumPicture: CGFloat = 160
-    fileprivate(set) var barHeight: CGFloat = 44
+    /// The sizes the window may take; the bar's measured size is filled in once it is laid out.
+    private(set) var layout: EditorLayout
     private var canvasHeight: NSLayoutConstraint?
 
     public init(document: Document, source: CGImage, on screen: NSScreen? = NSScreen.main) {
-        let visible = (screen ?? NSScreen.screens[0]).visibleFrame
-        let natural = CGSize(width: CGFloat(document.width) / document.scale, height: CGFloat(document.height) / document.scale)
-        let fit = min(1, (visible.width - 40) / natural.width, (visible.height - 120) / natural.height)
-        let zoom = fit / document.scale
-        canvas = CanvasView(document: document, source: source, zoom: zoom)
+        layout = EditorLayout(picture: CGSize(width: document.width, height: document.height), scale: document.scale, barHeight: 44,
+                              minimumWidth: Self.minimumWidth, inset: CanvasView.inset, minimumPicture: Self.minimumPicture)
+        canvas = CanvasView(document: document, source: source, zoom: layout.naturalZoom)
 
         let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
@@ -40,14 +39,17 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         window.delegate = self
         let content = makeContent()
         window.contentView = content
-        // The bar's height plus the canvas, with the insets below; sized here rather than from
-        // `fittingSize`, which a stack view answers before it has laid out.
+        // The bar's size once laid out: a stack view's `fittingSize` before layout is not it.
         content.layoutSubtreeIfNeeded()
-        let barSize = content.subviews.first?.fittingSize ?? NSSize(width: 0, height: 44)
-        barHeight = barSize.height
-        let width = max(canvas.frame.width, barSize.width, Self.minimumWidth)
-        window.setContentSize(NSSize(width: width, height: barSize.height + canvas.frame.height))
-        window.contentMinSize = contentSize(forZoom: minimumZoom)
+        let bar = content.subviews.first?.fittingSize ?? NSSize(width: Self.minimumWidth, height: 44)
+        layout.barHeight = bar.height
+        layout.minimumWidth = max(Self.minimumWidth, bar.width.rounded(.up))
+        // Open at the picture's on-screen size, or smaller to fit the screen with the title bar.
+        let visible = (screen ?? NSScreen.screens[0]).visibleFrame
+        let room = window.contentRect(forFrameRect: visible).size
+        show(zoom: layout.zoom(fitting: room))
+        window.setContentSize(layout.contentSize(zoom: canvas.zoom))
+        window.contentMinSize = layout.contentSize(zoom: layout.minimumZoom)
         window.center()
         canvas.style = Self.rememberedStyle
         showStyle(canvas.style)
@@ -310,50 +312,29 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     // Annotations are in picture pixels, so they scale with it, old and new alike, stay editable,
     // and export exactly as before. The window keeps the picture's proportions (plus the bar).
 
-    private var naturalZoom: CGFloat { 1 / canvas.document.scale }
-
-    private var minimumZoom: CGFloat {
-        min(naturalZoom, Self.minimumPicture / CGFloat(max(canvas.document.width, canvas.document.height)))
-    }
-
-    /// The zoom at which the picture fits a content area of this size.
-    private func zoom(forContentSize size: NSSize) -> CGFloat {
-        let inset = CanvasView.inset * 2
-        let fit = min((size.width - inset) / CGFloat(canvas.document.width),
-                      (size.height - barHeight - inset) / CGFloat(canvas.document.height))
-        return min(naturalZoom, max(minimumZoom, fit))
-    }
-
-    /// The content size that holds the picture at this zoom: snug around it, no narrower than the bar.
-    private func contentSize(forZoom zoom: CGFloat) -> NSSize {
-        let inset = CanvasView.inset * 2
-        return NSSize(width: max(Self.minimumWidth, (CGFloat(canvas.document.width) * zoom + inset).rounded()),
-                      height: (barHeight + CGFloat(canvas.document.height) * zoom + inset).rounded())
+    /// Draws the picture at this zoom, the canvas as tall as the picture and its field need.
+    private func show(zoom: CGFloat) {
+        canvas.endTextEntry(commit: true) // an entry is placed for one zoom
+        canvas.zoom = zoom
+        canvasHeight?.constant = CGFloat(canvas.document.height) * zoom + CanvasView.inset * 2
     }
 
     public func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
         let content = sender.contentRect(forFrameRect: NSRect(origin: .zero, size: frameSize)).size
-        let snug = contentSize(forZoom: zoom(forContentSize: content))
+        let snug = layout.contentSize(zoom: layout.zoom(fitting: content))
         return sender.frameRect(forContentRect: NSRect(origin: .zero, size: snug)).size
-    }
-
-    public func windowWillStartLiveResize(_ notification: Notification) {
-        canvas.endTextEntry(commit: true) // the entry is placed at one zoom
     }
 
     public func windowDidResize(_ notification: Notification) {
         guard let window else { return }
-        let zoom = zoom(forContentSize: window.contentRect(forFrameRect: window.frame).size)
-        guard zoom != canvas.zoom else { return }
-        canvas.endTextEntry(commit: true)
-        canvas.zoom = zoom
-        canvasHeight?.constant = CGFloat(canvas.document.height) * zoom + CanvasView.inset * 2
+        let zoom = layout.zoom(fitting: window.contentRect(forFrameRect: window.frame).size)
+        if zoom != canvas.zoom { show(zoom: zoom) }
     }
 
     /// The green button: the picture at its on-screen size, or as large as the screen allows.
     public func windowWillUseStandardFrame(_ window: NSWindow, defaultFrame: NSRect) -> NSRect {
         let room = window.contentRect(forFrameRect: defaultFrame).size
-        let content = contentSize(forZoom: zoom(forContentSize: room))
+        let content = layout.contentSize(zoom: layout.zoom(fitting: room))
         var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: content))
         frame.origin = NSPoint(x: defaultFrame.midX - frame.width / 2, y: defaultFrame.maxY - frame.height)
         return frame

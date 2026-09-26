@@ -5,20 +5,20 @@ import Foundation
 /// crop. The bitmap itself stays with the UI; Core only knows its size, so undo snapshots of a
 /// document cost a few annotations, never pixels.
 public struct Document: Equatable, Sendable {
-    public var width: Int
-    public var height: Int
+    public let width: Int
+    public let height: Int
     /// Pixels per point of the display the capture came from (2 on Retina).
-    public var scale: Double
+    public let scale: Double
     public var annotations: [Annotation]
-    /// In image pixels. `nil` means the whole image.
-    public var crop: CGRect?
+    /// In whole image pixels, inside the image; `setCrop` keeps it so. `nil` means the whole image.
+    public private(set) var crop: CGRect?
 
     public init(width: Int, height: Int, scale: Double, annotations: [Annotation] = [], crop: CGRect? = nil) {
         self.width = width
         self.height = height
         self.scale = scale
         self.annotations = annotations
-        self.crop = crop
+        setCrop(crop)
     }
 
     public var pixelBounds: CGRect { CGRect(x: 0, y: 0, width: width, height: height) }

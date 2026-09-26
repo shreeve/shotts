@@ -44,6 +44,27 @@ import Testing
         h.push(1)
         #expect(!h.canUndo)
     }
+
+    @Test func aChangeMadeInPlaceIsOneStep() {
+        var h = History(1)
+        h.push(2)
+        let base = h.current
+        h.replaceCurrent(3); h.replaceCurrent(4); h.replaceCurrent(5)
+        h.record(since: base)
+        #expect(h.current == 5)
+        #expect(h.undo() == 2)
+        #expect(h.undo() == 1)
+        #expect(h.redo() == 2 && h.redo() == 5)
+    }
+
+    @Test func aChangeThatEndsWhereItBeganIsNoStep() {
+        var h = History(1)
+        h.push(2)
+        h.replaceCurrent(7)
+        h.replaceCurrent(2)
+        h.record(since: 2)
+        #expect(h.current == 2 && h.undo() == 1 && !h.canUndo)
+    }
 }
 
 @Suite struct DocumentTests {
@@ -59,9 +80,36 @@ import Testing
     }
 
     @Test func degenerateShapesAreDropped() {
-        #expect(Annotation(shape: .arrow(from: .zero, to: CGPoint(x: 1, y: 1)), style: style).isDegenerate)
-        #expect(!Annotation(shape: .arrow(from: .zero, to: CGPoint(x: 40, y: 0)), style: style).isDegenerate)
-        #expect(Annotation(shape: .text(origin: .zero, string: "", size: .zero), style: style).isDegenerate)
+        let picture = CGRect(x: 0, y: 0, width: 100, height: 100)
+        #expect(Annotation(shape: .arrow(from: .zero, to: CGPoint(x: 1, y: 1)), style: style).isDegenerate(in: picture))
+        #expect(!Annotation(shape: .arrow(from: .zero, to: CGPoint(x: 40, y: 0)), style: style).isDegenerate(in: picture))
+        #expect(Annotation(shape: .text(origin: .zero, string: "", size: .zero), style: style).isDegenerate(in: picture))
+        #expect(Annotation(shape: .text(origin: .zero, string: " \n ", size: CGSize(width: 9, height: 9)), style: style).isDegenerate(in: picture))
+        #expect(Annotation(shape: .pen([CGPoint(x: 5, y: 5)]), style: style).isDegenerate(in: picture))
+        #expect(Annotation(shape: .rectangle(CGRect(x: 10, y: 10, width: -40, height: 2)), style: style).isDegenerate(in: picture))
+        #expect(!Annotation(shape: .rectangle(CGRect(x: 50, y: 50, width: -40, height: -40)), style: style).isDegenerate(in: picture))
+        // Drawn wholly in the field around the picture: it would never show or export.
+        #expect(Annotation(shape: .rectangle(CGRect(x: -80, y: 10, width: 40, height: 40)), style: style).isDegenerate(in: picture))
+        #expect(!Annotation(shape: .rectangle(CGRect(x: -20, y: 10, width: 40, height: 40)), style: style).isDegenerate(in: picture))
+    }
+
+    @Test func documentEditsById() {
+        let a = Annotation(shape: .pen([.zero, CGPoint(x: 5, y: 5)]), style: style)
+        var d = Document(width: 10, height: 10, scale: 1)
+        #expect(d.isBlank)
+        d.add(a)
+        #expect(!d.isBlank && d.annotation(a.id) == a)
+        var b = a
+        b.style.color = .blue
+        d.replace(b)
+        #expect(d.annotations == [b])
+        d.remove(a.id)
+        #expect(d.isBlank)
+        d.setCrop(CGRect(x: 2.4, y: 2.6, width: 3.2, height: 3))
+        #expect(d.crop == CGRect(x: 2, y: 2, width: 4, height: 4) && !d.isBlank)
+        d.setCrop(CGRect(x: 40, y: 40, width: 5, height: 5))
+        #expect(d.crop == nil)
+        #expect(Document(width: 10, height: 10, scale: 1, crop: CGRect(x: -5, y: 0, width: 8, height: 10)).crop == CGRect(x: 0, y: 0, width: 3, height: 10))
     }
 
     @Test func translateMovesEveryKind() {
@@ -98,11 +146,11 @@ import Testing
     @Test func aCalloutIsHitOnItsWordsOrItsArrow() {
         let words = Annotation.TextBox(origin: CGPoint(x: 0, y: 80), string: "hi", size: CGSize(width: 60, height: 30), alignment: .right)
         let c = Annotation(shape: .callout(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 100), text: words), style: style)
-        #expect(HitTest.calloutPart(at: CGPoint(x: 30, y: 95), of: c, tolerance: 4) == .text)
-        #expect(HitTest.calloutPart(at: CGPoint(x: 103, y: 98), of: c, tolerance: 4) == .tail)
-        #expect(HitTest.calloutPart(at: CGPoint(x: 200, y: 102), of: c, tolerance: 4) == .arrow)
-        #expect(HitTest.calloutPart(at: CGPoint(x: 295, y: 100), of: c, tolerance: 4) == .head)
-        #expect(HitTest.calloutPart(at: CGPoint(x: 200, y: 200), of: c, tolerance: 4) == nil)
+        #expect(HitTest.arrowPart(at: CGPoint(x: 30, y: 95), of: c, scale: 1, tolerance: 4) == .text)
+        #expect(HitTest.arrowPart(at: CGPoint(x: 103, y: 98), of: c, scale: 1, tolerance: 4) == .tail)
+        #expect(HitTest.arrowPart(at: CGPoint(x: 200, y: 102), of: c, scale: 1, tolerance: 4) == .shaft)
+        #expect(HitTest.arrowPart(at: CGPoint(x: 295, y: 100), of: c, scale: 1, tolerance: 4) == .head)
+        #expect(HitTest.arrowPart(at: CGPoint(x: 200, y: 200), of: c, scale: 1, tolerance: 4) == nil)
         #expect(c.bounds == CGRect(x: 0, y: 80, width: 300, height: 30))
         let moved = c.translated(by: CGPoint(x: 10, y: 10))
         if case let .callout(from, _, text) = moved.shape { #expect(from == CGPoint(x: 110, y: 110) && text.origin == CGPoint(x: 10, y: 90)) }
@@ -119,10 +167,10 @@ import Testing
 
     @Test func arrowOutlineRunsFromTailToTipAndScalesWithStroke() {
         let long = ArrowGeometry(from: .zero, to: CGPoint(x: 100, y: 0), width: 4)
-        #expect(long.tip == CGPoint(x: 100, y: 0))
-        #expect(long.outline.contains(CGPoint(x: 99, y: 0)))       // the tip
-        #expect(long.outline.contains(CGPoint(x: 85, y: 6)))       // inside the head
-        #expect(!long.outline.contains(CGPoint(x: 50, y: 6)))      // beside the shaft
+        #expect(long.outline[3] == CGPoint(x: 100, y: 0))
+        #expect(long.contains(CGPoint(x: 99, y: 0)))               // the tip
+        #expect(long.contains(CGPoint(x: 85, y: 6)))               // inside the head
+        #expect(!long.contains(CGPoint(x: 50, y: 6)))              // beside the shaft
         #expect(long.outline.map(\.x).max()! == 100 && long.outline.map(\.x).min()! >= 0)
         let thick = ArrowGeometry(from: .zero, to: CGPoint(x: 100, y: 0), width: 10)
         #expect(thick.outline.map(\.y).max()! > long.outline.map(\.y).max()!)
@@ -131,17 +179,109 @@ import Testing
         let even = ArrowGeometry(from: .zero, to: CGPoint(x: 100, y: 0), width: 4, tapered: false)
         #expect(even.outline[0].y == 2 && even.outline[1].y == 2)  // the shaft is 4 wide at both ends
         #expect(long.outline[0].y < 1)                              // the tapered tail is a point
+        let stubby = ArrowGeometry(from: .zero, to: CGPoint(x: 20, y: 0), width: 20)
+        #expect(stubby.outline[2].y > stubby.outline[1].y)          // a short thick arrow still has barbs
     }
 
+    @Test func retinaHitsFollowTheInkDrawn() {
+        // A 10-point arrow on a 2x capture is 20 pixels wide; its barbs reach about 74 pixels out.
+        let thick = Style(color: .red, strokeWidth: 10, fontSize: 20)
+        let arrow = Annotation(shape: .arrow(from: CGPoint(x: 0, y: 300), to: CGPoint(x: 500, y: 300)), style: thick)
+        let marker = Annotation(shape: .highlighter([CGPoint(x: 0, y: 100), CGPoint(x: 500, y: 100)]), style: thick)
+        let doc = Document(width: 600, height: 400, scale: 2, annotations: [arrow, marker])
+        #expect(HitTest.annotation(at: CGPoint(x: 430, y: 335), in: doc, tolerance: 2) == arrow.id) // in a barb, 35 px off the shaft
+        #expect(HitTest.annotation(at: CGPoint(x: 250, y: 125), in: doc, tolerance: 2) == marker.id) // 25 px off a 60 px band
+        #expect(HitTest.annotation(at: CGPoint(x: 250, y: 140), in: doc, tolerance: 2) == nil)
+    }
+
+    @Test func strokedEllipsesAreHitOnTheirLine() {
+        let thin = Annotation(shape: .ellipse(CGRect(x: 0, y: 0, width: 400, height: 20)), style: style)
+        let round = Annotation(shape: .ellipse(CGRect(x: 0, y: 100, width: 200, height: 100)), style: style)
+        let doc = Document(width: 1000, height: 400, scale: 1, annotations: [thin, round])
+        #expect(HitTest.annotation(at: CGPoint(x: 200, y: 2), in: doc, tolerance: 4) == thin.id)  // on the line
+        #expect(HitTest.annotation(at: CGPoint(x: 600, y: 10), in: doc, tolerance: 4) == nil)     // far past its end
+        #expect(HitTest.annotation(at: CGPoint(x: 100, y: 150), in: doc, tolerance: 4) == nil)    // the round one's middle
+        #expect(HitTest.annotation(at: CGPoint(x: 2, y: 150), in: doc, tolerance: 4) == round.id) // its left edge
+        #expect(HitTest.annotation(at: CGPoint(x: 225, y: 150), in: doc, tolerance: 4) == nil)    // 25 px past its right edge
+    }
+
+    @Test func emptyStrokesHitNothing() {
+        let doc = Document(width: 100, height: 100, scale: 1, annotations: [Annotation(shape: .pen([]), style: style)])
+        #expect(HitTest.annotation(at: .zero, in: doc, tolerance: 4) == nil)
+    }
+
+    @Test func aShortCalloutKeepsAShaftToMoveItBy() {
+        let words = Annotation.TextBox(origin: CGPoint(x: 0, y: 90), string: "hi", size: CGSize(width: 40, height: 20), alignment: .right)
+        let c = Annotation(shape: .callout(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 160, y: 100), text: words), style: style)
+        let parts = stride(from: 100, through: 160, by: 5).compactMap { HitTest.arrowPart(at: CGPoint(x: Double($0), y: 100), of: c, scale: 2, tolerance: 12) }
+        #expect(parts.first == .tail && parts.last == .head && parts.contains(.shaft))
+    }
+
+    @Test func dragsMoveThePartGrabbed() {
+        let tail = CGPoint(x: 10, y: 10), tip = CGPoint(x: 100, y: 10), d = CGPoint(x: 5, y: 7)
+        let arrow = Annotation(shape: .arrow(from: tail, to: tip), style: style)
+        #expect(arrow.dragged(.tail, by: d).shape == .arrow(from: tail + d, to: tip))
+        #expect(arrow.dragged(.head, by: d).shape == .arrow(from: tail, to: tip + d))
+        #expect(arrow.dragged(.shaft, by: d).shape == .arrow(from: tail + d, to: tip + d))
+        let words = Annotation.TextBox(origin: .zero, string: "a", size: CGSize(width: 9, height: 9), alignment: .left)
+        let callout = Annotation(shape: .callout(from: tail, to: tip, text: words), style: style)
+        #expect(callout.dragged(.text, by: d).shape == .callout(from: tail + d, to: tip, text: words))
+        #expect(callout.dragged(.head, by: d).shape == .callout(from: tail, to: tip + d, text: words))
+        guard case let .callout(_, _, moved) = callout.dragged(nil, by: d).shape else { Issue.record("not a callout"); return }
+        #expect(moved.origin == d)
+    }
+}
+
+@Suite struct StyleTests {
     @Test func hexIsUppercaseRRGGBB() {
         #expect(RGBA.red.hex == "#FF3B30")
         #expect(RGBA(red: 0, green: 0.5, blue: 1).hex == "#0080FF")
+        #expect(RGBA.yellow.isLight && !RGBA.blue.isLight)
     }
 
-    @Test func styleDecodesOlderSettings() throws {
+    @Test func decodesOlderSettings() throws {
         let old = Data(#"{"color":{"red":0,"green":0,"blue":1,"alpha":1},"strokeWidth":6,"fontSize":24,"shadow":false,"outline":true}"#.utf8)
         let style = try JSONDecoder().decode(Style.self, from: old)
         #expect(style.strokeWidth == 6 && style.shadow == false && style.taperedArrows == true && style.font == .rounded)
+    }
+
+    @Test func anUnknownFontKeepsTheRest() throws {
+        let newer = Data(#"{"color":{"red":0,"green":0,"blue":1,"alpha":1},"strokeWidth":10,"font":"serif"}"#.utf8)
+        let style = try JSONDecoder().decode(Style.self, from: newer)
+        #expect(style.font == .rounded && style.strokeWidth == 10 && style.color == RGBA(red: 0, green: 0, blue: 1))
+        let again = try JSONDecoder().decode(Style.self, from: JSONEncoder().encode(style))
+        #expect(again == style)
+    }
+
+    @Test func applyingChangesOnlyWhatChanged() {
+        var thick = Style.standard
+        thick.strokeWidth = 10
+        var bar = Style.standard
+        bar.color = .blue
+        #expect(thick.applying(from: .standard, to: bar) == Style(color: .blue, strokeWidth: 10, fontSize: 28))
+        #expect(thick.applying(from: bar, to: bar) == thick)
+    }
+}
+
+@Suite struct EditorLayoutTests {
+    let layout = EditorLayout(picture: CGSize(width: 1600, height: 1000), scale: 2, barHeight: 44, minimumWidth: 880, inset: 28, minimumPicture: 160)
+
+    @Test func aBigWindowShowsThePictureAtItsOnScreenSize() {
+        #expect(layout.zoom(fitting: CGSize(width: 3000, height: 2000)) == 0.5)
+        #expect(layout.contentSize(zoom: 0.5) == CGSize(width: 880, height: 600)) // 856 wide, floored at the bar's 880
+    }
+
+    @Test func aShortWindowShrinksThePictureKeepingTheBarsWidth() {
+        let zoom = layout.zoom(fitting: CGSize(width: 1000, height: 400))
+        #expect(zoom == 0.3)
+        #expect(layout.contentSize(zoom: zoom) == CGSize(width: 880, height: 400))
+    }
+
+    @Test func thePictureNeverGetsTiny() {
+        #expect(layout.minimumZoom == 0.1)
+        #expect(layout.zoom(fitting: CGSize(width: 10, height: 10)) == 0.1)
+        let icon = EditorLayout(picture: CGSize(width: 64, height: 64), scale: 2, barHeight: 44, minimumWidth: 880, inset: 28, minimumPicture: 160)
+        #expect(icon.minimumZoom == 0.5)
     }
 }
 
@@ -196,6 +336,14 @@ import Testing
         let l = CalloutLayout(tail: CGPoint(x: 200, y: 300), tip: CGPoint(x: 200, y: 100), lineHeight: 40, maxWidth: 1000, in: bounds)
         #expect(l.width == 1000)
         #expect(l.origin(for: CGSize(width: 100, height: 40)).x == 150)
+    }
+
+    @Test func aPictureSmallerThanTheMarginStillPlacesTheWords() {
+        let tiny = CGRect(x: 0, y: 0, width: 28, height: 60)
+        let l = CalloutLayout(tail: CGPoint(x: 20, y: 30), tip: CGPoint(x: 26, y: 50), lineHeight: 40, maxWidth: 28, in: tiny, margin: 16)
+        let o = l.origin(for: CGSize(width: 10, height: 40))
+        #expect(o.x.isFinite && o.y.isFinite && l.width > 0)
+        #expect(tiny.contains(o))
     }
 
     @Test func aCenteredBoxStaysInsideThePictureSideways() {

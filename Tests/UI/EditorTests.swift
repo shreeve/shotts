@@ -44,15 +44,26 @@ import Testing
         // A drag to a content area of 1000 by 400: the height limits, the width floor holds.
         let asked = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 1000, height: 400)).size
         let snug = window.contentRect(forFrameRect: NSRect(origin: .zero, size: controller.windowWillResize(window, to: asked))).size
-        let zoom = (snug.height - controller.barHeight - CanvasView.inset * 2) / 1000
+        let zoom = (snug.height - controller.layout.barHeight - CanvasView.inset * 2) / 1000
         #expect(zoom < natural)
-        #expect(snug.width == EditorWindowController.minimumWidth)
-        #expect(abs(snug.height - (controller.barHeight + 1000 * zoom + CanvasView.inset * 2)) < 1)
+        #expect(abs(snug.width - controller.layout.minimumWidth) < 0.5)
+        #expect(abs(snug.height - (controller.layout.barHeight + 1000 * zoom + CanvasView.inset * 2)) < 1)
         window.setContentSize(snug)
         #expect(abs(controller.canvas.zoom - zoom) < 0.001)
         #expect(controller.canvas.pictureRect.width < 1600 * natural)
 
         window.setContentSize(NSSize(width: 3000, height: 2000))
         #expect(controller.canvas.zoom == natural)
+    }
+
+    /// A capture as big as the screen opens smaller, inside the screen's visible frame.
+    @Test func aScreenSizedCaptureOpensInsideTheScreen() throws {
+        let screen = try #require(NSScreen.main)
+        let scale = screen.backingScaleFactor
+        let w = Int(screen.frame.width * scale), h = Int(screen.frame.height * scale)
+        let controller = EditorWindowController(document: Document(width: w, height: h, scale: scale), source: blankImage(w, h), on: screen)
+        let frame = try #require(controller.window?.frame)
+        #expect(frame.width <= screen.visibleFrame.width + 0.5 && frame.height <= screen.visibleFrame.height + 0.5)
+        #expect(controller.canvas.zoom < 1 / scale)
     }
 }

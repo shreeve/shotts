@@ -88,7 +88,7 @@ public final class CanvasView: NSView {
     private var dragAnchor: CGPoint?
     private var dragOriginal: Annotation?
     /// For a callout being dragged with the select tool: which part was grabbed.
-    private var dragPart: HitTest.CalloutPart?
+    private var dragPart: HitTest.ArrowPart?
     /// The tool the drag in progress behaves as: the current tool, or select when an arrow tool
     /// clicked an existing arrow.
     private var dragTool: Tool = .select
@@ -218,7 +218,7 @@ public final class CanvasView: NSView {
         case .select:
             selectedID = HitTest.annotation(at: p, in: document, tolerance: hitTolerance)
             dragOriginal = selectedID.flatMap { document.annotation($0) }
-            dragPart = dragOriginal.flatMap { HitTest.calloutPart(at: p, of: $0, tolerance: hitTolerance) }
+            dragPart = dragOriginal.flatMap { HitTest.arrowPart(at: p, of: $0, scale: document.scale, tolerance: hitTolerance) }
             if event.clickCount == 2, let a = dragOriginal {
                 if case let .text(origin, string, _, _) = a.shape {
                     var d = document
@@ -304,7 +304,7 @@ public final class CanvasView: NSView {
             }
         case .callout:
             // The arrow lands as a callout with no words yet, and typing starts at its tail.
-            if let live, !live.isDegenerate, case let .arrow(tail, tip) = live.shape {
+            if let live, !live.isDegenerate(in: document.pixelBounds), case let .arrow(tail, tip) = live.shape {
                 let layout = calloutLayout(tail: tail, tip: tip, style: live.style)
                 let callout = Annotation(shape: .callout(from: tail, to: tip, text: Annotation.TextBox(origin: layout.origin, string: "", size: .zero, alignment: layout.alignment)), style: live.style)
                 var d = document
@@ -313,7 +313,7 @@ public final class CanvasView: NSView {
                 editCalloutText(callout.id, from: tail, to: tip, initial: "", style: live.style)
             }
         default:
-            if let live, !live.isDegenerate {
+            if let live, !live.isDegenerate(in: document.pixelBounds) {
                 var d = document
                 d.add(live)
                 commit(d)
@@ -326,9 +326,8 @@ public final class CanvasView: NSView {
     /// The text may run to within a small margin of the picture's edge on its side; Return
     /// breaks a line sooner. Only that margin wraps.
     private func calloutLayout(tail: CGPoint, tip: CGPoint, style: Style) -> CalloutLayout {
-        let margin = Self.textMargin * document.scale
-        return CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
-                             maxWidth: Double(document.width), in: document.pixelBounds.insetBy(dx: margin, dy: margin))
+        CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
+                      maxWidth: Double(document.width), in: document.pixelBounds, margin: Self.textMargin * document.scale)
     }
 
     /// A callout with its words laid out afresh for its arrow.
@@ -340,16 +339,12 @@ public final class CanvasView: NSView {
         return copy
     }
 
-    /// The annotation as a drag of `delta` leaves it: a callout moves by the part grabbed
-    /// (its words or the tail's end move the tail, the head moves the tip, the shaft moves all),
-    /// anything else moves whole.
+    /// The annotation as a drag of `delta` on the part grabbed leaves it, a callout whose arrow
+    /// changed shape with its words laid out afresh.
     private func dragged(_ original: Annotation, by delta: CGPoint) -> Annotation {
-        guard case let .callout(from, to, text) = original.shape else { return original.translated(by: delta) }
-        switch dragPart {
-        case .text, .tail: return relaid(original, from: from + delta, to: to, string: text.string)
-        case .head: return relaid(original, from: from, to: to + delta, string: text.string)
-        default: return original.translated(by: delta)
-        }
+        let moved = original.dragged(dragPart, by: delta)
+        guard case let .callout(from, to, text) = moved.shape, dragPart != .shaft, dragPart != nil else { return moved }
+        return relaid(moved, from: from, to: to, string: text.string)
     }
 
     /// Opens typing for a callout's words. While typing, the callout shows its arrow only and

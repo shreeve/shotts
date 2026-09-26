@@ -5,12 +5,12 @@ import Foundation
 /// from the tip, wrapping before the picture's edge. A mostly horizontal arrow puts the text
 /// left or right of the tail, justified against it and centered on it vertically; a mostly
 /// vertical one puts it below or above, centered on it horizontally. All values in image pixels.
-public struct CalloutLayout: Equatable, Sendable {
-    public enum Side: Equatable, Sendable {
+public struct CalloutLayout: Sendable {
+    enum Side: Equatable, Sendable {
         case left, right, above, below
     }
 
-    public var side: Side
+    var side: Side
     /// The widest a line may be before it wraps.
     public var width: Double
     /// The point the text hangs from, a quarter of a line out from the tail on the text's side:
@@ -22,7 +22,11 @@ public struct CalloutLayout: Equatable, Sendable {
     /// - Parameters:
     ///   - lineHeight: one line of the text; a quarter of it is the gap between the tail and the words.
     ///   - maxWidth: the widest box wanted, whatever room there is.
-    public init(tail: CGPoint, tip: CGPoint, lineHeight: Double, maxWidth: Double, in bounds: CGRect) {
+    ///   - picture: where the words must stay, less `margin` on every side; on a picture too
+    ///     small for the margin, it shrinks to a quarter of the picture's shorter side.
+    public init(tail: CGPoint, tip: CGPoint, lineHeight: Double, maxWidth: Double, in picture: CGRect, margin: Double = 0) {
+        let inset = max(0, min(margin, picture.width / 4, picture.height / 4))
+        let bounds = picture.insetBy(dx: inset, dy: inset)
         self.lineHeight = lineHeight
         self.bounds = bounds
         let gap = lineHeight * 0.25
