@@ -62,8 +62,9 @@ public enum WindowFinder {
 
 /// How the area picker looks. Kept in the defaults; the menu bar menu changes them.
 public struct SelectionOptions: Equatable, Sendable {
-    /// Dims everything but the selection and a small window at the crosshair.
-    public var dims = false
+    /// Dims everything outside the selection while it is being dragged out. Never before: a
+    /// click on a window, or aiming, leaves the screen as it is.
+    public var dims = true
     /// The magnifier beside the pointer, with the color under the crosshair.
     public var magnifies = true
     /// The short list of keys, until the first drag.
@@ -79,7 +80,7 @@ public struct SelectionOptions: Equatable, Sendable {
         get {
             let d = UserDefaults.standard
             var o = SelectionOptions()
-            o.dims = d.bool(forKey: "selection.dims")
+            o.dims = d.object(forKey: "selection.dimsDrag") == nil ? true : d.bool(forKey: "selection.dimsDrag")
             o.magnifies = d.object(forKey: "selection.magnifies") == nil ? true : d.bool(forKey: "selection.magnifies")
             o.showsHints = d.object(forKey: "selection.hints") == nil ? true : d.bool(forKey: "selection.hints")
             o.copiesOnCapture = d.object(forKey: "capture.copies") == nil ? true : d.bool(forKey: "capture.copies")
@@ -88,7 +89,7 @@ public struct SelectionOptions: Equatable, Sendable {
         }
         set {
             let d = UserDefaults.standard
-            d.set(newValue.dims, forKey: "selection.dims")
+            d.set(newValue.dims, forKey: "selection.dimsDrag")
             d.set(newValue.magnifies, forKey: "selection.magnifies")
             d.set(newValue.showsHints, forKey: "selection.hints")
             d.set(newValue.copiesOnCapture, forKey: "capture.copies")
@@ -317,17 +318,11 @@ final class OverlayView: NSView {
         ctx.draw(display.image, in: bounds)
         ctx.restoreGState()
 
-        // Everything outside a selection being dragged is dimmed; before that, only when the
-        // option asks for it, and then never the pixel at the crosshair.
-        if let selection {
+        // Everything outside a selection being dragged is dimmed, when the option is on.
+        if let selection, options.dims {
             ctx.setFillColor(CGColor(gray: 0, alpha: 0.35))
             ctx.addRect(bounds)
             ctx.addRect(selection)
-            ctx.fillPath(using: .evenOdd)
-        } else if options.dims {
-            ctx.setFillColor(CGColor(gray: 0, alpha: 0.35))
-            ctx.addRect(bounds)
-            ctx.addRect(CGRect(x: floor(pointer.x) - 2, y: floor(pointer.y) - 2, width: 5, height: 5))
             ctx.fillPath(using: .evenOdd)
         }
 

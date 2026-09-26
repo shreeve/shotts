@@ -18,7 +18,7 @@ user did not copy, save, or drag out.
 | F10, or Capture Area in the menu bar | Every display is pictured as it is at that moment, the pointer disappears, and a crosshair follows it over that picture. |
 | Move over a window | The window under the crosshair gets a blue outline. |
 | Click | Captures that window on its own, without whatever was covering it, and without its shadow. |
-| Drag | Selects an area; everything outside it dims. Its size in pixels shows in the magnifier. |
+| Drag | Selects an area; everything outside it dims (unless Dim Outside the Selection is off). Its size in pixels shows in the magnifier. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
 | Release | Cuts the area out of the picture at the display's full resolution, puts it on the clipboard (unless Copy Capture to Clipboard is off), and opens the editor. |
@@ -39,7 +39,7 @@ The menu bar menu holds the picker's options, remembered across launches:
 | --- | --- | --- |
 | Copy Capture to Clipboard | on | The capture is on the clipboard the moment it is taken, before any editing; Copy in the editor replaces it with the annotated one. |
 | Drop Shadow Around Captures | off | Copied, saved, and dragged pictures get a transparent margin with a soft shadow, following the picture's edge. |
-| Dim Screen While Selecting | off | Darkens the screen before a drag too, except a small window at the crosshair, so the color there is true. |
+| Dim Outside the Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
 | Show Magnifier | on | The magnifier and its color readout. |
 | Show Hints | on | The list of keys until the first drag. |
 

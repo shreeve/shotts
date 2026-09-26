@@ -80,7 +80,8 @@ checking the renderer by eye. `Shotts --preview-style out.png` draws the editor'
 `Shotts --select out.txt` runs the picker alone over a drawn
 stand-in for each display and writes `selected x,y,w,h on <display>` or `cancelled`, which
 exercises the overlay on a Mac that has not granted Screen Recording. `Shotts --preview-overlay
-out.png [--dragged] [--dim] [--corner]` draws the picker off screen, with the pointer three pixels inside
+out.png [--dragged] [--dim] [--corner]` draws the picker off screen (`--dim` is the option on;
+it shows only with `--dragged`), with the pointer three pixels inside
 the corner of the stand-in's square at 1600,1600 so the magnifier's mapping can be checked
 without touching the screen. All are in `AppDelegate.applicationDidFinishLaunching`.
 

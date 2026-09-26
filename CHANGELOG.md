@@ -12,8 +12,8 @@ The first milestone: the daily screenshot workflow.
   it, to capture just that window, whatever was covering it. A magnifier beside the pointer shows the pixels under the
   crosshair, the crosshair itself magnified over them, their color in hex, and the selection's size; Command-C copies the color. A
   list of the keys shows until the first drag. The capture goes to the clipboard as soon as
-  it is taken. That, dimming before a drag, the magnifier, and the hints are options in the menu
-  bar menu.
+  it is taken. That, dimming outside a dragged selection, the magnifier, and the hints are
+  options in the menu bar menu.
 - An editor with arrow-with-text (drag the arrow, then type beside its tail), arrow, text,
   rectangle, ellipse, pen, highlighter, obscure, and crop tools,
   undo and redo, single-key tool switching, a color panel with ten colors and a custom color,
