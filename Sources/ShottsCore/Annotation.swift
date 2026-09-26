@@ -3,14 +3,19 @@ import Foundation
 
 /// One mark on a capture. Every coordinate is in image pixels with the origin at the top-left,
 /// the same space as the capture's bitmap.
+public enum TextAlignment: Equatable, Sendable {
+    case left, right
+}
+
 public struct Annotation: Identifiable, Equatable, Sendable {
     public enum Shape: Equatable, Sendable {
         case arrow(from: CGPoint, to: CGPoint)
         case rectangle(CGRect)
         case ellipse(CGRect)
-        /// `size` is the laid-out text's extent, measured by the UI when the text is set, so
-        /// hit testing and bounds need no font machinery here.
-        case text(origin: CGPoint, string: String, size: CGSize)
+        /// `size` is the text's layout box, measured by the UI when the text is set, so hit
+        /// testing and bounds need no font machinery here. Lines wrap inside its width and sit
+        /// against its left or right edge by `alignment`.
+        case text(origin: CGPoint, string: String, size: CGSize, alignment: TextAlignment = .left)
         case pen([CGPoint])
         case highlighter([CGPoint])
         /// Pixelates the source under the rectangle.
@@ -35,7 +40,7 @@ public struct Annotation: Identifiable, Equatable, Sendable {
                           width: abs(to.x - from.x), height: abs(to.y - from.y))
         case let .rectangle(rect), let .ellipse(rect), let .obscure(rect):
             return rect.standardized
-        case let .text(origin, _, size):
+        case let .text(origin, _, size, _):
             return CGRect(origin: origin, size: size)
         case let .pen(points), let .highlighter(points):
             return Self.bounds(of: points)
@@ -53,8 +58,8 @@ public struct Annotation: Identifiable, Equatable, Sendable {
             copy.shape = .ellipse(rect.offsetBy(dx: delta.x, dy: delta.y))
         case let .obscure(rect):
             copy.shape = .obscure(rect.offsetBy(dx: delta.x, dy: delta.y))
-        case let .text(origin, string, size):
-            copy.shape = .text(origin: origin + delta, string: string, size: size)
+        case let .text(origin, string, size, alignment):
+            copy.shape = .text(origin: origin + delta, string: string, size: size, alignment: alignment)
         case let .pen(points):
             copy.shape = .pen(points.map { $0 + delta })
         case let .highlighter(points):
@@ -70,7 +75,7 @@ public struct Annotation: Identifiable, Equatable, Sendable {
             return from.distance(to: to) < 3
         case let .rectangle(rect), let .ellipse(rect), let .obscure(rect):
             return rect.width < 3 || rect.height < 3
-        case let .text(_, string, _):
+        case let .text(_, string, _, _):
             return string.isEmpty
         case let .pen(points), let .highlighter(points):
             return points.count < 2

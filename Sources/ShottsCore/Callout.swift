@@ -35,14 +35,17 @@ public struct CalloutLayout: Equatable, Sendable {
         origin.y = min(max(tail.y - lineHeight / 2, bounds.minY), max(bounds.minY, bounds.maxY - lineHeight))
     }
 
-    /// The box's right edge, for a right-anchored callout whose text has been measured.
+    /// The box's right edge, half a line short of the tail for a right-anchored callout.
     public var rightEdge: Double { origin.x + width }
 
-    /// Where a box of `size` sits for this layout: against the anchored edge, and moved up if
-    /// it would run past the bottom of `bounds`.
+    /// How the text sits in its box: against the tail.
+    public var alignment: TextAlignment { anchorsRight ? .right : .left }
+
+    /// Where a box of `size` sits for this layout: the box keeps its full width, so a
+    /// right-aligned text ends at `rightEdge`; it moves up if it would run past the bottom of
+    /// `bounds`.
     public func origin(for size: CGSize, in bounds: CGRect) -> CGPoint {
         var o = origin
-        if anchorsRight { o.x = max(bounds.minX, rightEdge - size.width) }
         if o.y + size.height > bounds.maxY { o.y = max(bounds.minY, bounds.maxY - size.height) }
         return o
     }
