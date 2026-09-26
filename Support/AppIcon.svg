@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Shotts app icon: a camera in a viewfinder on a gradient tile, with a glass lens.
+     Apple's grid: an 824-point tile with 100 points of margin on a 1024 canvas; the Dock shadow
+     is drawn into the margin by Scripts/lib/render-app-icon.swift, which renders this file.
+     AppKit's SVG renderer draws gradients but ignores filters, so nothing here uses one. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3D33B8"/>
+      <stop offset="0.55" stop-color="#2470EB"/>
+      <stop offset="1" stop-color="#47C7F5"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glass" cx="0.35" cy="0.32" r="0.8">
+      <stop offset="0" stop-color="#BFFAFF"/>
+      <stop offset="0.45" stop-color="#199AE6"/>
+      <stop offset="1" stop-color="#0D1F73"/>
+    </radialGradient>
+  </defs>
+
+  <!-- The tile, its top-half gloss, and a fine lighter rim inside the edge. -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#tile)"/>
+  <path d="M100 512 V284 A184 184 0 0 1 284 100 H740 A184 184 0 0 1 924 284 V512 Z" fill="url(#gloss)"/>
+  <rect x="104" y="104" width="816" height="816" rx="180" fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="4"/>
+
+  <!-- The viewfinder: four corner brackets. -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="44" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M430 282 H358 A76 76 0 0 0 282 358 V430"/>
+    <path d="M594 282 H666 A76 76 0 0 1 742 358 V430"/>
+    <path d="M430 742 H358 A76 76 0 0 1 282 666 V594"/>
+    <path d="M594 742 H666 A76 76 0 0 0 742 666 V594"/>
+  </g>
+
+  <!-- The camera: the hump over the body, then the body with the lens ring and the flash cut
+       out of it, so the tile shows through them. -->
+  <rect x="416" y="378" width="136" height="60" rx="20" fill="#FFFFFF"/>
+  <path fill="#FFFFFF" fill-rule="evenodd"
+        d="M396 400 H628 A40 40 0 0 1 668 440 V580 A40 40 0 0 1 628 620 H396 A40 40 0 0 1 356 580 V440 A40 40 0 0 1 396 400 Z
+           M585.5 518.5 A73.5 73.5 0 1 0 438.5 518.5 A73.5 73.5 0 1 0 585.5 518.5 Z
+           M634 462 A18 18 0 1 0 598 462 A18 18 0 1 0 634 462 Z"/>
+
+  <!-- The lens: a white bezel with cool glass in it, lit from the upper left. -->
+  <circle cx="512" cy="518.5" r="49.5" fill="#FFFFFF"/>
+  <circle cx="512" cy="518.5" r="45" fill="url(#glass)"/>
+  <ellipse cx="500" cy="503" rx="10" ry="6.5" fill="#FFFFFF" fill-opacity="0.75"/>
+</svg>
