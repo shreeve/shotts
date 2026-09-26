@@ -15,12 +15,20 @@ public enum Export {
         return true
     }
 
-    /// `Shotts 2026-09-26 at 10.12.34.png`, in the style of the Screenshot app.
-    public static func suggestedName(date: Date = .now) -> String {
+    /// `Shotts 2026-09-26 at 10.12.34 PM.png`, named the way the Screenshot app names its files:
+    /// the date year first, then the time as the user's locale writes it, 12 or 24 hour. Colons,
+    /// which Finder shows as slashes, become dots, and the narrow space some locales put before
+    /// AM or PM becomes a plain one, which is easier to type in a shell.
+    public static func suggestedName(date: Date = .now, locale: Locale = .current) -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        return "Shotts \(f.string(from: date)).png"
+        f.locale = locale
+        f.calendar = Calendar(identifier: .gregorian)
+        // A time style, unlike a fixed format, follows the 24-hour setting in System Settings;
+        // medium is the one with seconds.
+        f.timeStyle = .medium
+        f.dateFormat = "yyyy-MM-dd 'at' " + f.dateFormat
+        let stamp = f.string(from: date).replacing(":", with: ".").replacing("/", with: "-").replacing(/\s/, with: " ")
+        return "Shotts \(stamp).png"
     }
 
     /// Writes the PNG.

@@ -163,6 +163,15 @@ func patternImage(_ width: Int, _ height: Int) -> CGImage {
         #expect(reds.allSatisfy { (64...192).contains($0) }, "\(Set(reds).sorted())")
     }
 
+    /// The time is written the way the locale writes it, with dots for colons and plain spaces.
+    @Test func theSuggestedNameFollowsTheLocalesTimeFormat() throws {
+        let date = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 26, hour: 22, minute: 12, second: 34)))
+        #expect(Export.suggestedName(date: date, locale: Locale(identifier: "en_US")) == "Shotts 2026-09-26 at 10.12.34 PM.png")
+        #expect(Export.suggestedName(date: date, locale: Locale(identifier: "en_US@hours=h23")) == "Shotts 2026-09-26 at 22.12.34.png")
+        #expect(Export.suggestedName(date: date, locale: Locale(identifier: "de_DE")) == "Shotts 2026-09-26 at 22.12.34.png")
+        #expect(Export.suggestedName(date: date, locale: Locale(identifier: "th_TH")).hasPrefix("Shotts 2026-09-26 at "))
+    }
+
     /// Nothing drawn means nothing to render: the export is the capture, not a copy of it.
     @Test func anUntouchedCaptureExportsItself() {
         let source = blankImage(60, 40)
