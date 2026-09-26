@@ -121,6 +121,33 @@ import Testing
         #expect(canvas.document.annotations.isEmpty)
     }
 
+    @Test func aDragWithoutItsMouseUpIsPutBackByTheNextClick() {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .rectangle
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 140, y: 140))
+        let before = canvas.document
+        canvas.tool = .select
+        mouse.down(CGPoint(x: 40, y: 90))
+        mouse.drag(CGPoint(x: 100, y: 90)) // and the mouse-up never arrives
+        mouse.down(CGPoint(x: 300, y: 250)); mouse.up(CGPoint(x: 300, y: 250))
+        #expect(canvas.document == before)
+        canvas.undo(nil)
+        #expect(canvas.document.annotations.isEmpty)
+    }
+
+    @Test func aTextBeingEditedIsNotShownSelected() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
+        canvas.typeText("Hi")
+        canvas.endTextEntry(commit: true)
+        let text = try #require(canvas.document.annotations.first)
+        canvas.tool = .select
+        mouse.doubleClick(CGPoint(x: text.bounds.midX, y: text.bounds.midY))
+        #expect(canvas.textField != nil && canvas.selectedID == nil)
+    }
+
     @Test func aMoveIsOneStep() {
         let canvas = canvasInWindow()
         let mouse = Mouse(canvas: canvas)
@@ -262,6 +289,20 @@ import Testing
         controller.onClose = { closed = true }
         controller.cancelOperation(nil)
         #expect(closed && !asked())
+    }
+
+    @Test func closingMidDragPutsTheDragBack() {
+        let (controller, _) = editor(annotated: true)
+        let canvas = controller.canvas
+        let before = canvas.document
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .select
+        mouse.down(CGPoint(x: 10, y: 35))
+        mouse.drag(CGPoint(x: 80, y: 35))
+        #expect(controller.windowShouldClose(controller.window!) == false)
+        #expect(canvas.document == before)
+        canvas.undo(nil) // not stuck behind a drag that never ended
+        #expect(canvas.document.isBlank)
     }
 
     @Test func wordsBeingTypedCountAsAnnotations() {

@@ -159,6 +159,9 @@ public final class CanvasView: NSView {
         if history.redo() != nil { selectedID = nil; needsDisplay = true; onChange?() }
     }
 
+    /// There is nothing to select all of; this keeps Command-A from beeping.
+    public override func selectAll(_ sender: Any?) {}
+
     @objc public func delete(_ sender: Any?) {
         guard let id = selectedID, dragAnchor == nil else { return }
         var d = document
@@ -223,6 +226,9 @@ public final class CanvasView: NSView {
     public override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         endTextEntry(commit: true)
+        // A drag whose mouse-up never came (a close asked mid-drag, say) is put back, not
+        // carried into this one.
+        if dragAnchor != nil { _ = cancelCurrent() }
         let p = imagePoint(event)
         let hit = HitTest.annotation(at: p, in: document, tolerance: hitTolerance).flatMap(document.annotation)
         dragAnchor = p
@@ -432,6 +438,7 @@ public final class CanvasView: NSView {
         case let .text(origin, string, size, alignment):
             d.replace(Annotation(id: id, shape: .text(origin: origin, string: "", size: size, alignment: alignment), style: a.style))
             history.replaceCurrent(d)
+            selectedID = nil // its box would stay at the old words' size while new ones are typed
             beginTextEntry(at: origin, initial: string, style: a.style)
         case let .callout(from, to, text):
             d.replace(relaid(a, from: from, to: to, string: ""))

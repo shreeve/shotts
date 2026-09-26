@@ -348,7 +348,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 
     /// Closing a capture with annotations asks first, in a sheet; Discard closes it.
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
-        canvas.endTextEntry(commit: true) // words being typed count as annotations
+        // Words being typed count as annotations; a drag in progress is put back.
+        _ = canvas.cancelCurrent()
         if closing || canvas.document.isBlank { return true }
         guard sender.attachedSheet == nil else { return false }
         askToDiscard(sender) { [weak self] in self?.finish() }

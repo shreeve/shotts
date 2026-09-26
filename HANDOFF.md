@@ -8,7 +8,7 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 0.1.0 is released (GitHub, the Homebrew cask, Sparkle), and the repository is public. The
 `revamp` branch (from `main` at e945441) is a correctness, security, and performance pass over
 the whole app; `CHANGELOG.md`'s Unreleased section is what it changed for users. It builds with
-no warnings (warnings are errors) and `swift test` passes: 39 Core tests and 40 AppKit tests.
+no warnings (warnings are errors) and `swift test` passes: 39 Core tests and 43 AppKit tests.
 
 Next, in order:
 
