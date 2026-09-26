@@ -174,15 +174,16 @@ public enum Renderer {
             size = attributed.size()
             size.width += pad * 2
         }
-        // Room for the outline, which strokes outside the glyph.
+        // Room for the outline, which strokes outside the glyphs: above the first line and below
+        // the last as well as at each side.
         size.width = ceil(size.width)
-        size.height = ceil(size.height + pad)
+        size.height = ceil(size.height + pad * 2)
         return size
     }
 
     /// One line of text in this style, in pixels.
     public static func lineHeight(style: Style, scale: Double) -> Double {
-        ceil(attributedText("Ag", style: style, scale: scale).size().height + outlineWidth(style, scale: scale))
+        ceil(attributedText("Ag", style: style, scale: scale).size().height + outlineWidth(style, scale: scale) * 2)
     }
 
     /// Everything an annotation may paint, its shadow and outline included, in image pixels.
@@ -240,7 +241,7 @@ public enum Renderer {
         case .right: paragraph.alignment = .right
         }
         // The box the text was measured in; lines wrap inside it exactly as they were measured.
-        let box = CGRect(x: origin.x + pad, y: origin.y, width: max(size.width - pad * 2, 1), height: size.height + pad)
+        let box = CGRect(x: origin.x + pad, y: origin.y + pad, width: max(size.width - pad * 2, 1), height: size.height)
         let fill = NSColor(cgColor: cgColor(style.color)) ?? .red
         let outline: NSColor = style.color.isLight ? .black : .white
         // AppKit's string drawing wants a current NSGraphicsContext; the canvas has one, and

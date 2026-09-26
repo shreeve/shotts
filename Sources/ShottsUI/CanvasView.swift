@@ -661,7 +661,7 @@ final class TextEntry: NSTextView {
         layoutManager?.ensureLayout(for: textContainer!)
         let used = layoutManager?.usedRect(for: textContainer!) ?? .zero
         if layout == nil { width = max(used.width, 4) + 4 }
-        frame = CGRect(x: x, y: origin.y * zoom + picture.minY, width: width, height: max(used.height, font?.pointSize ?? 20))
+        frame = CGRect(x: x, y: origin.y * zoom + picture.minY + pad, width: width, height: max(used.height, font?.pointSize ?? 20))
         wordsFrame = CGRect(x: origin.x * zoom + picture.minX, y: origin.y * zoom + picture.minY, width: box.width * zoom, height: box.height * zoom)
     }
 

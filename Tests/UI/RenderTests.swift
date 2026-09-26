@@ -59,6 +59,31 @@ func transparentContext(_ width: Int, _ height: Int) -> CGContext {
         }
     }
 
+    /// Selection, hit testing, and a callout's place in the picture all go by a text's measured
+    /// box, so its ink, outline included, stays inside it.
+    @Test func textInkStaysInsideItsMeasuredBox() {
+        var style = Style.standard
+        style.shadow = false
+        let words = "ÅÉ gjpqy\nTwo lines"
+        let size = Renderer.textSize(words, style: style, scale: 2)
+        let origin = CGPoint(x: 100, y: 100)
+        let a = Annotation(shape: .text(origin: origin, string: words, size: size), style: style)
+        let ctx = transparentContext(800, 400)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
+        Renderer.draw(a, document: Document(width: 800, height: 400, scale: 2), source: blankImage(800, 400), in: ctx)
+        NSGraphicsContext.restoreGraphicsState()
+        let box = CGRect(origin: origin, size: size).insetBy(dx: -1, dy: -1)
+        let pixels = ctx.data!.bindMemory(to: UInt8.self, capacity: 800 * 400 * 4)
+        var outside = 0
+        for y in 0..<400 {
+            for x in 0..<800 where pixels[(y * 800 + x) * 4 + 3] > 0 && !box.contains(CGPoint(x: Double(x) + 0.5, y: Double(y) + 0.5)) {
+                outside += 1
+            }
+        }
+        #expect(outside == 0, "\(outside) pixels of ink outside the measured box")
+    }
+
     /// What the canvas shows at the picture's on-screen size is what is exported, shadows included.
     @Test func theCanvasShowsWhatIsExported() throws {
         let canvas = canvasInWindow(width: 600, height: 400, scale: 2, zoom: 0.5)
