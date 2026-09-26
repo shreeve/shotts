@@ -43,11 +43,10 @@ final class CaptureFlow {
                 // The window on its own, whatever covered it. If it has gone meanwhile, the
                 // area it occupied in the display picture stands in.
                 Task {
-                    let image = (try? await ScreenCapture.captureWindow(window.id, scale: display.scale,
-                                                                        shadow: SelectionOptions.current.dropShadow))
-                        ?? display.cut(window.frame)
-                    guard let image else { restoreFocus(); return }
-                    deliver(image, scale: display.scale, on: display.screen)
+                    let captured = (try? await ScreenCapture.captureWindow(window.id, shadow: SelectionOptions.current.dropShadow))
+                        ?? display.cut(window.frame).map { ($0, display.scale) }
+                    guard let (image, scale) = captured else { restoreFocus(); return }
+                    deliver(image, scale: scale, on: display.screen)
                 }
             }
         }

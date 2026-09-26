@@ -57,35 +57,6 @@ public struct WindowInfo: Equatable, Sendable {
     }
 }
 
-/// The windows on screen, from the window server, per display in the picker's coordinates.
-/// Only ordinary windows count: no menu bar, Dock, desktop, or Shotts' own.
-public enum WindowFinder {
-    public static func windows(on screen: NSScreen, excluding pid: pid_t = ProcessInfo.processInfo.processIdentifier) -> [WindowInfo] {
-        guard let primary = NSScreen.screens.first,
-              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
-        else { return [] }
-        // The window server's space has its origin at the primary display's top-left; AppKit's
-        // at its bottom-left. This display's rectangle in the window server's space:
-        let display = CGRect(x: screen.frame.minX, y: primary.frame.height - screen.frame.maxY,
-                             width: screen.frame.width, height: screen.frame.height)
-        var result: [WindowInfo] = []
-        for w in list {
-            guard (w[kCGWindowLayer as String] as? Int) == 0,
-                  (w[kCGWindowOwnerPID as String] as? pid_t) != pid,
-                  (w[kCGWindowAlpha as String] as? Double ?? 1) > 0,
-                  let id = w[kCGWindowNumber as String] as? CGWindowID,
-                  let b = w[kCGWindowBounds as String] as? [String: CGFloat],
-                  let x = b["X"], let y = b["Y"], let width = b["Width"], let height = b["Height"],
-                  width >= 40, height >= 40
-            else { continue }
-            let rect = CGRect(x: x, y: y, width: width, height: height).intersection(display)
-            guard !rect.isEmpty else { continue }
-            result.append(WindowInfo(id: id, frame: rect.offsetBy(dx: -display.minX, dy: -display.minY)))
-        }
-        return result
-    }
-}
-
 /// How the area picker looks. Kept in the defaults; the menu bar menu changes them.
 public struct SelectionOptions: Equatable, Sendable {
     /// Dims everything outside the selection while it is being dragged out. Never before: a

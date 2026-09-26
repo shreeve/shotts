@@ -58,8 +58,8 @@ enum DevSwitches {
             let shadow = !arguments.contains("--no-shadow")
             Task {
                 do {
-                    let image = try await ScreenCapture.captureWindow(id, scale: NSScreen.main?.backingScaleFactor ?? 2, shadow: shadow)
-                    try Export.write(Document(width: image.width, height: image.height, scale: 2), source: image, to: out)
+                    let (image, scale) = try await ScreenCapture.captureWindow(id, shadow: shadow)
+                    try Export.write(Document(width: image.width, height: image.height, scale: scale), source: image, to: out)
                     exit(0)
                 } catch {
                     fputs("capture failed: \(error)\n", stderr)
