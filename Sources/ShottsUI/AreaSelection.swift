@@ -210,12 +210,14 @@ final class OverlayView: NSView {
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    #if DEBUG
     /// For previews: the state a real session would reach with the pointer here after a drag.
     func preview(pointer: CGPoint, selection: CGRect?) {
         self.pointer = pointer
         self.selection = selection
         hasDragged = selection != nil
     }
+    #endif
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -576,7 +578,8 @@ public enum PixelSampler {
     }
 }
 
-/// The picker's view alone, for drawing it off screen in a check.
+#if DEBUG
+/// The picker's view alone, for drawing it off screen in a developer check.
 public enum OverlayPreview {
     public static func make(display: DisplayImage, options: SelectionOptions, pointer: CGPoint, selection: CGRect?) -> NSView {
         let view = OverlayView(display: display, options: options)
@@ -584,3 +587,4 @@ public enum OverlayPreview {
         return view
     }
 }
+#endif
