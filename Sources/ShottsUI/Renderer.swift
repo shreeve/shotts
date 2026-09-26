@@ -102,7 +102,7 @@ public enum Renderer {
         else { return nil }
         if shadow {
             // Set before the flip: the offset is in device space, where down is negative.
-            ctx.setShadow(offset: CGSize(width: 0, height: -shadowDrop * s), blur: shadowBlur * s, color: CGColor(gray: 0, alpha: 0.38))
+            ctx.setShadow(offset: CGSize(width: 0, height: -shadowDrop * s), blur: shadowBlur * s, color: CGColor(gray: 0, alpha: 0.28))
             ctx.beginTransparencyLayer(auxiliaryInfo: nil)
         }
         // Flip so the document's top-left origin lands at the bitmap's top-left, inside the margin.
@@ -120,11 +120,11 @@ public enum Renderer {
     }
 
     /// The shadow's room around an exported picture, its drop, and its blur, in points. The
-    /// drop is large next to the blur on purpose: the shadow gathers below the picture and
-    /// barely shows above it, the way a window's does on macOS.
-    public static let shadowMargin: CGFloat = 44
-    static let shadowDrop: CGFloat = 14
-    static let shadowBlur: CGFloat = 22
+    /// drop exceeds the blur on purpose: the shadow gathers below the picture and none of it
+    /// reaches above the top edge, the way a window's does on macOS.
+    public static let shadowMargin: CGFloat = 40
+    static let shadowDrop: CGFloat = 16
+    static let shadowBlur: CGFloat = 14
 
     public static func pngData(of document: Document, source: CGImage, shadow: Bool = false) -> Data? {
         guard let image = image(of: document, source: source, shadow: shadow) else { return nil }
