@@ -15,7 +15,7 @@ user did not copy, save, or drag out.
 
 | Action | Result |
 | --- | --- |
-| F10, or Capture Area in the menu bar | Every display is pictured as it is at that moment, and the pointer becomes a crosshair over that picture. |
+| F10, or Capture Area in the menu bar | Every display is pictured as it is at that moment, the pointer disappears, and a crosshair follows it over that picture. |
 | Drag | Selects an area. Its size in pixels shows in the magnifier. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
