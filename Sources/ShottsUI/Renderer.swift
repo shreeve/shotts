@@ -88,28 +88,44 @@ public enum Renderer {
     }
 
     /// The exported image: the visible (cropped) part with every annotation, at pixel size.
-    public static func image(of document: Document, source: CGImage) -> CGImage? {
+    /// With `shadow`, a transparent margin around it holds a soft shadow that follows the
+    /// picture's own edge, rounded corners and all.
+    public static func image(of document: Document, source: CGImage, shadow: Bool = false) -> CGImage? {
         let visible = document.visibleRect
-        let width = Int(visible.width), height = Int(visible.height)
+        let s = document.scale
+        let margin = shadow ? (shadowMargin * s).rounded() : 0
+        let width = Int(visible.width + margin * 2), height = Int(visible.height + margin * 2)
         guard width > 0, height > 0,
               let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
         else { return nil }
-        // Flip so the document's top-left origin lands at the bitmap's top-left.
-        ctx.translateBy(x: 0, y: CGFloat(height))
+        if shadow {
+            // Set before the flip: the offset is in device space, where down is negative.
+            ctx.setShadow(offset: CGSize(width: 0, height: -shadowDrop * s), blur: shadowBlur * s, color: CGColor(gray: 0, alpha: 0.5))
+            ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+        }
+        // Flip so the document's top-left origin lands at the bitmap's top-left, inside the margin.
+        ctx.translateBy(x: margin, y: CGFloat(height) - margin)
         ctx.scaleBy(x: 1, y: -1)
         ctx.translateBy(x: -visible.minX, y: -visible.minY)
+        ctx.clip(to: visible)
         let nsContext = NSGraphicsContext(cgContext: ctx, flipped: true)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = nsContext
         draw(document, source: source, in: ctx)
         NSGraphicsContext.restoreGraphicsState()
+        if shadow { ctx.endTransparencyLayer() }
         return ctx.makeImage()
     }
 
-    public static func pngData(of document: Document, source: CGImage) -> Data? {
-        guard let image = image(of: document, source: source) else { return nil }
+    /// The shadow's room around an exported picture, its drop, and its blur, in points.
+    public static let shadowMargin: CGFloat = 32
+    static let shadowDrop: CGFloat = 10
+    static let shadowBlur: CGFloat = 20
+
+    public static func pngData(of document: Document, source: CGImage, shadow: Bool = false) -> Data? {
+        guard let image = image(of: document, source: source, shadow: shadow) else { return nil }
         let rep = NSBitmapImageRep(cgImage: image)
         return rep.representation(using: .png, properties: [:])
     }

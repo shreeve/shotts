@@ -38,6 +38,7 @@ The menu bar menu holds the picker's options, remembered across launches:
 | Option | Default | Effect |
 | --- | --- | --- |
 | Copy Capture to Clipboard | on | The capture is on the clipboard the moment it is taken, before any editing; Copy in the editor replaces it with the annotated one. |
+| Drop Shadow Around Captures | off | Copied, saved, and dragged pictures get a transparent margin with a soft shadow, following the picture's edge. |
 | Dim Screen While Selecting | off | Darkens the screen before a drag too, except a small window at the crosshair, so the color there is true. |
 | Show Magnifier | on | The magnifier and its color readout. |
 | Show Hints | on | The list of keys until the first drag. |
@@ -88,7 +89,8 @@ annotations asks first.
 | Save… (Command-S) | Asks where; suggests the Desktop and a name like `Shotts 2026-09-26 at 10.12.34.png`. The editor closes. |
 | Drag the hand icon | Drags a PNG file into another app or the Finder. The editor closes when the drop lands. |
 
-The copied, saved, and dragged pictures are identical to what the editor shows.
+The copied, saved, and dragged pictures are identical to what the editor shows, plus the drop
+shadow when that option is on.
 
 After the editor closes, the app that was in front when F10 was pressed comes back to the front.
 

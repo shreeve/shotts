@@ -118,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             document.setCrop(CGRect(x: w * 0.1, y: h * 0.1, width: w * 0.6, height: h * 0.5))
         }
         do {
-            try Export.write(document, source: cg, to: output)
+            try Export.write(document, source: cg, to: output, shadow: CommandLine.arguments.contains("--shadow"))
             return true
         } catch {
             fputs("render failed: \(error)\n", stderr)
@@ -164,6 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(open)
         menu.addItem(.separator())
         menu.addItem(optionItem("Copy Capture to Clipboard", \.copiesOnCapture))
+        menu.addItem(optionItem("Drop Shadow Around Captures", \.dropShadow))
         menu.addItem(optionItem("Dim Screen While Selecting", \.dims))
         menu.addItem(optionItem("Show Magnifier", \.magnifies))
         menu.addItem(optionItem("Show Hints", \.showsHints))
