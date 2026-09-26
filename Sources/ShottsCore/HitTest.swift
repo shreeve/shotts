@@ -36,7 +36,34 @@ public enum HitTest {
                 return true
             }
             return false
+        case .callout:
+            return calloutPart(at: p, of: a, tolerance: tolerance) != nil
         }
+    }
+
+    public enum CalloutPart: Equatable, Sendable {
+        /// The shaft: dragging it moves the whole callout.
+        case arrow
+        /// The words: dragging them moves the tail, the tip staying put.
+        case text
+        /// The head: dragging it moves the tip, the tail and words staying put.
+        case head
+    }
+
+    /// Which part of a callout a point lands on: its words, its head, else its arrow.
+    public static func calloutPart(at p: CGPoint, of a: Annotation, tolerance: Double) -> CalloutPart? {
+        guard case let .callout(from, to, text) = a.shape else { return nil }
+        if !text.string.isEmpty, text.frame.insetBy(dx: -tolerance, dy: -tolerance).contains(p) { return .text }
+        let geometry = ArrowGeometry(from: from, to: to, width: a.style.strokeWidth, tapered: a.style.taperedArrows)
+        let headLength = max(a.style.strokeWidth * 6, 18)
+        if p.distance(to: to) <= headLength + tolerance, geometry.outline.contains(p) || p.distance(to: to) <= tolerance + headLength / 2 {
+            return .head
+        }
+        let reach = tolerance + a.style.strokeWidth / 2
+        if distance(from: p, toSegment: from, to) <= reach || geometry.outline.contains(p) {
+            return .arrow
+        }
+        return nil
     }
 
     static func distance(from p: CGPoint, toSegment a: CGPoint, _ b: CGPoint) -> Double {

@@ -139,20 +139,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         document.add(Annotation(shape: .obscure(CGRect(x: w * 0.7, y: h * 0.8, width: w * 0.2, height: h * 0.12)), style: style))
         let text = "This is impossible to use!"
         document.add(Annotation(shape: .text(origin: CGPoint(x: w * 0.15, y: h * 0.3), string: text, size: Renderer.textSize(text, style: big, scale: 2)), style: big))
-        // A callout: its arrow, and text wrapped beside the tail on the side away from the tip.
-        let tail = CGPoint(x: w * 0.55, y: h * 0.9), tip = CGPoint(x: w * 0.85, y: h * 0.7)
-        document.add(Annotation(shape: .arrow(from: tail, to: tip), style: style))
-        let layout = CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: 2), maxWidth: w * 0.3, in: document.pixelBounds)
-        let words = "A callout wraps its words beside the tail and stays inside the picture"
-        let size = Renderer.textSize(words, style: style, scale: 2, width: layout.width)
-        document.add(Annotation(shape: .text(origin: layout.origin(for: size), string: words, size: size, alignment: layout.alignment), style: style))
+        // Callouts: an arrow with its words wrapped beside the tail on the side away from the tip.
+        func callout(_ tail: CGPoint, _ tip: CGPoint, _ words: String, _ style: Style, maxWidth: Double) -> Annotation {
+            let layout = CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: 2), maxWidth: maxWidth, in: document.pixelBounds)
+            let size = Renderer.textSize(words, style: style, scale: 2, width: layout.width)
+            let box = Annotation.TextBox(origin: layout.origin(for: size), string: words, size: size, alignment: layout.alignment)
+            return Annotation(shape: .callout(from: tail, to: tip, text: box), style: style)
+        }
+        document.add(callout(CGPoint(x: w * 0.55, y: h * 0.9), CGPoint(x: w * 0.85, y: h * 0.7),
+                             "A callout wraps its words beside the tail and stays inside the picture", style, maxWidth: w * 0.3))
         // And a vertical one: text centered above the tail of an arrow pointing down.
-        let tail2 = CGPoint(x: w * 0.3, y: h * 0.6), tip2 = CGPoint(x: w * 0.32, y: h * 0.85)
-        document.add(Annotation(shape: .arrow(from: tail2, to: tip2), style: blue))
-        let layout2 = CalloutLayout(tail: tail2, tip: tip2, lineHeight: Renderer.lineHeight(style: blue, scale: 2), maxWidth: w * 0.25, in: document.pixelBounds)
-        let words2 = "centered above, growing up"
-        let size2 = Renderer.textSize(words2, style: blue, scale: 2, width: layout2.width)
-        document.add(Annotation(shape: .text(origin: layout2.origin(for: size2), string: words2, size: size2, alignment: layout2.alignment), style: blue))
+        document.add(callout(CGPoint(x: w * 0.3, y: h * 0.6), CGPoint(x: w * 0.32, y: h * 0.85), "centered above, growing up", blue, maxWidth: w * 0.25))
         if CommandLine.arguments.contains("--crop") {
             document.setCrop(CGRect(x: w * 0.1, y: h * 0.1, width: w * 0.6, height: h * 0.5))
         }

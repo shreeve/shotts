@@ -64,6 +64,14 @@ box. `CalloutLayout` in Core decides where a callout's text goes from the arrow 
 `origin(for:in:)` keeps a right-anchored box against its edge and inside the picture as the text
 grows; the entry re-asks it after every keystroke.
 
+A callout is one annotation, `.callout(from:to:text:)`, whose `TextBox` is derived state: the
+canvas's `relaid(_:from:to:string:)` recomputes it from the arrow whenever the arrow changes.
+`HitTest.calloutPart` says which part a point is on (`.text`, `.head`, `.arrow`), and
+`dragged(_:by:)` turns a select-tool drag into the right edit: text moves the tail, head moves
+the tip, anything else moves the whole. While its words are being typed the callout sits in the
+document with empty text and the `TextEntry` carries its `calloutID`; `endTextEntry` puts the
+words back, or turns a wordless callout into a plain `.arrow`.
+
 ## Coordinates
 
 Three spaces meet here. `AreaSelection` reports points from the screen's top-left corner, y

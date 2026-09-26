@@ -20,6 +20,26 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         case highlighter([CGPoint])
         /// Pixelates the source under the rectangle.
         case obscure(CGRect)
+        /// An arrow with text pegged to its tail: one object. The text box is laid out from
+        /// the arrow by the UI (`CalloutLayout`) whenever the tail or the words change.
+        case callout(from: CGPoint, to: CGPoint, text: TextBox)
+    }
+
+    /// Where a callout's words sit, and what they are.
+    public struct TextBox: Equatable, Sendable {
+        public var origin: CGPoint
+        public var string: String
+        public var size: CGSize
+        public var alignment: TextAlignment
+
+        public init(origin: CGPoint, string: String, size: CGSize, alignment: TextAlignment) {
+            self.origin = origin
+            self.string = string
+            self.size = size
+            self.alignment = alignment
+        }
+
+        public var frame: CGRect { CGRect(origin: origin, size: size) }
     }
 
     public let id: UUID
@@ -44,6 +64,9 @@ public struct Annotation: Identifiable, Equatable, Sendable {
             return CGRect(origin: origin, size: size)
         case let .pen(points), let .highlighter(points):
             return Self.bounds(of: points)
+        case let .callout(from, to, text):
+            let arrow = CGRect(x: min(from.x, to.x), y: min(from.y, to.y), width: abs(to.x - from.x), height: abs(to.y - from.y))
+            return text.string.isEmpty ? arrow : arrow.union(text.frame)
         }
     }
 
@@ -64,6 +87,10 @@ public struct Annotation: Identifiable, Equatable, Sendable {
             copy.shape = .pen(points.map { $0 + delta })
         case let .highlighter(points):
             copy.shape = .highlighter(points.map { $0 + delta })
+        case let .callout(from, to, text):
+            var moved = text
+            moved.origin = text.origin + delta
+            copy.shape = .callout(from: from + delta, to: to + delta, text: moved)
         }
         return copy
     }
@@ -79,6 +106,8 @@ public struct Annotation: Identifiable, Equatable, Sendable {
             return string.isEmpty
         case let .pen(points), let .highlighter(points):
             return points.count < 2
+        case let .callout(from, to, _):
+            return from.distance(to: to) < 3
         }
     }
 
