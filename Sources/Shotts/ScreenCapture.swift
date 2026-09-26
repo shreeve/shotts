@@ -20,9 +20,9 @@ enum ScreenCapture {
 
     static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
 
-    /// Asks macOS for permission; the system shows its own dialog and records the answer for
-    /// this app's signature. Returns whether it is granted right now.
-    static func requestPermission() -> Bool { CGRequestScreenCaptureAccess() }
+    /// Asks macOS for permission. The system shows its own dialog, once per code signature, and
+    /// records the answer; this returns before the user answers, so it reports nothing.
+    static func requestPermission() { _ = CGRequestScreenCaptureAccess() }
 
     /// Every display at once, and the windows on each from one reading of the window server,
     /// so all of them show the same moment. Shotts' own windows are left out.

@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? ""
         if !key.isEmpty { updater.startUpdater() }
         #if DEBUG
-        DevSwitches.run(CommandLine.arguments, open: openFile(_:))
+        DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
         #endif
     }
 
@@ -37,14 +37,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         flow.begin()
     }
 
+    /// Open Image…: the editor, or a cancelled panel, gives focus back to the app in front when
+    /// the menu was used.
     @objc private func openFile() {
+        let returnTo = flow.appToReturnTo()
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.png, .jpeg, .tiff]
         NSApp.activate()
-        if panel.runModal() == .OK, let url = panel.url { openFile(url) }
+        guard panel.runModal() == .OK, let url = panel.url else { returnTo?.activate(); return }
+        openFile(url, returningTo: returnTo)
     }
 
-    private func openFile(_ url: URL) {
+    private func openFile(_ url: URL, returningTo returnTo: NSRunningApplication?) {
         guard let image = NSImage(contentsOf: url),
               let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
         // A file carries no backing scale. Trust its DPI when it says 2x; otherwise a picture
@@ -53,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !(scale.isFinite && scale > 1), let screen = NSScreen.main, Double(cg.width) > screen.frame.width {
             scale = screen.backingScaleFactor
         }
-        flow.open(image: cg, scale: max(scale, 1), on: NSScreen.main)
+        flow.open(image: cg, scale: max(scale, 1), on: NSScreen.main, returningTo: returnTo)
     }
 
     private func makeStatusItem() {
