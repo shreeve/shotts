@@ -64,8 +64,10 @@ selection outline fits the words. `Renderer.textSize` measures it and `drawText`
 it. `CalloutLayout` in Core decides where a callout's text goes from the arrow alone: an
 `anchor` half a line out from the tail, and `origin(for:)` hangs a box of any size from that
 anchor, centered along its near edge and kept inside the picture; the entry re-asks it after
-every keystroke and sits exactly over the measured box, so the caret stays against the words
-whichever way they align.
+every keystroke. The entry view is as wide as the wrap width, so lines fold exactly where the
+renderer's do, and is slid so the edge its words align to lies on the measured box's edge, so the
+caret stays against the words whichever way they align. (Sizing the view to the measured box
+instead folded the last word onto a phantom line whenever the zoomed font came out a hair wider.)
 
 A callout is one annotation, `.callout(from:to:text:)`, whose `TextBox` is derived state: the
 canvas's `relaid(_:from:to:string:)` recomputes it from the arrow whenever the arrow changes.
