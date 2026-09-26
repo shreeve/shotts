@@ -35,13 +35,17 @@ space: the window server's origin is the primary display's top-left, so a displa
 there is `(frame.minX, primary.height - frame.maxY, …)` and window bounds are offset by that.
 The picker outlines the first window containing the pointer, and a click with no drag reports
 it as `.window`; the flow then captures that window on its own through
-`SCContentFilter(desktopIndependentWindow:)`, so nothing covering it appears, without its shadow.
-A window that has gone since the displays were pictured falls back to its area of the display
-picture.
+`SCContentFilter(desktopIndependentWindow:)`, so nothing covering it appears. With the option
+on, `ignoreShadowsSingleWindow` is false and the picture is the window with the shadow macOS
+draws around it, on a transparent margin, sized from the filter's `contentRect`; that is the
+system's own look, which no synthesized shadow matched (three tries, compared side by side
+with Monosnap's, before this). A window that has gone since the displays were pictured falls
+back to its area of the display picture. `Shotts --capture-window <id> out.png [--no-shadow]`
+exercises it on any window.
 
 The picker's magnifier reads the pointer's neighborhood from the display picture and its color
 through `PixelSampler`, which draws one pixel into a one-pixel context rather than parsing the
-capture's pixel format. `SelectionOptions` (copy on capture, drop shadow, dimming, magnifier, hints) live in
+capture's pixel format. `SelectionOptions` (copy on capture, window shadow, dimming, magnifier, hints) live in
 the defaults and are toggled from the menu bar menu, whose check marks are refreshed in
 `menuNeedsUpdate`.
 
@@ -75,7 +79,7 @@ same for its block image.
 ## Developer switches
 
 `Shotts --edit file.png` opens a picture in the editor without capturing. `Shotts --render
-in.png out.png [--crop] [--shadow]` draws one of every annotation on a picture and writes the PNG, for
+in.png out.png [--crop]` draws one of every annotation on a picture and writes the PNG, for
 checking the renderer by eye. `Shotts --preview-style out.png` draws the editor's style popover.
 `Shotts --select out.txt` runs the picker alone over a drawn
 stand-in for each display and writes `selected x,y,w,h on <display>` or `cancelled`, which

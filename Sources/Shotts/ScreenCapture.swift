@@ -50,19 +50,23 @@ enum ScreenCapture {
         return result
     }
 
-    /// One window on its own, whatever covers it, without its shadow, at the display's scale.
-    /// Fails when the window has gone since the displays were pictured.
-    static func captureWindow(_ id: CGWindowID, scale: CGFloat) async throws -> CGImage {
+    /// One window on its own, whatever covers it, at the display's scale. With `shadow`, the
+    /// picture is the window with the shadow macOS draws around it, on a transparent margin,
+    /// exactly as the system's own window screenshots come out. Fails when the window has
+    /// gone since the displays were pictured.
+    static func captureWindow(_ id: CGWindowID, scale: CGFloat, shadow: Bool) async throws -> CGImage {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let window = content.windows.first(where: { $0.windowID == id }) else { throw Failure.noWindow }
         let filter = SCContentFilter(desktopIndependentWindow: window)
         let configuration = SCStreamConfiguration()
-        configuration.width = Int(window.frame.width * scale)
-        configuration.height = Int(window.frame.height * scale)
+        configuration.ignoreShadowsSingleWindow = !shadow
+        // The filter's content rectangle is the window plus, with the shadow, its margins.
+        let size = filter.contentRect.size
+        configuration.width = Int(size.width * scale)
+        configuration.height = Int(size.height * scale)
         configuration.captureResolution = .best
         configuration.showsCursor = false
         configuration.scalesToFit = false
-        configuration.ignoreShadowsSingleWindow = true
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
     }
 }

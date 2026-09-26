@@ -38,15 +38,16 @@ final class CaptureFlow {
                 restoreFocus()
             case let .selected(display, rect):
                 guard let image = cut(rect, from: display) else { restoreFocus(); return }
-                deliver(image, scale: display.scale, on: display.screen, isWindow: false)
+                deliver(image, scale: display.scale, on: display.screen)
             case let .window(display, window):
                 // The window on its own, whatever covered it. If it has gone meanwhile, the
                 // area it occupied in the display picture stands in.
                 Task {
-                    let image = (try? await ScreenCapture.captureWindow(window.id, scale: display.scale))
+                    let image = (try? await ScreenCapture.captureWindow(window.id, scale: display.scale,
+                                                                        shadow: SelectionOptions.current.dropShadow))
                         ?? cut(window.frame, from: display)
                     guard let image else { restoreFocus(); return }
-                    deliver(image, scale: display.scale, on: display.screen, isWindow: true)
+                    deliver(image, scale: display.scale, on: display.screen)
                 }
             }
         }
@@ -60,20 +61,18 @@ final class CaptureFlow {
         return display.image.cropping(to: pixels)
     }
 
-    private func deliver(_ image: CGImage, scale: CGFloat, on screen: NSScreen, isWindow: Bool) {
+    private func deliver(_ image: CGImage, scale: CGFloat, on screen: NSScreen) {
         if SelectionOptions.current.copiesOnCapture {
             // The plain capture is on the clipboard at once; Copy in the editor replaces it
-            // with the annotated one. Only a window gets the shadow.
-            _ = Export.copy(Document(width: image.width, height: image.height, scale: scale), source: image,
-                            shadow: isWindow && SelectionOptions.current.dropShadow)
+            // with the annotated one.
+            _ = Export.copy(Document(width: image.width, height: image.height, scale: scale), source: image)
         }
-        open(image: image, scale: scale, on: screen, isWindow: isWindow)
+        open(image: image, scale: scale, on: screen)
     }
 
-    func open(image: CGImage, scale: CGFloat, on screen: NSScreen?, isWindow: Bool = false) {
+    func open(image: CGImage, scale: CGFloat, on screen: NSScreen?) {
         let document = Document(width: image.width, height: image.height, scale: scale)
         let editor = EditorWindowController(document: document, source: image, on: screen)
-        editor.isWindow = isWindow
         editor.onClose = { [weak self, weak editor] in
             self?.editors.removeAll { $0 === editor }
             if self?.editors.isEmpty == true { self?.restoreFocus() }

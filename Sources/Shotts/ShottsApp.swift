@@ -53,6 +53,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Developer check of the style popover's layout, drawn off screen.
             exit(StylePopoverPreview.write(to: URL(fileURLWithPath: arguments[i + 1])) ? 0 : 1)
         }
+        if let i = arguments.firstIndex(of: "--capture-window"), i + 2 < arguments.count, let id = CGWindowID(arguments[i + 1]) {
+            // Developer check of window capture: the window with that id, with its shadow
+            // unless --no-shadow, written as a PNG.
+            let out = URL(fileURLWithPath: arguments[i + 2])
+            let shadow = !arguments.contains("--no-shadow")
+            Task {
+                do {
+                    let image = try await ScreenCapture.captureWindow(id, scale: NSScreen.main?.backingScaleFactor ?? 2, shadow: shadow)
+                    try Export.write(Document(width: image.width, height: image.height, scale: 2), source: image, to: out)
+                    exit(0)
+                } catch {
+                    fputs("capture failed: \(error)\n", stderr)
+                    exit(1)
+                }
+            }
+            return
+        }
         if let i = arguments.firstIndex(of: "--render"), i + 2 < arguments.count {
             // Developer check of the renderer: every kind of annotation on the given picture,
             // written as a PNG, no window.
@@ -129,7 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             document.setCrop(CGRect(x: w * 0.1, y: h * 0.1, width: w * 0.6, height: h * 0.5))
         }
         do {
-            try Export.write(document, source: cg, to: output, shadow: CommandLine.arguments.contains("--shadow"))
+            try Export.write(document, source: cg, to: output)
             return true
         } catch {
             fputs("render failed: \(error)\n", stderr)
@@ -175,7 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(open)
         menu.addItem(.separator())
         menu.addItem(optionItem("Copy Capture to Clipboard", \.copiesOnCapture))
-        menu.addItem(optionItem("Drop Shadow Around Captured Windows", \.dropShadow))
+        menu.addItem(optionItem("Keep the Shadow Around Captured Windows", \.dropShadow))
         menu.addItem(optionItem("Dim Outside the Selection", \.dims))
         menu.addItem(optionItem("Show Magnifier", \.magnifies))
         menu.addItem(optionItem("Show Hints", \.showsHints))
