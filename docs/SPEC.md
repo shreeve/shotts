@@ -17,7 +17,7 @@ user did not copy, save, or drag out.
 | --- | --- |
 | F10, or Capture Area in the menu bar | Every display is pictured as it is at that moment, the pointer disappears, and a crosshair follows it over that picture. |
 | Move over a window | The window under the crosshair gets a blue outline. |
-| Click | Captures that window on its own, without whatever was covering it, and without its shadow. |
+| Click | Captures that window on its own, without whatever was covering it. With Keep the Shadow Around Captured Windows on, the window comes with the shadow macOS draws around it, on a transparent margin. |
 | Drag | Selects an area; everything outside it dims (unless Dim Outside the Selection is off). Its size in pixels shows in the magnifier. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
@@ -38,7 +38,7 @@ The menu bar menu holds the picker's options, remembered across launches:
 | Option | Default | Effect |
 | --- | --- | --- |
 | Copy Capture to Clipboard | on | The capture is on the clipboard the moment it is taken, before any editing; Copy in the editor replaces it with the annotated one. |
-| Drop Shadow Around Captured Windows | off | A captured window, when copied, saved, or dragged, gets a transparent margin with a soft shadow below it. An area cut from the screen never does. |
+| Keep the Shadow Around Captured Windows | off | A clicked window is captured with its own macOS shadow on a transparent margin, as the system's window screenshots are. An area cut from the screen never has one. |
 | Dim Outside the Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
 | Show Magnifier | on | The magnifier and its color readout. |
 | Show Hints | on | The list of keys until the first drag. |
@@ -69,8 +69,8 @@ open at once.
 
 Every tool but Highlighter and Obscure draws with the chosen color and line width. Text uses
 the chosen size. The color swatch in the bar opens a panel with ten colors, a custom color, and
-switches for the soft shadow under annotations, the outline on text, tapered arrows, and the
-shadow around a captured window. Color, width, size, and the switches are remembered across
+switches for the soft shadow under annotations, the outline on text, tapered arrows, and
+keeping a captured window's shadow. Color, width, size, and the switches are remembered across
 captures, as is the last tool used. Changing them with an annotation selected restyles it.
 
 ### Editing
@@ -92,8 +92,7 @@ annotations asks first.
 | Save… (Command-S) | Asks where; suggests the Desktop and a name like `Shotts 2026-09-26 at 10.12.34.png`. The editor closes. |
 | Drag the hand icon | Drags a PNG file into another app or the Finder. The editor closes when the drop lands. |
 
-The copied, saved, and dragged pictures are identical to what the editor shows, plus the drop
-shadow for a captured window when that option is on.
+The copied, saved, and dragged pictures are identical to what the editor shows.
 
 After the editor closes, the app that was in front when F10 was pressed comes back to the front.
 

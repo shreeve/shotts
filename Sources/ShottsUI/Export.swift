@@ -5,9 +5,9 @@ import UniformTypeIdentifiers
 /// Where a finished capture goes: the pasteboard, a file the user names, or a temporary file
 /// for a drag.
 public enum Export {
-    public static func copy(_ document: Document, source: CGImage, shadow: Bool = false) -> Bool {
-        guard let image = Renderer.image(of: document, source: source, shadow: shadow),
-              let png = Renderer.pngData(of: document, source: source, shadow: shadow) else { return false }
+    public static func copy(_ document: Document, source: CGImage) -> Bool {
+        guard let image = Renderer.image(of: document, source: source),
+              let png = Renderer.pngData(of: document, source: source) else { return false }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setData(png, forType: .png)
@@ -25,19 +25,19 @@ public enum Export {
 
     /// Writes the PNG. Returns the URL written.
     @discardableResult
-    public static func write(_ document: Document, source: CGImage, to url: URL, shadow: Bool = false) throws -> URL {
-        guard let png = Renderer.pngData(of: document, source: source, shadow: shadow) else { throw ExportError.render }
+    public static func write(_ document: Document, source: CGImage, to url: URL) throws -> URL {
+        guard let png = Renderer.pngData(of: document, source: source) else { throw ExportError.render }
         try png.write(to: url, options: .atomic)
         return url
     }
 
     /// A PNG in a fresh temporary folder, for a drag out of the editor. The folder is the
     /// caller's to remove.
-    public static func temporaryFile(_ document: Document, source: CGImage, shadow: Bool = false) throws -> URL {
+    public static func temporaryFile(_ document: Document, source: CGImage) throws -> URL {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("Shotts-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return try write(document, source: source, to: folder.appendingPathComponent(suggestedName()), shadow: shadow)
+        return try write(document, source: source, to: folder.appendingPathComponent(suggestedName()))
     }
 
     public enum ExportError: Error { case render }

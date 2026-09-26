@@ -71,7 +71,7 @@ public struct SelectionOptions: Equatable, Sendable {
     public var showsHints = true
     /// Puts the capture on the clipboard as soon as the area is selected, before any editing.
     public var copiesOnCapture = true
-    /// Exports carry a soft shadow on a transparent margin around the picture.
+    /// A captured window keeps the shadow macOS draws around it, on a transparent margin.
     public var dropShadow = false
 
     public init() {}

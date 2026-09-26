@@ -6,9 +6,6 @@ import ShottsCore
 public final class EditorWindowController: NSWindowController, NSWindowDelegate {
     public let canvas: CanvasView
     public var onClose: (() -> Void)?
-    /// Whether the picture is a whole window, the only kind that gets the export shadow.
-    public var isWindow = false
-    private var exportShadow: Bool { isWindow && SelectionOptions.current.dropShadow }
 
     private let tools = NSSegmentedControl()
     private let colorButton = NSButton()
@@ -221,7 +218,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 
     @objc public func copyPressed() {
         canvas.endTextEntry(commit: true)
-        if Export.copy(canvas.document, source: canvas.source, shadow: exportShadow) {
+        if Export.copy(canvas.document, source: canvas.source) {
             finish()
         }
     }
@@ -236,7 +233,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         panel.beginSheetModal(for: window) { [self] response in
             guard response == .OK, let url = panel.url else { return }
             do {
-                try Export.write(canvas.document, source: canvas.source, to: url, shadow: exportShadow)
+                try Export.write(canvas.document, source: canvas.source, to: url)
                 finish()
             } catch {
                 NSAlert(error: error).beginSheetModal(for: window)
@@ -286,8 +283,7 @@ final class DragGrip: NSImageView {
     required init?(coder: NSCoder) { nil }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let controller, let file = try? Export.temporaryFile(controller.canvas.document, source: controller.canvas.source,
-                                                                  shadow: controller.isWindow && SelectionOptions.current.dropShadow) else { return }
+        guard let controller, let file = try? Export.temporaryFile(controller.canvas.document, source: controller.canvas.source) else { return }
         let item = NSDraggingItem(pasteboardWriter: file as NSURL)
         let preview = NSImage(cgImage: controller.canvas.source, size: NSSize(width: 160, height: 160 * CGFloat(controller.canvas.document.height) / CGFloat(controller.canvas.document.width)))
         item.setDraggingFrame(NSRect(origin: convert(event.locationInWindow, from: nil), size: preview.size), contents: preview)
