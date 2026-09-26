@@ -14,6 +14,8 @@ The first milestone: the daily screenshot workflow.
   list of the keys shows until the first drag. The capture goes to the clipboard as soon as
   it is taken. That, dimming outside a dragged selection, the magnifier, and the hints are
   options in the menu bar menu.
+- An app icon: the menu bar's camera-in-a-viewfinder on a blue gradient tile with a warm glass
+  lens, drawn by `Scripts/make-app-icon.sh`.
 - An editor with arrow-with-text (drag the arrow, then type beside its tail; the arrow and its
   text are one object, moved by the arrow, reshaped by the text or the head), arrow, text,
   rectangle, ellipse, pen, highlighter, obscure, and crop tools,
