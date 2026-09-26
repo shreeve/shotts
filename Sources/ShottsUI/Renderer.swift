@@ -82,8 +82,8 @@ public enum Renderer {
         case let .obscure(rect):
             drawPixelated(source, rect: rect.standardized.intersection(document.pixelBounds), cell: max(8 * s, 8), in: ctx)
 
-        case let .text(origin, string, _):
-            drawText(string, at: origin, style: a.style, scale: s, in: ctx)
+        case let .text(origin, string, size):
+            drawText(string, at: origin, size: size, style: a.style, scale: s, in: ctx)
         }
     }
 
@@ -137,15 +137,30 @@ public enum Renderer {
         NSFont.systemFont(ofSize: style.fontSize * scale, weight: .bold)
     }
 
-    /// The pixel size the laid-out text will take, for `Annotation.Shape.text`'s `size`.
-    public static func textSize(_ string: String, style: Style, scale: Double) -> CGSize {
+    /// The pixel size the laid-out text will take, for `Annotation.Shape.text`'s `size`. With
+    /// `width`, lines wrap to fit it and the size's width is that box, so the export wraps the
+    /// same way the editor did.
+    public static func textSize(_ string: String, style: Style, scale: Double, width: Double? = nil) -> CGSize {
         let attributed = attributedText(string, style: style, scale: scale)
-        var size = attributed.size()
-        // Room for the outline, which strokes outside the glyph.
         let pad = outlineWidth(style, scale: scale)
-        size.width = ceil(size.width + pad * 2)
+        var size: CGSize
+        if let width {
+            let box = attributed.boundingRect(with: CGSize(width: width - pad * 2, height: .greatestFiniteMagnitude),
+                                              options: [.usesLineFragmentOrigin]).size
+            size = CGSize(width: width, height: box.height)
+        } else {
+            size = attributed.size()
+            size.width += pad * 2
+        }
+        // Room for the outline, which strokes outside the glyph.
+        size.width = ceil(size.width)
         size.height = ceil(size.height + pad)
         return size
+    }
+
+    /// One line of text in this style, in pixels.
+    public static func lineHeight(style: Style, scale: Double) -> Double {
+        ceil(attributedText("Ag", style: style, scale: scale).size().height + outlineWidth(style, scale: scale))
     }
 
     // MARK: - Pieces
@@ -169,10 +184,11 @@ public enum Renderer {
         NSAttributedString(string: string, attributes: [.font: font(for: style, scale: scale)])
     }
 
-    static func drawText(_ string: String, at origin: CGPoint, style: Style, scale: Double, in ctx: CGContext) {
+    static func drawText(_ string: String, at origin: CGPoint, size: CGSize, style: Style, scale: Double, in ctx: CGContext) {
         let font = font(for: style, scale: scale)
         let pad = outlineWidth(style, scale: scale)
-        let point = CGPoint(x: origin.x + pad, y: origin.y)
+        // The box the text was measured in; lines wrap inside it exactly as they were measured.
+        let box = CGRect(x: origin.x + pad, y: origin.y, width: max(size.width - pad * 2, 1), height: size.height + pad)
         let fill = NSColor(cgColor: cgColor(style.color)) ?? .red
         let outline: NSColor = style.color.isLight ? .black : .white
         // AppKit's string drawing wants a current NSGraphicsContext; the canvas has one, and
@@ -183,9 +199,10 @@ public enum Renderer {
             // Stroke first, then fill on top, so the outline sits outside the letters.
             NSAttributedString(string: string, attributes: [
                 .font: font, .strokeColor: outline, .strokeWidth: pad / font.pointSize * 100 * 2,
-            ]).draw(at: point)
+            ]).draw(with: box, options: [.usesLineFragmentOrigin])
         }
-        NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: fill]).draw(at: point)
+        NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: fill])
+            .draw(with: box, options: [.usesLineFragmentOrigin])
         ctx.endTransparencyLayer()
     }
 

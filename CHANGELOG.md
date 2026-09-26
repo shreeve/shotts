@@ -14,7 +14,8 @@ The first milestone: the daily screenshot workflow.
   list of the keys shows until the first drag. The capture goes to the clipboard as soon as
   it is taken. That, dimming before a drag, the magnifier, and the hints are options in the menu
   bar menu.
-- An editor with arrow, text, rectangle, ellipse, pen, highlighter, obscure, and crop tools,
+- An editor with arrow-with-text (drag the arrow, then type beside its tail), arrow, text,
+  rectangle, ellipse, pen, highlighter, obscure, and crop tools,
   undo and redo, single-key tool switching, a color panel with ten colors and a custom color,
   and remembered color, width, text size, shadow, outline, and arrow tapering.
 - Copy, Save…, and drag out, each closing the editor and returning focus to the previous app.

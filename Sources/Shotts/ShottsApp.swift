@@ -118,6 +118,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         document.add(Annotation(shape: .obscure(CGRect(x: w * 0.7, y: h * 0.8, width: w * 0.2, height: h * 0.12)), style: style))
         let text = "This is impossible to use!"
         document.add(Annotation(shape: .text(origin: CGPoint(x: w * 0.15, y: h * 0.3), string: text, size: Renderer.textSize(text, style: big, scale: 2)), style: big))
+        // A callout: its arrow, and text wrapped beside the tail on the side away from the tip.
+        let tail = CGPoint(x: w * 0.55, y: h * 0.9), tip = CGPoint(x: w * 0.85, y: h * 0.7)
+        document.add(Annotation(shape: .arrow(from: tail, to: tip), style: style))
+        let layout = CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: 2), maxWidth: w * 0.3, in: document.pixelBounds)
+        let words = "A callout wraps its words beside the tail and stays inside the picture"
+        let size = Renderer.textSize(words, style: style, scale: 2, width: layout.width)
+        document.add(Annotation(shape: .text(origin: layout.origin(for: size, in: document.pixelBounds), string: words, size: size), style: style))
         if CommandLine.arguments.contains("--crop") {
             document.setCrop(CGRect(x: w * 0.1, y: h * 0.1, width: w * 0.6, height: h * 0.5))
         }

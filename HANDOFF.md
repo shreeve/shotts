@@ -49,6 +49,17 @@ Permission is checked with `CGPreflightScreenCaptureAccess` and asked for with
 `CGRequestScreenCaptureAccess`; macOS records the grant against the app's code signature, which
 is why local builds are signed with the Developer ID rather than ad hoc.
 
+## Text and callouts
+
+Text is typed on the picture: `CanvasView.beginTextEntry` adds an invisible `TextEntry`
+(an `NSTextView` with clear text and a colored caret) and draws the live text through the
+renderer as the user types, so what is typed looks exactly like the export. A text shape's
+`size` is its layout box: with a wrap width (a callout), lines wrap inside that width in both
+the entry and the renderer, which is why `Renderer.textSize` and `drawText` take and use the
+box. `CalloutLayout` in Core decides where a callout's text goes from the arrow alone, and
+`origin(for:in:)` keeps a right-anchored box against its edge and inside the picture as the text
+grows; the entry re-asks it after every keystroke.
+
 ## Coordinates
 
 Three spaces meet here. `AreaSelection` reports points from the screen's top-left corner, y
