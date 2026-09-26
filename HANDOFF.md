@@ -80,7 +80,8 @@ same for its block image.
 
 `Shotts --edit file.png` opens a picture in the editor without capturing. `Shotts --render
 in.png out.png [--crop]` draws one of every annotation on a picture and writes the PNG, for
-checking the renderer by eye. `Shotts --preview-style out.png` draws the editor's style popover.
+checking the renderer by eye. `Shotts --preview-style out.png` draws the editor's style popover. `Shotts --check-text-entry`
+exercises text entry headlessly.
 `Shotts --select out.txt` runs the picker alone over a drawn
 stand-in for each display and writes `selected x,y,w,h on <display>` or `cancelled`, which
 exercises the overlay on a Mac that has not granted Screen Recording. `Shotts --preview-overlay
@@ -117,6 +118,12 @@ they are ten lines each and worth recreating rather than keeping.
   itself from `layoutSubtreeIfNeeded()` plus a floor of `EditorWindowController.minimumWidth`.
 - `NSResponder` already declares `selectAll(_:)` and `cancelOperation(_:)` (override them) but
   not `delete(_:)` or `undo(_:)` (plain `@objc` actions).
+- A subclass of `NSWindow` or `NSTextView` must provide the designated initializer
+  (`init(contentRect:styleMask:backing:defer:)`, `init(frame:textContainer:)`): the convenience
+  ones call it, and a missing one traps at first use. `OverlayWindow` and `TextEntry` both
+  crashed this way; `TextEntry` builds the text system by hand and hands the container in.
+  `Shotts --check-text-entry` opens text entry in an unshown window and exits non-zero if it
+  cannot; run it after touching `TextEntry`.
 - A blend mode is the wrong way to make a highlighter: multiply vanishes on the dark
   backgrounds screenshots are full of. It is a translucent stroke.
 - A bitmap context's first row in memory is its top row, even though its drawing coordinates

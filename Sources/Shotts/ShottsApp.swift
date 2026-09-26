@@ -49,6 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             exit(Self.previewOverlay(to: URL(fileURLWithPath: arguments[i + 1]), selected: arguments.contains("--dragged"),
                                      dimmed: arguments.contains("--dim"), corner: arguments.contains("--corner")) ? 0 : 1)
         }
+        if arguments.contains("--check-text-entry") {
+            // Developer check: text entry can open and take a string without a display.
+            exit(TextEntryCheck.run() ? 0 : 1)
+        }
         if let i = arguments.firstIndex(of: "--preview-style"), i + 1 < arguments.count {
             // Developer check of the style popover's layout, drawn off screen.
             exit(StylePopoverPreview.write(to: URL(fileURLWithPath: arguments[i + 1])) ? 0 : 1)
