@@ -81,6 +81,9 @@ public final class CanvasView: NSView {
     private var dragOriginal: Annotation?
     /// For a callout being dragged with the select tool: which part was grabbed.
     private var dragPart: HitTest.CalloutPart?
+    /// The tool the drag in progress behaves as: the current tool, or select when an arrow tool
+    /// clicked an existing arrow.
+    private var dragTool: Tool = .select
     fileprivate(set) var textField: TextEntry?
 
     /// The dark field around the picture, and the room its shadow needs.
@@ -194,7 +197,16 @@ public final class CanvasView: NSView {
         endTextEntry(commit: true)
         let p = imagePoint(event)
         dragAnchor = p
-        switch tool {
+        dragTool = tool
+        if tool == .callout || tool == .arrow,
+           let id = HitTest.annotation(at: p, in: document, tolerance: hitTolerance), let a = document.annotation(id), a.isArrowOrCallout {
+            // Clicking an arrow or callout with those tools selects it as the select tool
+            // would, so what was just drawn can be moved or reshaped without changing tools.
+            dragTool = .select
+        } else if tool != .select {
+            selectedID = nil
+        }
+        switch dragTool {
         case .select:
             selectedID = HitTest.annotation(at: p, in: document, tolerance: hitTolerance)
             dragOriginal = selectedID.flatMap { document.annotation($0) }
@@ -235,7 +247,7 @@ public final class CanvasView: NSView {
         let shift = event.modifierFlags.contains(.shift)
         // Option while drawing makes a rectangle or ellipse solid; either key may change mid-drag.
         let filled = event.modifierFlags.contains(.option)
-        switch tool {
+        switch dragTool {
         case .select:
             if let original = dragOriginal {
                 var d = document
@@ -264,7 +276,7 @@ public final class CanvasView: NSView {
 
     public override func mouseUp(with event: NSEvent) {
         defer { dragAnchor = nil; dragOriginal = nil; dragPart = nil; live = nil; liveCrop = nil; needsDisplay = true }
-        switch tool {
+        switch dragTool {
         case .select:
             // The drag edited the current state in place; make it an undo step against the
             // state before the drag.
@@ -565,6 +577,15 @@ final class TextEntry: NSTextView {
 
     override func cancelOperation(_ sender: Any?) {
         onFinish?()
+    }
+}
+
+extension Annotation {
+    var isArrowOrCallout: Bool {
+        switch shape {
+        case .arrow, .callout: true
+        default: false
+        }
     }
 }
 
