@@ -317,12 +317,13 @@ public final class CanvasView: NSView {
         return copy
     }
 
-    /// The annotation as a drag of `delta` leaves it: a callout moves by the part grabbed,
+    /// The annotation as a drag of `delta` leaves it: a callout moves by the part grabbed
+    /// (its words or the tail's end move the tail, the head moves the tip, the shaft moves all),
     /// anything else moves whole.
     private func dragged(_ original: Annotation, by delta: CGPoint) -> Annotation {
         guard case let .callout(from, to, text) = original.shape else { return original.translated(by: delta) }
         switch dragPart {
-        case .text: return relaid(original, from: from + delta, to: to, string: text.string)
+        case .text, .tail: return relaid(original, from: from + delta, to: to, string: text.string)
         case .head: return relaid(original, from: from, to: to + delta, string: text.string)
         default: return original.translated(by: delta)
         }
