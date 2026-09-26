@@ -205,6 +205,15 @@ import Testing
         #expect(HitTest.annotation(at: CGPoint(x: 225, y: 150), in: doc, tolerance: 4) == nil)    // 25 px past its right edge
     }
 
+    @Test func aShapeThinnerThanItsStrokeIsHitWhereItIsDrawn() {
+        // The renderer fills it: its whole area, not an outline, is ink.
+        let thick = Style(color: .red, strokeWidth: 10, fontSize: 20)
+        let sliver = Annotation(shape: .rectangle(CGRect(x: 100, y: 100, width: 6, height: 30)), style: thick)
+        let doc = Document(width: 300, height: 300, scale: 2, annotations: [sliver])
+        #expect(HitTest.annotation(at: CGPoint(x: 103, y: 115), in: doc, tolerance: 2) == sliver.id)
+        #expect(HitTest.annotation(at: CGPoint(x: 140, y: 115), in: doc, tolerance: 2) == nil)
+    }
+
     @Test func emptyStrokesHitNothing() {
         let doc = Document(width: 100, height: 100, scale: 1, annotations: [Annotation(shape: .pen([]), style: style)])
         #expect(HitTest.annotation(at: .zero, in: doc, tolerance: 4) == nil)

@@ -8,7 +8,7 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 0.1.0 is released (GitHub, the Homebrew cask, Sparkle), and the repository is public. The
 `revamp` branch (from `main` at e945441) is a correctness, security, and performance pass over
 the whole app; `CHANGELOG.md`'s Unreleased section is what it changed for users. It builds with
-no warnings (warnings are errors) and `swift test` passes: 38 Core tests and 40 AppKit tests.
+no warnings (warnings are errors) and `swift test` passes: 39 Core tests and 40 AppKit tests.
 
 Next, in order:
 
@@ -90,7 +90,8 @@ display pictures live in the picker's windows and go when it closes.
 
 Focus: the app to return to is the one in front at F10, or, if that was Shotts because an editor
 was in front, the app that editor returns to. Each editor keeps its own and activates it when it
-closes; a cancelled capture returns to it at once.
+closes as the window being worked in; one closing in the background (Close All) leaves focus
+alone. A cancelled capture returns to it at once.
 
 The window list comes from `CGWindowListCopyWindowInfo` (layer 0, not Shotts', shareable, at
 least 40 points each way), front to back, placed on each display with `CGDisplayBounds`. The

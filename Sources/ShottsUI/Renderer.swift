@@ -202,7 +202,9 @@ public enum Renderer {
             ink = a.bounds.insetBy(dx: -a.style.stroke(scale: s), dy: -a.style.stroke(scale: s))
         }
         // The arrow's softening stroke, a text outline's top, and a shadow's blur reach past the
-        // ink; 20 points covers all three with room to spare.
+        // ink; 20 points covers all three with room to spare. The shadow's blur grows with
+        // `baseScale`, which stays at most 1 because the canvas never zooms past on-screen size
+        // (`EditorLayout`); a canvas that zoomed in would need the extent to grow with it.
         let reach = 20 * s + a.style.stroke(scale: s) + outlineWidth(a.style, scale: s)
         return ink.insetBy(dx: -reach, dy: -reach)
     }

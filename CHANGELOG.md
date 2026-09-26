@@ -27,6 +27,8 @@ Unreleased, whose heading becomes the version's when it ships.
 - Dragging the picture out takes the words being typed with it, works from the first press while
   another app is in front, and leaves at most one file in the temporary folder.
 - A click with the Crop tool clears the crop; the Text tool edits a text it clicks.
+- A rectangle or ellipse thinner than its line is drawn solid instead of vanishing, and a short,
+  thick arrow keeps a head wider than its shaft.
 - The picker shows its crosshair only on the display the pointer is on, keys act there, and it
   cancels when another app comes to the front or the displays change.
 - The editor keeps only the area you captured in memory, not the whole display it came from, and

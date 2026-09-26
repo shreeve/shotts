@@ -82,13 +82,15 @@ final class CaptureFlow {
         open(image: image, scale: scale, on: screen, returningTo: returnTo)
     }
 
-    /// Opens `image` in an editor that, however it closes, gives focus back to `returnTo`.
+    /// Opens `image` in an editor that, when it closes as the window being worked in, gives focus
+    /// back to `returnTo`. One closing in the background (Close All) leaves focus where it is.
     func open(image: CGImage, scale: CGFloat, on screen: NSScreen?, returningTo returnTo: NSRunningApplication?) {
         let document = Document(width: image.width, height: image.height, scale: scale)
         let editor = EditorWindowController(document: document, source: image, on: screen)
         editor.onClose = { [weak self, weak editor] in
+            let working = editor?.window?.isKeyWindow ?? false
             self?.editors.removeAll { $0.editor === editor }
-            returnTo?.activate()
+            if working { returnTo?.activate() }
         }
         editors.append((editor, returnTo))
         editor.present()
