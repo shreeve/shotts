@@ -82,8 +82,8 @@ public enum Renderer {
         case let .obscure(rect):
             drawPixelated(source, rect: rect.standardized.intersection(document.pixelBounds), cell: max(8 * s, 8), in: ctx)
 
-        case let .text(origin, string, size):
-            drawText(string, at: origin, size: size, style: a.style, scale: s, in: ctx)
+        case let .text(origin, string, size, alignment):
+            drawText(string, at: origin, size: size, alignment: alignment, style: a.style, scale: s, in: ctx)
         }
     }
 
@@ -166,9 +166,11 @@ public enum Renderer {
         NSAttributedString(string: string, attributes: [.font: font(for: style, scale: scale)])
     }
 
-    static func drawText(_ string: String, at origin: CGPoint, size: CGSize, style: Style, scale: Double, in ctx: CGContext) {
+    static func drawText(_ string: String, at origin: CGPoint, size: CGSize, alignment: TextAlignment, style: Style, scale: Double, in ctx: CGContext) {
         let font = font(for: style, scale: scale)
         let pad = outlineWidth(style, scale: scale)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment == .right ? .right : .left
         // The box the text was measured in; lines wrap inside it exactly as they were measured.
         let box = CGRect(x: origin.x + pad, y: origin.y, width: max(size.width - pad * 2, 1), height: size.height + pad)
         let fill = NSColor(cgColor: cgColor(style.color)) ?? .red
@@ -180,10 +182,10 @@ public enum Renderer {
         if pad > 0 {
             // Stroke first, then fill on top, so the outline sits outside the letters.
             NSAttributedString(string: string, attributes: [
-                .font: font, .strokeColor: outline, .strokeWidth: pad / font.pointSize * 100 * 2,
+                .font: font, .strokeColor: outline, .strokeWidth: pad / font.pointSize * 100 * 2, .paragraphStyle: paragraph,
             ]).draw(with: box, options: [.usesLineFragmentOrigin])
         }
-        NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: fill])
+        NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: fill, .paragraphStyle: paragraph])
             .draw(with: box, options: [.usesLineFragmentOrigin])
         ctx.endTransparencyLayer()
     }

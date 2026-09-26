@@ -188,7 +188,7 @@ public final class CanvasView: NSView {
         case .select:
             selectedID = HitTest.annotation(at: p, in: document, tolerance: hitTolerance)
             dragOriginal = selectedID.flatMap { document.annotation($0) }
-            if event.clickCount == 2, let a = dragOriginal, case let .text(origin, string, _) = a.shape {
+            if event.clickCount == 2, let a = dragOriginal, case let .text(origin, string, _, _) = a.shape {
                 var d = document
                 d.remove(a.id)
                 commit(d)
@@ -291,6 +291,7 @@ public final class CanvasView: NSView {
     fileprivate func beginTextEntry(at origin: CGPoint, initial: String, style: Style, layout: CalloutLayout? = nil) {
         let entry = TextEntry(style: style, origin: origin, zoom: zoom, scale: document.scale)
         entry.layout = layout
+        if layout?.alignment == .right { entry.alignment = .right }
         entry.string = initial
         entry.onChange = { [weak self] string in self?.updateLiveText(string) }
         entry.onFinish = { [weak self] in self?.endTextEntry(commit: true) }
@@ -309,7 +310,7 @@ public final class CanvasView: NSView {
             // A callout's text keeps to its anchored edge and stays inside the picture.
             entry.origin = layout.origin(for: size, in: document.pixelBounds)
         }
-        live = string.isEmpty ? nil : Annotation(shape: .text(origin: entry.origin, string: string, size: size), style: entry.style)
+        live = string.isEmpty ? nil : Annotation(shape: .text(origin: entry.origin, string: string, size: size, alignment: entry.layout?.alignment ?? .left), style: entry.style)
         entry.place(in: pictureRect)
         needsDisplay = true
     }
@@ -326,7 +327,7 @@ public final class CanvasView: NSView {
         let size = Renderer.textSize(string, style: entry.style, scale: document.scale, width: entry.layout?.width)
         let origin = entry.layout?.origin(for: size, in: document.pixelBounds) ?? entry.origin
         var d = document
-        d.add(Annotation(shape: .text(origin: origin, string: string, size: size), style: entry.style))
+        d.add(Annotation(shape: .text(origin: origin, string: string, size: size, alignment: entry.layout?.alignment ?? .left), style: entry.style))
         self.commit(d)
     }
 
@@ -479,15 +480,15 @@ public enum TextEntryCheck {
         canvas.check_beginText(at: CGPoint(x: 40, y: 40), initial: "Hello")
         canvas.check_typed("Hello there")
         canvas.endTextEntry(commit: true)
-        guard canvas.document.annotations.count == 1, case let .text(_, string, size) = canvas.document.annotations[0].shape,
+        guard canvas.document.annotations.count == 1, case let .text(_, string, size, _) = canvas.document.annotations[0].shape,
               string == "Hello there", size.width > 0, size.height > 0 else { return false }
         // A callout's text too, with its wrapped, anchored layout.
         let layout = CalloutLayout(tail: CGPoint(x: 300, y: 150), tip: CGPoint(x: 380, y: 100), lineHeight: 40, maxWidth: 200, in: canvas.document.pixelBounds)
         canvas.check_beginText(at: layout.origin, initial: "", layout: layout)
         canvas.check_typed("wrapped words beside the tail of the arrow")
         canvas.endTextEntry(commit: true)
-        guard canvas.document.annotations.count == 2, case let .text(origin, _, size2) = canvas.document.annotations[1].shape,
-              size2.width == layout.width, origin.x + size2.width <= layout.rightEdge + 0.5 else { return false }
+        guard canvas.document.annotations.count == 2, case let .text(origin, _, size2, alignment) = canvas.document.annotations[1].shape,
+              size2.width == layout.width, alignment == .right, origin.x + size2.width == layout.rightEdge else { return false }
         return true
     }
 }

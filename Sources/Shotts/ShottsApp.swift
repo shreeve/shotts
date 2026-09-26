@@ -145,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let layout = CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: 2), maxWidth: w * 0.3, in: document.pixelBounds)
         let words = "A callout wraps its words beside the tail and stays inside the picture"
         let size = Renderer.textSize(words, style: style, scale: 2, width: layout.width)
-        document.add(Annotation(shape: .text(origin: layout.origin(for: size, in: document.pixelBounds), string: words, size: size), style: style))
+        document.add(Annotation(shape: .text(origin: layout.origin(for: size, in: document.pixelBounds), string: words, size: size, alignment: layout.alignment), style: style))
         if CommandLine.arguments.contains("--crop") {
             document.setCrop(CGRect(x: w * 0.1, y: h * 0.1, width: w * 0.6, height: h * 0.5))
         }

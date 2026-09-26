@@ -68,8 +68,9 @@ import Testing
         let d = CGPoint(x: 5, y: -5)
         let pen = Annotation(shape: .pen([.zero, CGPoint(x: 10, y: 10)]), style: style).translated(by: d)
         #expect(pen.bounds == CGRect(x: 5, y: -5, width: 10, height: 10))
-        let text = Annotation(shape: .text(origin: CGPoint(x: 1, y: 1), string: "a", size: CGSize(width: 8, height: 8)), style: style).translated(by: d)
+        let text = Annotation(shape: .text(origin: CGPoint(x: 1, y: 1), string: "a", size: CGSize(width: 8, height: 8), alignment: .right), style: style).translated(by: d)
         #expect(text.bounds.origin == CGPoint(x: 6, y: -4))
+        if case let .text(_, _, _, alignment) = text.shape { #expect(alignment == .right) }
     }
 }
 
@@ -131,7 +132,8 @@ import Testing
         #expect(l.rightEdge == 480)          // half a line short of the tail
         #expect(l.width == 300)
         #expect(l.origin.y == 280)           // first line centered on the tail
-        #expect(l.origin(for: CGSize(width: 120, height: 40), in: bounds) == CGPoint(x: 360, y: 280))
+        #expect(l.alignment == .right)
+        #expect(l.origin(for: CGSize(width: 300, height: 40), in: bounds) == CGPoint(x: 180, y: 280))
     }
 
     @Test func textSitsRightOfATailWhoseArrowPointsLeft() {
