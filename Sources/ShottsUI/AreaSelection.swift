@@ -132,6 +132,11 @@ public final class AreaSelection {
         // this is the form that ignores other apps. Then the main display's overlay is made key.
         NSApp.activate(ignoringOtherApps: true)
         windows.first(where: { $0.screen == NSScreen.main })?.makeKeyAndOrderFront(nil)
+        // Start with the crosshair where the pointer already is, not at a corner waiting for
+        // the first movement.
+        for window in windows {
+            window.overlayView.pointerMoved(to: window.convertPoint(fromScreen: NSEvent.mouseLocation))
+        }
         // The crosshair is the pointer while the picker is up; an arrow beside it would only
         // add a second, offset hotspot to look at.
         NSCursor.hide()
@@ -221,7 +226,12 @@ final class OverlayView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        pointer = convert(event.locationInWindow, from: nil)
+        pointerMoved(to: event.locationInWindow)
+    }
+
+    /// `location` in the window's coordinates.
+    func pointerMoved(to location: NSPoint) {
+        pointer = convert(location, from: nil)
         needsDisplay = true
     }
 
