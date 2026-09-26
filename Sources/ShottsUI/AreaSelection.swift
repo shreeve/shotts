@@ -331,7 +331,7 @@ final class OverlayView: NSView {
         if let selection {
             text = "\(Int(selection.width * display.scale)) × \(Int(selection.height * display.scale))   " + hex
         } else {
-            text = "\(pointerPixel.x), \(pointerPixel.y)   " + hex
+            text = "\(pointerPixel.x),\(pointerPixel.y)   " + hex
         }
         let textSize = (text as NSString).size(withAttributes: attributes)
         // Wide enough for the label, which grows while dragging; the pixels stay centered.
