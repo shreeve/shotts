@@ -5,10 +5,7 @@ import UniformTypeIdentifiers
 /// Where a finished capture goes: the pasteboard, a file the user names, or a temporary file
 /// for a drag.
 public enum Export {
-    /// Whether exports carry the drop shadow, from the saved options unless a caller says.
-    public static var shadow: Bool { SelectionOptions.current.dropShadow }
-
-    public static func copy(_ document: Document, source: CGImage, shadow: Bool = Export.shadow) -> Bool {
+    public static func copy(_ document: Document, source: CGImage, shadow: Bool = false) -> Bool {
         guard let image = Renderer.image(of: document, source: source, shadow: shadow),
               let png = Renderer.pngData(of: document, source: source, shadow: shadow) else { return false }
         let pasteboard = NSPasteboard.general
@@ -28,7 +25,7 @@ public enum Export {
 
     /// Writes the PNG. Returns the URL written.
     @discardableResult
-    public static func write(_ document: Document, source: CGImage, to url: URL, shadow: Bool = Export.shadow) throws -> URL {
+    public static func write(_ document: Document, source: CGImage, to url: URL, shadow: Bool = false) throws -> URL {
         guard let png = Renderer.pngData(of: document, source: source, shadow: shadow) else { throw ExportError.render }
         try png.write(to: url, options: .atomic)
         return url
@@ -36,7 +33,7 @@ public enum Export {
 
     /// A PNG in a fresh temporary folder, for a drag out of the editor. The folder is the
     /// caller's to remove.
-    public static func temporaryFile(_ document: Document, source: CGImage, shadow: Bool = Export.shadow) throws -> URL {
+    public static func temporaryFile(_ document: Document, source: CGImage, shadow: Bool = false) throws -> URL {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("Shotts-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

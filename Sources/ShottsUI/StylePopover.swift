@@ -11,7 +11,7 @@ final class StylePopover: NSViewController {
     private let shadow = NSButton(checkboxWithTitle: "Shadow", target: nil, action: nil)
     private let outline = NSButton(checkboxWithTitle: "Outline on text", target: nil, action: nil)
     private let tapered = NSButton(checkboxWithTitle: "Tapered arrows", target: nil, action: nil)
-    private let imageShadow = NSButton(checkboxWithTitle: "Shadow around the picture", target: nil, action: nil)
+    private let imageShadow = NSButton(checkboxWithTitle: "Shadow around a captured window", target: nil, action: nil)
 
     init(style: Style) {
         self.style = style

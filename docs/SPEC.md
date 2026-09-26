@@ -38,7 +38,7 @@ The menu bar menu holds the picker's options, remembered across launches:
 | Option | Default | Effect |
 | --- | --- | --- |
 | Copy Capture to Clipboard | on | The capture is on the clipboard the moment it is taken, before any editing; Copy in the editor replaces it with the annotated one. |
-| Drop Shadow Around Captures | off | Copied, saved, and dragged pictures get a transparent margin with a soft shadow, following the picture's edge. |
+| Drop Shadow Around Captured Windows | off | A captured window, when copied, saved, or dragged, gets a transparent margin with a soft shadow below it. An area cut from the screen never does. |
 | Dim Outside the Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
 | Show Magnifier | on | The magnifier and its color readout. |
 | Show Hints | on | The list of keys until the first drag. |
@@ -70,7 +70,7 @@ open at once.
 Every tool but Highlighter and Obscure draws with the chosen color and line width. Text uses
 the chosen size. The color swatch in the bar opens a panel with ten colors, a custom color, and
 switches for the soft shadow under annotations, the outline on text, tapered arrows, and the
-shadow around exported pictures. Color, width, size, and the switches are remembered across
+shadow around a captured window. Color, width, size, and the switches are remembered across
 captures, as is the last tool used. Changing them with an annotation selected restyles it.
 
 ### Editing
@@ -93,7 +93,7 @@ annotations asks first.
 | Drag the hand icon | Drags a PNG file into another app or the Finder. The editor closes when the drop lands. |
 
 The copied, saved, and dragged pictures are identical to what the editor shows, plus the drop
-shadow when that option is on.
+shadow for a captured window when that option is on.
 
 After the editor closes, the app that was in front when F10 was pressed comes back to the front.
 
