@@ -136,11 +136,11 @@ public enum Renderer {
         CGColor(srgbRed: c.red, green: c.green, blue: c.blue, alpha: c.alpha)
     }
 
-    /// A soft shadow below and to the right. Offsets are given in the flipped user space, so a
-    /// positive y is downward on the picture.
+    /// A soft, even shadow all around, the way macOS shadows its own controls. It has no
+    /// offset on purpose: Core Graphics applies a shadow offset in device space, so in the
+    /// editor's flipped space a "downward" offset came out pointing up.
     static func setShadow(_ ctx: CGContext, scale: Double) {
-        ctx.setShadow(offset: CGSize(width: 0, height: 1.5 * scale), blur: 3 * scale,
-                      color: CGColor(gray: 0, alpha: 0.45))
+        ctx.setShadow(offset: .zero, blur: 5 * scale, color: CGColor(gray: 0, alpha: 0.55))
     }
 
     static func outlineWidth(_ style: Style, scale: Double) -> Double {

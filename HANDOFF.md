@@ -81,5 +81,8 @@ they are ten lines each and worth recreating rather than keeping.
   not `delete(_:)` or `undo(_:)` (plain `@objc` actions).
 - A blend mode is the wrong way to make a highlighter: multiply vanishes on the dark
   backgrounds screenshots are full of. It is a translucent stroke.
+- `CGContext.setShadow` takes its offset in device space, untouched by the CTM, so in a flipped
+  context an offset meant to fall below the shape falls above it. The renderer's shadow has no
+  offset, only blur, which looks like macOS's own and cannot flip.
 - An arrow is one filled outline (`ArrowGeometry.outline`), not a stroked line plus a head:
   that is what lets it taper, and one shape means one shadow with no seam.
