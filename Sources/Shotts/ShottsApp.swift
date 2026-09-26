@@ -1,6 +1,7 @@
 import AppKit
 import ShottsCore
 import ShottsUI
+import Sparkle
 
 /// The menu bar item, the hot key, the menus that give the editor its key equivalents, and the
 /// developer switches (`--edit file.png` opens a file in the editor).
@@ -10,6 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var hotKey: HotKey?
     private let flow = CaptureFlow()
     private var selectionCheck: AreaSelection?
+    /// Reads SUFeedURL and SUPublicEDKey from Info.plist and checks on its own schedule. Off until
+    /// the plist has a public key, so a build without one never shows the "not configured" alert.
+    private let updater = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
 
     static func main() {
         let app = NSApplication.shared
@@ -22,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.mainMenu = makeMainMenu()
         makeStatusItem()
         hotKey = HotKey(keyCode: HotKey.f10) { [weak self] in self?.flow.begin() }
+        let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? ""
+        if !key.isEmpty { updater.startUpdater() }
 
         let arguments = CommandLine.arguments
         if let i = arguments.firstIndex(of: "--edit"), i + 1 < arguments.count {
@@ -207,9 +213,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(optionItem("Show Hints", \.showsHints))
         menu.delegate = self
         menu.addItem(.separator())
+        menu.addItem(checkForUpdatesItem())
         menu.addItem(NSMenuItem(title: "Quit Shotts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+    }
+
+    private func checkForUpdatesItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates(nil)
+    }
+
+    /// Sparkle says when a check can start: not before the updater has started, and not during one.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(checkForUpdates) { return updater.updater.canCheckForUpdates }
+        return true
     }
 
     /// Key equivalents route through the main menu even for a menu bar app, so the editor gets
@@ -219,6 +242,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
+        appMenu.addItem(checkForUpdatesItem())
+        appMenu.addItem(.separator())
         appMenu.addItem(NSMenuItem(title: "Quit Shotts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appItem.submenu = appMenu
 

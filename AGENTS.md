@@ -51,4 +51,5 @@ open "$(Scripts/package-app.sh)"
 ```
 
 `Scripts/package-app.sh` builds `Shotts.app`, signed with the Developer ID so Screen Recording
-permission survives rebuilds, and prints its path.
+permission survives rebuilds, and prints its path. Releases, Homebrew, and Sparkle updates are
+in `docs/RELEASING.md`.
