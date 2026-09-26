@@ -99,6 +99,7 @@ import Testing
         let words = Annotation.TextBox(origin: CGPoint(x: 0, y: 80), string: "hi", size: CGSize(width: 60, height: 30), alignment: .right)
         let c = Annotation(shape: .callout(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 100), text: words), style: style)
         #expect(HitTest.calloutPart(at: CGPoint(x: 30, y: 95), of: c, tolerance: 4) == .text)
+        #expect(HitTest.calloutPart(at: CGPoint(x: 103, y: 98), of: c, tolerance: 4) == .tail)
         #expect(HitTest.calloutPart(at: CGPoint(x: 200, y: 102), of: c, tolerance: 4) == .arrow)
         #expect(HitTest.calloutPart(at: CGPoint(x: 295, y: 100), of: c, tolerance: 4) == .head)
         #expect(HitTest.calloutPart(at: CGPoint(x: 200, y: 200), of: c, tolerance: 4) == nil)

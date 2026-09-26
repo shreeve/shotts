@@ -48,12 +48,16 @@ public enum HitTest {
         case text
         /// The head: dragging it moves the tip, the tail and words staying put.
         case head
+        /// The tail's end: dragging it moves the tail, the tip staying put.
+        case tail
     }
 
-    /// Which part of a callout a point lands on: its words, its head, else its arrow.
+    /// Which part of a callout a point lands on: its words, the tail's end, its head, else its arrow.
     public static func calloutPart(at p: CGPoint, of a: Annotation, tolerance: Double) -> CalloutPart? {
         guard case let .callout(from, to, text) = a.shape else { return nil }
         if !text.string.isEmpty, text.frame.insetBy(dx: -tolerance, dy: -tolerance).contains(p) { return .text }
+        // The end of the tail is a grip of its own, the size of the dot that marks it when selected.
+        if p.distance(to: from) <= max(a.style.strokeWidth * 2, tolerance * 3) { return .tail }
         let geometry = ArrowGeometry(from: from, to: to, width: a.style.strokeWidth, tapered: a.style.taperedArrows)
         let headLength = max(a.style.strokeWidth * 6, 18)
         if p.distance(to: to) <= headLength + tolerance, geometry.outline.contains(p) || p.distance(to: to) <= tolerance + headLength / 2 {
