@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var hotKey: HotKey?
     private let flow = CaptureFlow()
+    private var selectionCheck: AreaSelection?
 
     static func main() {
         let app = NSApplication.shared
@@ -25,6 +26,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let arguments = CommandLine.arguments
         if let i = arguments.firstIndex(of: "--edit"), i + 1 < arguments.count {
             openFile(URL(fileURLWithPath: arguments[i + 1]))
+        }
+        if let i = arguments.firstIndex(of: "--select"), i + 1 < arguments.count {
+            // Developer check of the area selection alone: writes the outcome to the file and quits.
+            let out = URL(fileURLWithPath: arguments[i + 1])
+            selectionCheck = AreaSelection { outcome in
+                let line: String
+                switch outcome {
+                case .cancelled: line = "cancelled"
+                case let .selected(screen, rect): line = "selected \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(screen.localizedName)"
+                }
+                try? line.write(to: out, atomically: true, encoding: .utf8)
+                exit(0)
+            }
+            selectionCheck?.show()
         }
         if let i = arguments.firstIndex(of: "--render"), i + 2 < arguments.count {
             // Developer check of the renderer: every kind of annotation on the given picture,
@@ -52,6 +67,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         document.add(Annotation(shape: .obscure(CGRect(x: w * 0.7, y: h * 0.8, width: w * 0.2, height: h * 0.12)), style: style))
         let text = "This is impossible to use!"
         document.add(Annotation(shape: .text(origin: CGPoint(x: w * 0.15, y: h * 0.3), string: text, size: Renderer.textSize(text, style: big, scale: 2)), style: big))
+        if CommandLine.arguments.contains("--crop") {
+            document.setCrop(CGRect(x: w * 0.1, y: h * 0.1, width: w * 0.6, height: h * 0.5))
+        }
         do {
             try Export.write(document, source: cg, to: output)
             return true

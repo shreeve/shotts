@@ -24,11 +24,15 @@ public final class AreaSelection {
     }
 
     public func show() {
-        NSApp.activate()
         for window in windows {
             window.orderFrontRegardless()
         }
-        windows.first(where: { $0.screen == NSScreen.main })?.makeKey()
+        // A menu bar app is not the active app when its hot key fires, and only the active
+        // app's key window gets Escape. The plain `activate()` is refused here (measured on
+        // macOS 27: the app stays inactive and Escape goes to whatever app was in front), so
+        // this is the form that ignores other apps. Then the main display's overlay is made key.
+        NSApp.activate(ignoringOtherApps: true)
+        windows.first(where: { $0.screen == NSScreen.main })?.makeKeyAndOrderFront(nil)
         NSCursor.crosshair.push()
     }
 
@@ -49,7 +53,10 @@ final class OverlayWindow: NSWindow {
 
     init(screen: NSScreen) {
         overlayView = OverlayView(screen: screen)
-        super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false, screen: screen)
+        // The four-argument initializer is the designated one; the variant taking a screen
+        // calls it, which a subclass must therefore provide.
+        super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        setFrame(screen.frame, display: false)
         level = .screenSaver
         isOpaque = false
         backgroundColor = .clear

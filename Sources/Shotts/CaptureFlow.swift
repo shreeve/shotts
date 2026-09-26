@@ -36,7 +36,7 @@ final class CaptureFlow {
             let capture = try await ScreenCapture.capture(rect: rect, on: screen)
             open(capture, on: screen)
         } catch {
-            NSApp.activate()
+            NSApp.activate(ignoringOtherApps: true)
             let alert = NSAlert()
             alert.messageText = "Shotts could not capture the screen"
             alert.informativeText = error.localizedDescription
@@ -64,7 +64,7 @@ final class CaptureFlow {
     }
 
     private func explainPermission() {
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true)
         if ScreenCapture.requestPermission() {
             begin()
             return

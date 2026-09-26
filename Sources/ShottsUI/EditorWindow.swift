@@ -52,7 +52,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     required init?(coder: NSCoder) { nil }
 
     public func present() {
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true) // see AreaSelection.show()
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
         window?.makeFirstResponder(canvas)

@@ -46,8 +46,10 @@ same for its block image.
 ## Developer switches
 
 `Shotts --edit file.png` opens a picture in the editor without capturing. `Shotts --render
-in.png out.png` draws one of every annotation on a picture and writes the PNG, for checking the
-renderer by eye. Both are in `AppDelegate.applicationDidFinishLaunching`.
+in.png out.png [--crop]` draws one of every annotation on a picture and writes the PNG, for
+checking the renderer by eye. `Shotts --select out.txt` runs the area selection alone and
+writes `selected x,y,w,h on <display>` or `cancelled`, which exercises the overlay on a Mac that
+has not granted Screen Recording. All three are in `AppDelegate.applicationDidFinishLaunching`.
 
 ## Exercising the editor
 
@@ -62,8 +64,14 @@ they are ten lines each and worth recreating rather than keeping.
 - Screen Recording permission is keyed to the code signature. An ad-hoc-signed build has a new
   signature every time, so each rebuild would ask again and leave another row in System Settings.
   `Scripts/package-app.sh` signs every build with the Developer ID for that reason.
-- A menu bar app (`LSUIElement`) is not active when its windows appear. The editor must
-  `NSApp.activate` itself, and remember the app that was frontmost before, to hand focus back.
+- A menu bar app (`LSUIElement`) is not active when its windows appear, and on macOS 27 the
+  plain `NSApp.activate()` is refused for it: the overlay showed but Escape went to the app in
+  front (measured with `--select`). `activate(ignoringOtherApps: true)` works and is what
+  `AreaSelection.show()`, `EditorWindowController.present()`, and the alerts use. The flow
+  remembers the app that was frontmost before, to hand focus back.
+- `AreaSelection` holds its windows and calls back once; whoever shows one must keep a
+  reference to it. The `--select` switch first created one inline, its `[weak self]` callback
+  found nothing, and the overlay stayed up with no way to finish.
 - Key equivalents in a menu bar app still route through `NSApp.mainMenu`, which such an app has
   to build by hand (`AppDelegate.makeMainMenu`). Without it, Command-Z, Command-W, and Delete
   reach nothing.

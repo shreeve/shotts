@@ -288,6 +288,8 @@ public final class CanvasView: NSView {
         addSubview(field)
         textField = field
         window?.makeFirstResponder(field)
+        // Editing existing text continues at its end rather than replacing it.
+        field.currentEditor()?.selectedRange = NSRange(location: (initial as NSString).length, length: 0)
     }
 
     func endTextEntry(commit: Bool) {
