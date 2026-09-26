@@ -151,44 +151,44 @@ import Testing
     @Test func textSitsLeftOfATailWhoseArrowPointsRight() {
         let l = CalloutLayout(tail: CGPoint(x: 500, y: 300), tip: CGPoint(x: 800, y: 200), lineHeight: 40, maxWidth: 300, in: bounds)
         #expect(l.side == .left && l.alignment == .right)
-        #expect(l.anchor == CGPoint(x: 480, y: 300))     // half a line short of the tail
+        #expect(l.anchor == CGPoint(x: 490, y: 300))     // a quarter line short of the tail
         #expect(l.width == 300)
-        #expect(l.origin(for: CGSize(width: 100, height: 40)) == CGPoint(x: 380, y: 280))  // right edge on the anchor, centered on the tail
-        #expect(l.origin(for: CGSize(width: 300, height: 120)) == CGPoint(x: 180, y: 240)) // taller: still centered
+        #expect(l.origin(for: CGSize(width: 100, height: 40)) == CGPoint(x: 390, y: 280))  // right edge on the anchor, centered on the tail
+        #expect(l.origin(for: CGSize(width: 300, height: 120)) == CGPoint(x: 190, y: 240)) // taller: still centered
     }
 
     @Test func textSitsRightOfATailWhoseArrowPointsLeft() {
         let l = CalloutLayout(tail: CGPoint(x: 500, y: 300), tip: CGPoint(x: 100, y: 300), lineHeight: 40, maxWidth: 300, in: bounds)
         #expect(l.side == .right && l.alignment == .left)
-        #expect(l.origin(for: CGSize(width: 100, height: 40)) == CGPoint(x: 520, y: 280))
+        #expect(l.origin(for: CGSize(width: 100, height: 40)) == CGPoint(x: 510, y: 280))
         #expect(l.width == 300)
     }
 
     @Test func noRoomOnTheFarSideFlipsIt() {
         let l = CalloutLayout(tail: CGPoint(x: 30, y: 300), tip: CGPoint(x: 400, y: 300), lineHeight: 40, maxWidth: 300, in: bounds)
-        #expect(l.side == .right && l.origin.x == 50)
+        #expect(l.side == .right && l.origin.x == 40)
     }
 
     @Test func widthAndPositionStayInsideThePicture() {
         let l = CalloutLayout(tail: CGPoint(x: 900, y: 590), tip: CGPoint(x: 1000, y: 560), lineHeight: 40, maxWidth: 300, in: bounds)
-        #expect(l.side == .left && l.anchor.x == 880 && l.width == 300)
+        #expect(l.side == .left && l.anchor.x == 890 && l.width == 300)
         #expect(l.origin.y == 560)                                          // clamped to the bottom
-        #expect(l.origin(for: CGSize(width: 300, height: 120)) == CGPoint(x: 580, y: 480)) // taller: moved up
+        #expect(l.origin(for: CGSize(width: 300, height: 120)) == CGPoint(x: 590, y: 480)) // taller: moved up
     }
 
     @Test func anArrowPointingUpPutsCenteredTextBelowTheTailGrowingDown() {
         let l = CalloutLayout(tail: CGPoint(x: 500, y: 300), tip: CGPoint(x: 520, y: 100), lineHeight: 40, maxWidth: 300, in: bounds)
         #expect(l.side == .below && l.alignment == .center)
-        #expect(l.origin(for: CGSize(width: 100, height: 40)) == CGPoint(x: 450, y: 320))  // centered on the tail, half a line below it
-        #expect(l.origin(for: CGSize(width: 300, height: 120)) == CGPoint(x: 350, y: 320)) // taller: grows downward
+        #expect(l.origin(for: CGSize(width: 100, height: 40)) == CGPoint(x: 450, y: 310))  // centered on the tail, a quarter line below it
+        #expect(l.origin(for: CGSize(width: 300, height: 120)) == CGPoint(x: 350, y: 310)) // taller: grows downward
     }
 
     @Test func anArrowPointingDownPutsCenteredTextAboveTheTailGrowingUp() {
         let l = CalloutLayout(tail: CGPoint(x: 500, y: 300), tip: CGPoint(x: 480, y: 500), lineHeight: 40, maxWidth: 300, in: bounds)
         #expect(l.side == .above && l.alignment == .center)
-        #expect(l.anchor == CGPoint(x: 500, y: 280))                        // half a line above the tail
-        #expect(l.origin(for: CGSize(width: 100, height: 40)) == CGPoint(x: 450, y: 240))
-        #expect(l.origin(for: CGSize(width: 300, height: 120)) == CGPoint(x: 350, y: 160)) // taller: grows upward
+        #expect(l.anchor == CGPoint(x: 500, y: 290))                        // a quarter line above the tail
+        #expect(l.origin(for: CGSize(width: 100, height: 40)) == CGPoint(x: 450, y: 250))
+        #expect(l.origin(for: CGSize(width: 300, height: 120)) == CGPoint(x: 350, y: 170)) // taller: grows upward
     }
 
     @Test func centeredTextCentersOnTheTailNotThePicture() {

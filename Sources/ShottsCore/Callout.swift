@@ -13,19 +13,19 @@ public struct CalloutLayout: Equatable, Sendable {
     public var side: Side
     /// The widest a line may be before it wraps.
     public var width: Double
-    /// The point the text hangs from, half a line out from the tail on the text's side: the
-    /// middle of the box's near edge.
+    /// The point the text hangs from, a quarter of a line out from the tail on the text's side:
+    /// the middle of the box's near edge.
     public var anchor: CGPoint
     private var lineHeight: Double
     private var bounds: CGRect
 
     /// - Parameters:
-    ///   - lineHeight: one line of the text; half of it is the gap between the tail and the words.
+    ///   - lineHeight: one line of the text; a quarter of it is the gap between the tail and the words.
     ///   - maxWidth: the widest box wanted, whatever room there is.
     public init(tail: CGPoint, tip: CGPoint, lineHeight: Double, maxWidth: Double, in bounds: CGRect) {
         self.lineHeight = lineHeight
         self.bounds = bounds
-        let gap = lineHeight * 0.5
+        let gap = lineHeight * 0.25
         let dx = tip.x - tail.x, dy = tip.y - tail.y
         if abs(dy) > abs(dx) {
             // Vertical: the text sits on the far side of the tail from the tip, centered on it.
