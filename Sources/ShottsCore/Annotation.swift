@@ -133,7 +133,8 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         return copy
     }
 
-    static func bounds(of points: [CGPoint]) -> CGRect {
+    /// The smallest rectangle holding every point.
+    public static func bounds(of points: [CGPoint]) -> CGRect {
         guard let first = points.first else { return .zero }
         var minX = first.x, minY = first.y, maxX = first.x, maxY = first.y
         for p in points.dropFirst() {

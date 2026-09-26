@@ -442,8 +442,8 @@ public final class CanvasView: NSView {
         ctx.clip(to: picture)
         ctx.translateBy(x: picture.minX, y: picture.minY)
         ctx.scaleBy(x: zoom, y: zoom)
-        Renderer.draw(document, source: source, in: ctx)
-        if let live { Renderer.draw(live, document: document, source: source, in: ctx) }
+        Renderer.draw(document, source: source, in: ctx, baseScale: zoom)
+        if let live { Renderer.draw(live, document: document, source: source, in: ctx, baseScale: zoom) }
         ctx.restoreGState()
 
         let crop = liveCrop ?? document.crop

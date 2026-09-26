@@ -6,10 +6,13 @@ import ShottsCore
 ///
 /// Every `draw` expects a context whose user space is image pixels with the origin at the
 /// top-left and y growing downward (a flipped context), which is how both the flipped canvas
-/// view and `image(of:source:)` set theirs up.
+/// view and `image(of:source:)` set theirs up. `baseScale` is the context's base units per image
+/// pixel (the canvas's zoom, 1 for a bitmap of the picture): Core Graphics sizes shadows in base
+/// units whatever the CTM, and the renderer converts so a shadow looks the same in both.
 public enum Renderer {
-    /// Draws the source and the annotations, in image pixels.
-    public static func draw(_ document: Document, source: CGImage, in ctx: CGContext) {
+    /// Draws the source and the annotations, in image pixels. Annotations wholly outside the
+    /// clip are skipped.
+    public static func draw(_ document: Document, source: CGImage, in ctx: CGContext, baseScale: Double = 1) {
         let bounds = document.pixelBounds
         ctx.saveGState()
         // The bitmap is stored top row first; drawing it into a flipped context would turn it
@@ -20,25 +23,30 @@ public enum Renderer {
         ctx.draw(source, in: bounds)
         ctx.restoreGState()
 
-        for annotation in document.annotations {
-            draw(annotation, document: document, source: source, in: ctx)
+        let clip = ctx.boundingBoxOfClipPath
+        for annotation in document.annotations where extent(of: annotation, scale: document.scale).intersects(clip) {
+            draw(annotation, document: document, source: source, in: ctx, baseScale: baseScale)
         }
     }
 
     /// One annotation, used by the canvas for the shape being dragged out too.
-    public static func draw(_ a: Annotation, document: Document, source: CGImage, in ctx: CGContext) {
+    public static func draw(_ a: Annotation, document: Document, source: CGImage, in ctx: CGContext, baseScale: Double = 1) {
         let s = document.scale
-        let width = a.style.strokeWidth * s
+        let width = a.style.stroke(scale: s)
         let color = cgColor(a.style.color)
+        let shadow = a.style.shadow ? 5 * s * baseScale : 0
         ctx.saveGState()
         defer { ctx.restoreGState() }
+        // Nothing reaches past the extent. Clipping to it also keeps each transparency layer,
+        // which Core Graphics sizes to the clip, as small as the annotation instead of the picture.
+        ctx.clip(to: extent(of: a, scale: s))
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
 
         func arrow(from: CGPoint, to: CGPoint) {
-            let geometry = ArrowGeometry(from: from, to: to, width: width, tapered: a.style.taperedArrows)
+            let geometry = a.style.arrow(from: from, to: to, scale: s)
             ctx.saveGState()
-            if a.style.shadow { setShadow(ctx, scale: s) }
+            setShadow(ctx, blur: shadow)
             ctx.beginTransparencyLayer(auxiliaryInfo: nil)
             // Fill the outline, then stroke it thinly with round joins to soften the corners.
             ctx.setFillColor(color)
@@ -58,11 +66,11 @@ public enum Renderer {
         case let .callout(from, to, text):
             arrow(from: from, to: to)
             if !text.string.isEmpty {
-                drawText(text.string, at: text.origin, size: text.size, alignment: text.alignment, style: a.style, scale: s, in: ctx)
+                drawText(text.string, at: text.origin, size: text.size, alignment: text.alignment, style: a.style, scale: s, shadow: shadow, in: ctx)
             }
 
         case let .rectangle(rect, filled):
-            if a.style.shadow { setShadow(ctx, scale: s) }
+            setShadow(ctx, blur: shadow)
             if filled {
                 ctx.setFillColor(color)
                 ctx.fill(rect.standardized)
@@ -73,7 +81,7 @@ public enum Renderer {
             }
 
         case let .ellipse(rect, filled):
-            if a.style.shadow { setShadow(ctx, scale: s) }
+            setShadow(ctx, blur: shadow)
             if filled {
                 ctx.setFillColor(color)
                 ctx.fillEllipse(in: rect.standardized)
@@ -84,7 +92,7 @@ public enum Renderer {
             }
 
         case let .pen(points):
-            if a.style.shadow { setShadow(ctx, scale: s) }
+            setShadow(ctx, blur: shadow)
             ctx.setStrokeColor(color)
             ctx.setLineWidth(width)
             addSmoothPath(points, to: ctx)
@@ -96,7 +104,7 @@ public enum Renderer {
             var c = a.style.color
             c.alpha = 0.45
             ctx.setStrokeColor(cgColor(c))
-            ctx.setLineWidth(max(width * 3, 12 * s))
+            ctx.setLineWidth(a.style.highlighterWidth(scale: s))
             ctx.setLineCap(.square)
             addSmoothPath(points, to: ctx)
             ctx.strokePath()
@@ -105,7 +113,7 @@ public enum Renderer {
             drawPixelated(source, rect: rect.standardized.intersection(document.pixelBounds), cell: max(8 * s, 8), in: ctx)
 
         case let .text(origin, string, size, alignment):
-            drawText(string, at: origin, size: size, alignment: alignment, style: a.style, scale: s, in: ctx)
+            drawText(string, at: origin, size: size, alignment: alignment, style: a.style, scale: s, shadow: shadow, in: ctx)
         }
     }
 
@@ -178,17 +186,40 @@ public enum Renderer {
         ceil(attributedText("Ag", style: style, scale: scale).size().height + outlineWidth(style, scale: scale))
     }
 
+    /// Everything an annotation may paint, its shadow and outline included, in image pixels.
+    public static func extent(of a: Annotation, scale s: Double) -> CGRect {
+        let ink: CGRect
+        switch a.shape {
+        case let .arrow(from, to):
+            ink = Annotation.bounds(of: a.style.arrow(from: from, to: to, scale: s).outline)
+        case let .callout(from, to, text):
+            ink = Annotation.bounds(of: a.style.arrow(from: from, to: to, scale: s).outline).union(text.frame)
+        case .highlighter:
+            ink = a.bounds.insetBy(dx: -a.style.highlighterWidth(scale: s) / 2, dy: -a.style.highlighterWidth(scale: s) / 2)
+        case .text, .obscure:
+            ink = a.bounds
+        case .rectangle, .ellipse, .pen:
+            ink = a.bounds.insetBy(dx: -a.style.stroke(scale: s), dy: -a.style.stroke(scale: s))
+        }
+        // The arrow's softening stroke, a text outline's top, and a shadow's blur reach past the
+        // ink; 20 points covers all three with room to spare.
+        let reach = 20 * s + a.style.stroke(scale: s) + outlineWidth(a.style, scale: s)
+        return ink.insetBy(dx: -reach, dy: -reach)
+    }
+
     // MARK: - Pieces
 
     static func cgColor(_ c: RGBA) -> CGColor {
         CGColor(srgbRed: c.red, green: c.green, blue: c.blue, alpha: c.alpha)
     }
 
-    /// A soft, even shadow all around, the way macOS shadows its own controls. It has no
-    /// offset on purpose: Core Graphics applies a shadow offset in device space, so in the
-    /// editor's flipped space a "downward" offset came out pointing up.
-    static func setShadow(_ ctx: CGContext, scale: Double) {
-        ctx.setShadow(offset: .zero, blur: 5 * scale, color: CGColor(gray: 0, alpha: 0.55))
+    /// A soft, even shadow all around, the way macOS shadows its own controls; none for a blur
+    /// of 0. It has no offset on purpose: Core Graphics applies a shadow offset in base space,
+    /// untouched by the CTM, so in the editor's flipped space a "downward" offset came out
+    /// pointing up.
+    static func setShadow(_ ctx: CGContext, blur: Double) {
+        guard blur > 0 else { return }
+        ctx.setShadow(offset: .zero, blur: blur, color: CGColor(gray: 0, alpha: 0.55))
     }
 
     static func outlineWidth(_ style: Style, scale: Double) -> Double {
@@ -199,7 +230,8 @@ public enum Renderer {
         NSAttributedString(string: string, attributes: [.font: font(for: style, scale: scale)])
     }
 
-    static func drawText(_ string: String, at origin: CGPoint, size: CGSize, alignment: TextAlignment, style: Style, scale: Double, in ctx: CGContext) {
+    static func drawText(_ string: String, at origin: CGPoint, size: CGSize, alignment: TextAlignment, style: Style, scale: Double,
+                         shadow: Double, in ctx: CGContext) {
         let font = font(for: style, scale: scale)
         let pad = outlineWidth(style, scale: scale)
         let paragraph = NSMutableParagraphStyle()
@@ -214,7 +246,7 @@ public enum Renderer {
         let outline: NSColor = style.color.isLight ? .black : .white
         // AppKit's string drawing wants a current NSGraphicsContext; the canvas has one, and
         // `image(of:)` installs one around the draw.
-        if style.shadow { setShadow(ctx, scale: scale) }
+        setShadow(ctx, blur: shadow)
         ctx.beginTransparencyLayer(auxiliaryInfo: nil)
         if pad > 0 {
             // Stroke first, then fill on top, so the outline sits outside the letters.
