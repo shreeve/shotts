@@ -2,7 +2,8 @@ import AppKit
 import ShottsCore
 
 /// What one display looked like when the hot key fired: the picture the overlay shows, the
-/// magnifier reads, and the selection is cut from. Held only while the user selects.
+/// magnifier reads, and the selection is cut from. Held only while the user selects; the
+/// cut-out shares none of its pixels.
 public struct DisplayImage {
     public var screen: NSScreen
     public var image: CGImage
@@ -16,6 +17,31 @@ public struct DisplayImage {
         self.image = image
         self.scale = scale
         self.windows = windows
+    }
+
+    /// The picture's pixels under `rect` (points from the display's top-left), whole pixels,
+    /// inside the picture: the one conversion from the picker's points, so the size the picker
+    /// shows is the size cut.
+    public func pixelRect(for rect: CGRect) -> CGRect {
+        SelectionRule.pixelRect(rect, scale: scale, within: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+    }
+
+    /// The area under `rect` as a picture of its own. `CGImage.cropping(to:)` alone would keep
+    /// a reference to the whole display's pixels for as long as the editor holds the cut-out,
+    /// so the crop is drawn into a bitmap of its own size, in the picture's own color space and
+    /// pixel format so no color shifts.
+    public func cut(_ rect: CGRect) -> CGImage? {
+        let pixels = pixelRect(for: rect)
+        guard !pixels.isEmpty, let crop = image.cropping(to: pixels), let space = image.colorSpace else { return nil }
+        let w = crop.width, h = crop.height
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: image.bitsPerComponent, bytesPerRow: 0,
+                                  space: space, bitmapInfo: image.bitmapInfo.rawValue)
+                ?? CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        else { return nil }
+        ctx.setBlendMode(.copy)
+        ctx.draw(crop, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
     }
 }
 
