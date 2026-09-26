@@ -95,6 +95,18 @@ import Testing
         #expect(HitTest.annotation(at: CGPoint(x: 90, y: 196), in: doc, tolerance: 1) == arrow.id) // inside the head, 4 px off the shaft
     }
 
+    @Test func aCalloutIsHitOnItsWordsOrItsArrow() {
+        let words = Annotation.TextBox(origin: CGPoint(x: 0, y: 80), string: "hi", size: CGSize(width: 60, height: 30), alignment: .right)
+        let c = Annotation(shape: .callout(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 300, y: 100), text: words), style: style)
+        #expect(HitTest.calloutPart(at: CGPoint(x: 30, y: 95), of: c, tolerance: 4) == .text)
+        #expect(HitTest.calloutPart(at: CGPoint(x: 200, y: 102), of: c, tolerance: 4) == .arrow)
+        #expect(HitTest.calloutPart(at: CGPoint(x: 295, y: 100), of: c, tolerance: 4) == .head)
+        #expect(HitTest.calloutPart(at: CGPoint(x: 200, y: 200), of: c, tolerance: 4) == nil)
+        #expect(c.bounds == CGRect(x: 0, y: 80, width: 300, height: 30))
+        let moved = c.translated(by: CGPoint(x: 10, y: 10))
+        if case let .callout(from, _, text) = moved.shape { #expect(from == CGPoint(x: 110, y: 110) && text.origin == CGPoint(x: 10, y: 90)) }
+    }
+
     @Test func arrowOutlineRunsFromTailToTipAndScalesWithStroke() {
         let long = ArrowGeometry(from: .zero, to: CGPoint(x: 100, y: 0), width: 4)
         #expect(long.tip == CGPoint(x: 100, y: 0))

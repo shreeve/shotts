@@ -35,9 +35,9 @@ public enum Renderer {
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
 
-        switch a.shape {
-        case let .arrow(from, to):
+        func arrow(from: CGPoint, to: CGPoint) {
             let geometry = ArrowGeometry(from: from, to: to, width: width, tapered: a.style.taperedArrows)
+            ctx.saveGState()
             if a.style.shadow { setShadow(ctx, scale: s) }
             ctx.beginTransparencyLayer(auxiliaryInfo: nil)
             // Fill the outline, then stroke it thinly with round joins to soften the corners.
@@ -48,6 +48,18 @@ public enum Renderer {
             ctx.closePath()
             ctx.drawPath(using: .fillStroke)
             ctx.endTransparencyLayer()
+            ctx.restoreGState()
+        }
+
+        switch a.shape {
+        case let .arrow(from, to):
+            arrow(from: from, to: to)
+
+        case let .callout(from, to, text):
+            arrow(from: from, to: to)
+            if !text.string.isEmpty {
+                drawText(text.string, at: text.origin, size: text.size, alignment: text.alignment, style: a.style, scale: s, in: ctx)
+            }
 
         case let .rectangle(rect):
             if a.style.shadow { setShadow(ctx, scale: s) }
