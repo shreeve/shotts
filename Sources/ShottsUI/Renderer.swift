@@ -170,7 +170,11 @@ public enum Renderer {
         let font = font(for: style, scale: scale)
         let pad = outlineWidth(style, scale: scale)
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = alignment == .right ? .right : .left
+        switch alignment {
+        case .left: paragraph.alignment = .left
+        case .center: paragraph.alignment = .center
+        case .right: paragraph.alignment = .right
+        }
         // The box the text was measured in; lines wrap inside it exactly as they were measured.
         let box = CGRect(x: origin.x + pad, y: origin.y, width: max(size.width - pad * 2, 1), height: size.height + pad)
         let fill = NSColor(cgColor: cgColor(style.color)) ?? .red

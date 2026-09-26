@@ -291,7 +291,11 @@ public final class CanvasView: NSView {
     fileprivate func beginTextEntry(at origin: CGPoint, initial: String, style: Style, layout: CalloutLayout? = nil) {
         let entry = TextEntry(style: style, origin: origin, zoom: zoom, scale: document.scale)
         entry.layout = layout
-        if layout?.alignment == .right { entry.alignment = .right }
+        switch layout?.alignment {
+        case .right: entry.alignment = .right
+        case .center: entry.alignment = .center
+        default: break
+        }
         entry.string = initial
         entry.onChange = { [weak self] string in self?.updateLiveText(string) }
         entry.onFinish = { [weak self] in self?.endTextEntry(commit: true) }
@@ -308,7 +312,7 @@ public final class CanvasView: NSView {
         let size = Renderer.textSize(string.isEmpty ? " " : string, style: entry.style, scale: document.scale, width: entry.layout?.width)
         if let layout = entry.layout {
             // A callout's text keeps to its anchored edge and stays inside the picture.
-            entry.origin = layout.origin(for: size, in: document.pixelBounds)
+            entry.origin = layout.origin(for: size)
         }
         live = string.isEmpty ? nil : Annotation(shape: .text(origin: entry.origin, string: string, size: size, alignment: entry.layout?.alignment ?? .left), style: entry.style)
         entry.place(in: pictureRect)
@@ -325,7 +329,7 @@ public final class CanvasView: NSView {
         needsDisplay = true
         guard commit, !string.isEmpty else { return }
         let size = Renderer.textSize(string, style: entry.style, scale: document.scale, width: entry.layout?.width)
-        let origin = entry.layout?.origin(for: size, in: document.pixelBounds) ?? entry.origin
+        let origin = entry.layout?.origin(for: size) ?? entry.origin
         var d = document
         d.add(Annotation(shape: .text(origin: origin, string: string, size: size, alignment: entry.layout?.alignment ?? .left), style: entry.style))
         self.commit(d)
