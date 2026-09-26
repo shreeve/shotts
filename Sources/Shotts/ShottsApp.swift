@@ -55,6 +55,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             exit(Self.previewOverlay(to: URL(fileURLWithPath: arguments[i + 1]), selected: arguments.contains("--dragged"),
                                      dimmed: arguments.contains("--dim"), corner: arguments.contains("--corner")) ? 0 : 1)
         }
+        if let i = arguments.firstIndex(of: "--print-pdf"), i + 2 < arguments.count {
+            // Developer check of printing: the sample's page written as a PDF.
+            guard let (document, cg) = Self.sample(from: URL(fileURLWithPath: arguments[i + 1])) else { exit(1) }
+            exit(EditorWindowController.printPDF(document, source: cg, to: URL(fileURLWithPath: arguments[i + 2])) ? 0 : 1)
+        }
         if arguments.contains("--check-text-entry") {
             // Developer check: text entry can open and take a string without a display.
             exit(TextEntryCheck.run() ? 0 : 1)
@@ -127,8 +132,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func renderSample(from input: URL, to output: URL) -> Bool {
+        guard let (document, cg) = Self.sample(from: input) else { return false }
+        do {
+            try Export.write(document, source: cg, to: output)
+            return true
+        } catch {
+            fputs("render failed: \(error)\n", stderr)
+            return false
+        }
+    }
+
+    /// The picture with one of every annotation on it, for the developer checks.
+    private static func sample(from input: URL) -> (Document, CGImage)? {
         guard let image = NSImage(contentsOf: input),
-              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
         let w = Double(cg.width), h = Double(cg.height)
         var document = Document(width: cg.width, height: cg.height, scale: 2)
         let style = Style.standard
@@ -160,13 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if CommandLine.arguments.contains("--crop") {
             document.setCrop(CGRect(x: w * 0.1, y: h * 0.1, width: w * 0.6, height: h * 0.5))
         }
-        do {
-            try Export.write(document, source: cg, to: output)
-            return true
-        } catch {
-            fputs("render failed: \(error)\n", stderr)
-            return false
-        }
+        return (document, cg)
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
@@ -251,6 +262,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         main.addItem(fileItem)
         let file = NSMenu(title: "File")
         file.addItem(NSMenuItem(title: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+        file.addItem(.separator())
+        // To the editor's window controller through the responder chain.
+        file.addItem(NSMenuItem(title: "Print…", action: #selector(EditorWindowController.printPressed), keyEquivalent: "p"))
         fileItem.submenu = file
 
         let editItem = NSMenuItem()

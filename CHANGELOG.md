@@ -16,6 +16,7 @@ The first milestone: the daily screenshot workflow.
   list of the keys shows until the first drag. The capture goes to the clipboard as soon as
   it is taken. That, dimming outside a dragged selection, the magnifier, and the hints are
   options in the menu bar menu.
+- Command-P prints the picture, scaled to fit one page.
 - Installs with `brew install --cask shreeve/tap/shotts` and updates itself through Sparkle:
   Check for Updates… in the menu bar menu. Releases are signed with a Developer ID and notarized.
 - An app icon: a camera in a viewfinder, like the menu bar's, on a blue gradient tile with a
