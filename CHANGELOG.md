@@ -18,3 +18,4 @@ The first milestone: the daily screenshot workflow.
   undo and redo, single-key tool switching, and remembered color, width, text size, and arrow
   tapering.
 - Copy, Save…, and drag out, each closing the editor and returning focus to the previous app.
+  An option adds a soft drop shadow on a transparent margin to every exported picture.

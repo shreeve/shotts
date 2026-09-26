@@ -70,6 +70,8 @@ public struct SelectionOptions: Equatable, Sendable {
     public var showsHints = true
     /// Puts the capture on the clipboard as soon as the area is selected, before any editing.
     public var copiesOnCapture = true
+    /// Exports carry a soft shadow on a transparent margin around the picture.
+    public var dropShadow = false
 
     public init() {}
 
@@ -81,6 +83,7 @@ public struct SelectionOptions: Equatable, Sendable {
             o.magnifies = d.object(forKey: "selection.magnifies") == nil ? true : d.bool(forKey: "selection.magnifies")
             o.showsHints = d.object(forKey: "selection.hints") == nil ? true : d.bool(forKey: "selection.hints")
             o.copiesOnCapture = d.object(forKey: "capture.copies") == nil ? true : d.bool(forKey: "capture.copies")
+            o.dropShadow = d.bool(forKey: "export.shadow")
             return o
         }
         set {
@@ -89,6 +92,7 @@ public struct SelectionOptions: Equatable, Sendable {
             d.set(newValue.magnifies, forKey: "selection.magnifies")
             d.set(newValue.showsHints, forKey: "selection.hints")
             d.set(newValue.copiesOnCapture, forKey: "capture.copies")
+            d.set(newValue.dropShadow, forKey: "export.shadow")
         }
     }
 }
