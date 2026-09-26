@@ -10,7 +10,12 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     private let tools = NSSegmentedControl()
     private let colorButton = NSButton()
     private let popover = NSPopover()
-    private var stylePopover: StylePopover?
+    /// One per window, so the color panel it targets lives as long as the window.
+    private lazy var stylePopover: StylePopover = {
+        let content = StylePopover(style: canvas.style)
+        content.onStyle = { [weak self] style in self?.apply(style) }
+        return content
+    }()
     private let widths = NSPopUpButton()
     private let sizes = NSPopUpButton()
     private let fonts = NSPopUpButton()
@@ -99,6 +104,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         colorButton.target = self
         colorButton.action = #selector(showStylePopover)
         colorButton.toolTip = "Color and style"
+        colorButton.setAccessibilityLabel("Color and style")
 
         for w in Style.strokeWidths {
             widths.addItem(withTitle: "\(Int(w)) pt")
@@ -205,10 +211,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 
     @objc private func showStylePopover() {
         if popover.isShown { popover.close(); return }
-        let content = StylePopover(style: canvas.style)
-        content.onStyle = { [weak self] style in self?.apply(style) }
-        stylePopover = content
-        popover.contentViewController = content
+        stylePopover.show(canvas.style)
+        popover.contentViewController = stylePopover
         popover.behavior = .transient
         popover.show(relativeTo: colorButton.bounds, of: colorButton, preferredEdge: .minY)
     }
@@ -225,7 +229,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         if let i = Style.strokeWidths.firstIndex(of: style.strokeWidth) { widths.selectItem(at: i) }
         if let i = Style.fontSizes.firstIndex(of: style.fontSize) { sizes.selectItem(at: i) }
         if let i = FontChoice.allCases.firstIndex(of: style.font) { fonts.selectItem(at: i) }
-        stylePopover?.show(style)
+        if popover.isShown { stylePopover.show(style) }
     }
 
     /// The style the last edit used, so the next capture starts with the same color and sizes.
@@ -340,23 +344,31 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         return frame
     }
 
+    /// Closing a capture with annotations asks first, in a sheet; Discard closes it.
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        canvas.endTextEntry(commit: true) // words being typed count as annotations
         if closing || canvas.document.isBlank { return true }
+        guard sender.attachedSheet == nil else { return false }
         let alert = NSAlert()
         alert.messageText = "Discard this capture?"
         alert.informativeText = "It has annotations that were not copied or saved."
-        alert.addButton(withTitle: "Discard")
+        alert.addButton(withTitle: "Discard").hasDestructiveAction = true
         alert.addButton(withTitle: "Cancel")
-        return alert.runModal() == .alertFirstButtonReturn
+        alert.beginSheetModal(for: sender) { [weak self] response in
+            if response == .alertFirstButtonReturn { self?.finish() }
+        }
+        return false
     }
 
     public func windowWillClose(_ notification: Notification) {
-        onClose?()
+        let done = onClose
         onClose = nil
+        done?()
     }
 
+    /// Escape: whatever the canvas is in the middle of, else the editor, asking as Close does.
     public override func cancelOperation(_ sender: Any?) {
-        if !canvas.cancelCurrent() { close() }
+        if !canvas.cancelCurrent() { window?.performClose(nil) }
     }
 }
 
@@ -387,17 +399,28 @@ final class DragGrip: NSImageView {
         super.init(frame: .zero)
         image = NSImage(systemSymbolName: "hand.draw", accessibilityDescription: "Drag out")
         toolTip = "Drag the picture into another app"
+        setAccessibilityRole(.button)
+        setAccessibilityLabel("Drag the picture into another app")
         widthAnchor.constraint(equalToConstant: 28).isActive = true
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
+    // The drag starts from the first press even while another app is in front, which is when a
+    // drag into it is wanted, without bringing the editor forward.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func shouldDelayWindowOrdering(for event: NSEvent) -> Bool { true }
+
     override func mouseDragged(with event: NSEvent) {
-        guard let controller, let file = try? Export.temporaryFile(controller.canvas.document, source: controller.canvas.source) else { return }
+        guard let controller else { return }
+        controller.canvas.endTextEntry(commit: true) // the words being typed go with the picture
+        guard let file = try? Export.temporaryFile(controller.canvas.document, source: controller.canvas.source) else { return }
         let item = NSDraggingItem(pasteboardWriter: file as NSURL)
-        let preview = NSImage(cgImage: controller.canvas.source, size: NSSize(width: 160, height: 160 * CGFloat(controller.canvas.document.height) / CGFloat(controller.canvas.document.width)))
-        item.setDraggingFrame(NSRect(origin: convert(event.locationInWindow, from: nil), size: preview.size), contents: preview)
+        // The picture as it will land, annotations and crop included, read back from the file.
+        let picture = NSImage(contentsOf: file) ?? NSImage(cgImage: controller.canvas.source, size: .zero)
+        let preview = NSSize(width: 160, height: 160 * picture.size.height / max(picture.size.width, 1))
+        item.setDraggingFrame(NSRect(origin: convert(event.locationInWindow, from: nil), size: preview), contents: picture)
         let session = beginDraggingSession(with: [item], event: event, source: self)
         session.animatesToStartingPositionsOnCancelOrFail = true
     }

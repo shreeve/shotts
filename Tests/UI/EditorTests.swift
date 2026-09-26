@@ -22,13 +22,244 @@ import Testing
         var d = canvas.document
         d.add(callout)
         canvas.commit(d)
-        canvas.editCalloutText(callout.id, from: tail, to: tip, initial: "", style: canvas.style)
+        canvas.editText(callout.id)
         canvas.typeText("wrapped words beside the tail of the arrow")
         canvas.endTextEntry(commit: true)
         guard case let .callout(from, _, text)? = canvas.document.annotations.last?.shape else { Issue.record("no callout"); return }
         #expect(from == tail)
         #expect(text.string.hasPrefix("wrapped") && text.alignment == .right && text.size.width > 0)
         #expect(text.frame.maxX <= tail.x)
+    }
+}
+
+/// Mouse events at picture pixels, for a canvas in a window that is never shown.
+@MainActor struct Mouse {
+    let canvas: CanvasView
+
+    func event(_ type: NSEvent.EventType, _ p: CGPoint, clicks: Int = 1, flags: NSEvent.ModifierFlags = []) -> NSEvent {
+        let picture = canvas.pictureRect
+        let inView = CGPoint(x: picture.minX + p.x * canvas.zoom, y: picture.minY + p.y * canvas.zoom)
+        return NSEvent.mouseEvent(with: type, location: canvas.convert(inView, to: nil), modifierFlags: flags, timestamp: 0,
+                                  windowNumber: canvas.window!.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)!
+    }
+
+    func down(_ p: CGPoint, clicks: Int = 1) { canvas.mouseDown(with: event(.leftMouseDown, p, clicks: clicks)) }
+    func drag(_ p: CGPoint) { canvas.mouseDragged(with: event(.leftMouseDragged, p)) }
+    func up(_ p: CGPoint, clicks: Int = 1) { canvas.mouseUp(with: event(.leftMouseUp, p, clicks: clicks)) }
+
+    func stroke(_ from: CGPoint, _ to: CGPoint) {
+        down(from); drag(CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)); drag(to); up(to)
+    }
+
+    func doubleClick(_ p: CGPoint) { down(p); up(p); down(p, clicks: 2); up(p, clicks: 2) }
+}
+
+@MainActor @Suite struct EditingTests {
+    @Test func aNewCalloutIsOneUndoStep() {
+        let canvas = canvasInWindow()
+        canvas.tool = .callout
+        Mouse(canvas: canvas).stroke(CGPoint(x: 100, y: 150), CGPoint(x: 300, y: 100))
+        canvas.typeText("look here")
+        canvas.endTextEntry(commit: true)
+        guard case let .callout(_, _, text)? = canvas.document.annotations.first?.shape else { Issue.record("no callout"); return }
+        #expect(text.string == "look here")
+        canvas.undo(nil)
+        #expect(canvas.document.annotations.isEmpty)
+        #expect(!canvas.history.canUndo)
+    }
+
+    @Test func aCalloutLeftWithoutWordsIsAnArrowInOneStep() {
+        let canvas = canvasInWindow()
+        canvas.tool = .callout
+        Mouse(canvas: canvas).stroke(CGPoint(x: 100, y: 150), CGPoint(x: 300, y: 100))
+        canvas.endTextEntry(commit: true)
+        guard case .arrow? = canvas.document.annotations.first?.shape else { Issue.record("not an arrow"); return }
+        canvas.undo(nil)
+        #expect(canvas.document.annotations.isEmpty)
+    }
+
+    @Test func editingTextKeepsItsPlaceAndIsOneStep() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
+        canvas.typeText("first")
+        canvas.endTextEntry(commit: true)
+        canvas.tool = .rectangle
+        mouse.stroke(CGPoint(x: 200, y: 200), CGPoint(x: 300, y: 280))
+        let text = try #require(canvas.document.annotations.first)
+        canvas.tool = .select
+        let inside = CGPoint(x: text.bounds.midX, y: text.bounds.midY)
+        mouse.doubleClick(inside)
+        // The words stay visible while the entry is open.
+        #expect(canvas.textField?.preview != nil)
+        canvas.typeText("second")
+        canvas.endTextEntry(commit: true)
+        #expect(canvas.document.annotations.count == 2)
+        #expect(canvas.document.annotations.first?.id == text.id)
+        guard case let .text(_, string, _, _)? = canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
+        #expect(string == "second")
+        canvas.undo(nil)
+        guard case let .text(_, before, _, _)? = canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
+        #expect(before == "first" && canvas.document.annotations.count == 2)
+    }
+
+    @Test func escapePutsAMoveBack() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .rectangle
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 140, y: 140))
+        let before = canvas.document
+        canvas.tool = .select
+        mouse.down(CGPoint(x: 40, y: 90))
+        mouse.drag(CGPoint(x: 100, y: 90))
+        #expect(canvas.document != before)
+        #expect(canvas.cancelCurrent())
+        mouse.drag(CGPoint(x: 120, y: 90))
+        mouse.up(CGPoint(x: 120, y: 90))
+        #expect(canvas.document == before)
+        canvas.undo(nil)
+        #expect(canvas.document.annotations.isEmpty)
+    }
+
+    @Test func aMoveIsOneStep() {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .rectangle
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 140, y: 140))
+        canvas.tool = .select
+        mouse.down(CGPoint(x: 40, y: 90))
+        for x in stride(from: 45, through: 100, by: 5) { mouse.drag(CGPoint(x: Double(x), y: 90)) }
+        mouse.up(CGPoint(x: 100, y: 90))
+        #expect(canvas.document.annotations.first?.bounds.minX == 100)
+        canvas.undo(nil)
+        #expect(canvas.document.annotations.first?.bounds.minX == 40)
+    }
+
+    @Test func restylingTextMeasuresItAgain() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.beginTextEntry(at: CGPoint(x: 20, y: 20), initial: "", style: canvas.style)
+        canvas.typeText("grow")
+        canvas.endTextEntry(commit: true)
+        let small = try #require(canvas.document.annotations.first).bounds
+        canvas.tool = .select
+        mouse.down(CGPoint(x: small.midX, y: small.midY)); mouse.up(CGPoint(x: small.midX, y: small.midY))
+        var bigger = canvas.style
+        bigger.fontSize = 48
+        canvas.style = bigger
+        let big = try #require(canvas.document.annotations.first).bounds
+        #expect(big.width > small.width * 1.4 && big.height > small.height * 1.4)
+    }
+
+    @Test func aColorChangeLeavesTheOtherStylesAlone() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        var thick = canvas.style
+        thick.strokeWidth = 10
+        canvas.style = thick
+        canvas.tool = .arrow
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 300, y: 200))
+        var bar = thick
+        bar.strokeWidth = 2
+        canvas.style = bar // the bar moves on to a thin line for the next shape
+        canvas.tool = .select
+        mouse.down(CGPoint(x: 170, y: 120)); mouse.up(CGPoint(x: 170, y: 120))
+        var blue = bar
+        blue.color = .blue
+        canvas.style = blue
+        let arrow = try #require(canvas.document.annotations.first)
+        #expect(arrow.style.color == .blue && arrow.style.strokeWidth == 10)
+    }
+
+    @Test func aStyleChangeWhileTypingStylesTheWords() throws {
+        let canvas = canvasInWindow()
+        canvas.beginTextEntry(at: CGPoint(x: 20, y: 20), initial: "", style: canvas.style)
+        canvas.typeText("blue")
+        var blue = canvas.style
+        blue.color = .blue
+        canvas.style = blue
+        canvas.endTextEntry(commit: true)
+        #expect(try #require(canvas.document.annotations.first).style.color == .blue)
+    }
+
+    @Test func undoWhileTypingUndoesTypingNotTheDocument() {
+        let canvas = canvasInWindow()
+        canvas.tool = .rectangle
+        Mouse(canvas: canvas).stroke(CGPoint(x: 40, y: 40), CGPoint(x: 140, y: 140))
+        canvas.beginTextEntry(at: CGPoint(x: 200, y: 20), initial: "", style: canvas.style)
+        canvas.textField?.insertText("ab", replacementRange: NSRange(location: NSNotFound, length: 0))
+        canvas.undo(nil)
+        #expect(canvas.textField != nil)
+        #expect(canvas.document.annotations.count == 1)
+    }
+
+    @Test func clicksBesideCalloutWordsReachTheCanvas() throws {
+        let canvas = canvasInWindow()
+        canvas.tool = .callout
+        Mouse(canvas: canvas).stroke(CGPoint(x: 200, y: 250), CGPoint(x: 200, y: 50)) // vertical: a wide wrap
+        canvas.typeText("hi")
+        let entry = try #require(canvas.textField)
+        // Inside the entry's frame, which spans the wrap width, but well beside the short words.
+        let beside = CGPoint(x: entry.frame.minX + 4, y: entry.frame.midY)
+        #expect(canvas.hitTest(canvas.convert(beside, to: canvas.superview)) === canvas)
+    }
+
+    @Test func aCropToolClickClearsTheCrop() {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .crop
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 200, y: 200))
+        #expect(canvas.document.crop != nil)
+        mouse.down(CGPoint(x: 100, y: 100)); mouse.up(CGPoint(x: 100, y: 100))
+        #expect(canvas.document.crop == nil)
+    }
+
+    @Test func thePlainArrowHasGripsToo() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .arrow
+        mouse.stroke(CGPoint(x: 40, y: 150), CGPoint(x: 340, y: 150))
+        mouse.down(CGPoint(x: 340, y: 150)) // the arrow tool grabs the head
+        mouse.drag(CGPoint(x: 340, y: 60)); mouse.up(CGPoint(x: 340, y: 60))
+        #expect(try #require(canvas.document.annotations.first).shape == .arrow(from: CGPoint(x: 40, y: 150), to: CGPoint(x: 340, y: 60)))
+    }
+}
+
+@MainActor @Suite struct ClosingTests {
+    func editor(annotated: Bool) -> EditorWindowController {
+        let controller = EditorWindowController(document: Document(width: 400, height: 300, scale: 2), source: blankImage(400, 300))
+        if annotated {
+            var d = controller.canvas.document
+            d.add(Annotation(shape: .rectangle(CGRect(x: 10, y: 10, width: 50, height: 50)), style: .standard))
+            controller.canvas.commit(d)
+        }
+        return controller
+    }
+
+    @Test func escapeAsksBeforeDiscardingAnnotations() {
+        let controller = editor(annotated: true)
+        var closed = false
+        controller.onClose = { closed = true }
+        controller.cancelOperation(nil)
+        #expect(!closed)
+        #expect(controller.window?.attachedSheet != nil)
+        controller.finish()
+        #expect(closed)
+    }
+
+    @Test func escapeClosesABlankCapture() {
+        let controller = editor(annotated: false)
+        var closed = false
+        controller.onClose = { closed = true }
+        controller.cancelOperation(nil)
+        #expect(closed)
+    }
+
+    @Test func wordsBeingTypedCountAsAnnotations() {
+        let controller = editor(annotated: false)
+        controller.canvas.beginTextEntry(at: CGPoint(x: 20, y: 20), initial: "", style: .standard)
+        controller.canvas.typeText("unsaved")
+        #expect(controller.windowShouldClose(controller.window!) == false)
     }
 }
 
