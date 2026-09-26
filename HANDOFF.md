@@ -58,11 +58,14 @@ is why local builds are signed with the Developer ID rather than ad hoc.
 Text is typed on the picture: `CanvasView.beginTextEntry` adds an invisible `TextEntry`
 (an `NSTextView` with clear text and a colored caret) and draws the live text through the
 renderer as the user types, so what is typed looks exactly like the export. A text shape's
-`size` is its layout box: with a wrap width (a callout), lines wrap inside that width in both
-the entry and the renderer, which is why `Renderer.textSize` and `drawText` take and use the
-box. `CalloutLayout` in Core decides where a callout's text goes from the arrow alone, and
-`origin(for:in:)` keeps a right-anchored box against its edge and inside the picture as the text
-grows; the entry re-asks it after every keystroke.
+`size` is its layout box, which hugs the words: a callout's words wrap at `CalloutLayout.width`
+but the box is only as wide as the widest line, so it can be centered on the tail and its
+selection outline fits the words. `Renderer.textSize` measures it and `drawText` draws inside
+it. `CalloutLayout` in Core decides where a callout's text goes from the arrow alone: an
+`anchor` half a line out from the tail, and `origin(for:)` hangs a box of any size from that
+anchor, centered along its near edge and kept inside the picture; the entry re-asks it after
+every keystroke and sits exactly over the measured box, so the caret stays against the words
+whichever way they align.
 
 A callout is one annotation, `.callout(from:to:text:)`, whose `TextBox` is derived state: the
 canvas's `relaid(_:from:to:string:)` recomputes it from the arrow whenever the arrow changes.

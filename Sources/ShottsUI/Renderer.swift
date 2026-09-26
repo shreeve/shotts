@@ -149,9 +149,10 @@ public enum Renderer {
         let pad = outlineWidth(style, scale: scale)
         var size: CGSize
         if let width {
+            // Wrapped at `width`, but the box hugs the words: the widest line, not the room.
             let box = attributed.boundingRect(with: CGSize(width: width - pad * 2, height: .greatestFiniteMagnitude),
                                               options: [.usesLineFragmentOrigin]).size
-            size = CGSize(width: width, height: box.height)
+            size = CGSize(width: box.width + pad * 2, height: box.height)
         } else {
             size = attributed.size()
             size.width += pad * 2

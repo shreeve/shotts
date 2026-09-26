@@ -366,8 +366,9 @@ public final class CanvasView: NSView {
         guard let entry = textField else { return }
         let size = Renderer.textSize(string.isEmpty ? " " : string, style: entry.style, scale: document.scale, width: entry.layout?.width)
         if let layout = entry.layout {
-            // A callout's text keeps to its anchored edge and stays inside the picture.
+            // A callout's text hangs from its anchor and stays inside the picture.
             entry.origin = layout.origin(for: size)
+            entry.box = size
         }
         live = string.isEmpty ? nil : Annotation(shape: .text(origin: entry.origin, string: string, size: size, alignment: entry.layout?.alignment ?? .left), style: entry.style)
         entry.place(in: pictureRect)
@@ -463,8 +464,10 @@ public final class CanvasView: NSView {
 final class TextEntry: NSTextView {
     private(set) var style = Style.standard
     var origin = CGPoint.zero
-    /// Set for a callout: the box wraps at its width and keeps to its anchored edge.
+    /// Set for a callout: the box wraps at its width and hangs from its anchor.
     var layout: CalloutLayout?
+    /// For a callout: the measured box of the words, which the entry sits over exactly.
+    var box = CGSize.zero
     /// The callout these words belong to, when editing one.
     var calloutID: Annotation.ID?
     private var zoom: CGFloat = 1
@@ -514,14 +517,19 @@ final class TextEntry: NSTextView {
 
     /// Sits exactly over where the canvas draws the text, and grows with it.
     func place(in picture: CGRect) {
-        let pad = Renderer.outlineWidth(style, scale: scale) * zoom
+        let outline = Renderer.outlineWidth(style, scale: scale)
+        let pad = outline * zoom
+        var width: CGFloat = 0
         if let layout {
-            // Wrap where the renderer will: the box width less the outline's room on each side.
-            textContainer?.containerSize = NSSize(width: (layout.width - Renderer.outlineWidth(style, scale: scale) * 2) * zoom, height: 4000)
+            // The measured box less the outline's room on each side, so the caret sits against
+            // the words' edge whichever way they align. A couple of points of slack cover the
+            // zoomed font's rounding; the wrap width caps it so lines break where the renderer's do.
+            width = min((box.width - outline * 2) * zoom + 2, (layout.width - outline * 2) * zoom)
+            textContainer?.containerSize = NSSize(width: width, height: 4000)
         }
         layoutManager?.ensureLayout(for: textContainer!)
         let used = layoutManager?.usedRect(for: textContainer!) ?? .zero
-        let width = layout.map { ($0.width - Renderer.outlineWidth(style, scale: scale) * 2) * zoom } ?? (max(used.width, 4) + 4)
+        if layout == nil { width = max(used.width, 4) + 4 }
         frame = CGRect(x: origin.x * zoom + picture.minX + pad, y: origin.y * zoom + picture.minY,
                        width: width, height: max(used.height, font?.pointSize ?? 20))
     }
