@@ -349,15 +349,19 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         canvas.endTextEntry(commit: true) // words being typed count as annotations
         if closing || canvas.document.isBlank { return true }
         guard sender.attachedSheet == nil else { return false }
+        askToDiscard(sender) { [weak self] in self?.finish() }
+        return false
+    }
+
+    /// Asks whether to discard, calling back only for Discard. Tests answer it themselves: a
+    /// sheet on a window that is never shown can end the test process.
+    var askToDiscard: (NSWindow, @escaping () -> Void) -> Void = { window, discard in
         let alert = NSAlert()
         alert.messageText = "Discard this capture?"
         alert.informativeText = "It has annotations that were not copied or saved."
         alert.addButton(withTitle: "Discard").hasDestructiveAction = true
         alert.addButton(withTitle: "Cancel")
-        alert.beginSheetModal(for: sender) { [weak self] response in
-            if response == .alertFirstButtonReturn { self?.finish() }
-        }
-        return false
+        alert.beginSheetModal(for: window) { if $0 == .alertFirstButtonReturn { discard() } }
     }
 
     public func windowWillClose(_ notification: Notification) {

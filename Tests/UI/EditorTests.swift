@@ -226,40 +226,49 @@ import Testing
 }
 
 @MainActor @Suite struct ClosingTests {
-    func editor(annotated: Bool) -> EditorWindowController {
+    /// An editor whose discard question is answered by `answer`, and a record of being asked.
+    func editor(annotated: Bool, answer discard: Bool = false) -> (EditorWindowController, asked: () -> Bool) {
         let controller = EditorWindowController(document: Document(width: 400, height: 300, scale: 2), source: blankImage(400, 300))
         if annotated {
             var d = controller.canvas.document
             d.add(Annotation(shape: .rectangle(CGRect(x: 10, y: 10, width: 50, height: 50)), style: .standard))
             controller.canvas.commit(d)
         }
-        return controller
+        var asked = false
+        controller.askToDiscard = { _, done in
+            asked = true
+            if discard { done() }
+        }
+        return (controller, { asked })
     }
 
     @Test func escapeAsksBeforeDiscardingAnnotations() {
-        let controller = editor(annotated: true)
+        let (kept, keptAsked) = editor(annotated: true)
         var closed = false
-        controller.onClose = { closed = true }
-        controller.cancelOperation(nil)
-        #expect(!closed)
-        #expect(controller.window?.attachedSheet != nil)
-        controller.finish()
-        #expect(closed)
+        kept.onClose = { closed = true }
+        kept.cancelOperation(nil)
+        #expect(keptAsked() && !closed)
+
+        let (discarded, _) = editor(annotated: true, answer: true)
+        var gone = false
+        discarded.onClose = { gone = true }
+        discarded.cancelOperation(nil)
+        #expect(gone)
     }
 
     @Test func escapeClosesABlankCapture() {
-        let controller = editor(annotated: false)
+        let (controller, asked) = editor(annotated: false)
         var closed = false
         controller.onClose = { closed = true }
         controller.cancelOperation(nil)
-        #expect(closed)
+        #expect(closed && !asked())
     }
 
     @Test func wordsBeingTypedCountAsAnnotations() {
-        let controller = editor(annotated: false)
+        let (controller, asked) = editor(annotated: false)
         controller.canvas.beginTextEntry(at: CGPoint(x: 20, y: 20), initial: "", style: .standard)
         controller.canvas.typeText("unsaved")
-        #expect(controller.windowShouldClose(controller.window!) == false)
+        #expect(controller.windowShouldClose(controller.window!) == false && asked())
     }
 }
 
