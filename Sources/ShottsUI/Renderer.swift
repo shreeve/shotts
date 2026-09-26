@@ -123,11 +123,7 @@ public enum Renderer {
         if document.isBlank { return source }
         let visible = document.visibleRect
         let width = Int(visible.width), height = Int(visible.height)
-        guard width > 0, height > 0,
-              let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
-        else { return nil }
+        guard width > 0, height > 0, let ctx = bitmap(width: width, height: height, like: source) else { return nil }
         // Flip so the document's top-left origin lands at the bitmap's top-left.
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: 1, y: -1)
@@ -255,13 +251,21 @@ public enum Renderer {
         ctx.endTransparencyLayer()
     }
 
+    /// A bitmap for drawing the source into, in the source's color space when a bitmap can use
+    /// it, so a Display P3 capture keeps the colors sRGB would clip; otherwise sRGB.
+    static func bitmap(width: Int, height: Int, like source: CGImage) -> CGContext? {
+        func make(_ space: CGColorSpace) -> CGContext? {
+            CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        }
+        if let space = source.colorSpace, space.model == .rgb, space.supportsOutput, let ctx = make(space) { return ctx }
+        return make(CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
+
     static func drawPixelated(_ source: CGImage, rect: CGRect, cell: Double, in ctx: CGContext) {
         guard !rect.isEmpty, let piece = source.cropping(to: rect) else { return }
         let small = CGSize(width: max(1, (rect.width / cell).rounded(.up)), height: max(1, (rect.height / cell).rounded(.up)))
-        guard let tiny = CGContext(data: nil, width: Int(small.width), height: Int(small.height), bitsPerComponent: 8,
-                                   bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                   bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
-        else { return }
+        guard let tiny = bitmap(width: Int(small.width), height: Int(small.height), like: source) else { return }
         tiny.interpolationQuality = .medium
         tiny.draw(piece, in: CGRect(origin: .zero, size: small))
         guard let blocks = tiny.makeImage() else { return }
