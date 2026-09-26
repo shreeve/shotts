@@ -94,13 +94,15 @@ public final class AreaSelection {
         // this is the form that ignores other apps. Then the main display's overlay is made key.
         NSApp.activate(ignoringOtherApps: true)
         windows.first(where: { $0.screen == NSScreen.main })?.makeKeyAndOrderFront(nil)
-        NSCursor.crosshair.push()
+        // The crosshair is the pointer while the picker is up; an arrow beside it would only
+        // add a second, offset hotspot to look at.
+        NSCursor.hide()
     }
 
     private func finish(_ outcome: Outcome) {
         guard let completion else { return }
         self.completion = nil
-        NSCursor.pop()
+        NSCursor.unhide()
         for window in windows {
             window.orderOut(nil)
         }
