@@ -9,7 +9,7 @@ The first milestone: the daily screenshot workflow.
 
 - F10 pictures every display and opens an area selection over it: drag, Shift for a square,
   Space to move, Escape to cancel; or click a window, outlined as the crosshair passes over
-  it, to capture just that window. A magnifier beside the pointer shows the pixels under the
+  it, to capture just that window, whatever was covering it. A magnifier beside the pointer shows the pixels under the
   crosshair, the crosshair itself magnified over them, their color in hex, and the selection's size; Command-C copies the color. A
   list of the keys shows until the first drag. The capture goes to the clipboard as soon as
   it is taken. That, dimming before a drag, the magnifier, and the hints are options in the menu

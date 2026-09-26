@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 switch outcome {
                 case .cancelled: line = "cancelled"
                 case let .selected(display, rect): line = "selected \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(display.screen.localizedName)"
+                case let .window(display, window): line = "window \(window.id) at \(Int(window.frame.minX)),\(Int(window.frame.minY)) on \(display.screen.localizedName)"
                 }
                 try? line.write(to: out, atomically: true, encoding: .utf8)
                 exit(0)
@@ -73,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         // One "window" for the picker to outline, at 700,700 points, 600 by 400.
         return DisplayImage(screen: screen, image: ctx.makeImage()!, scale: scale,
-                            windows: [CGRect(x: 700, y: 700, width: 600, height: 400)])
+                            windows: [WindowInfo(id: 0, frame: CGRect(x: 700, y: 700, width: 600, height: 400))])
     }
 
     static func previewOverlay(to output: URL, selected: Bool, dimmed: Bool, corner: Bool) -> Bool {

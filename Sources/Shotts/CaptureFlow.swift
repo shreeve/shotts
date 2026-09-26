@@ -37,21 +37,36 @@ final class CaptureFlow {
             case .cancelled:
                 restoreFocus()
             case let .selected(display, rect):
-                let pixels = SelectionRule.pixelRect(rect, scale: display.scale,
-                                                     within: CGRect(x: 0, y: 0, width: display.image.width, height: display.image.height))
-                guard !pixels.isEmpty, let image = display.image.cropping(to: pixels) else {
-                    restoreFocus()
-                    return
+                guard let image = cut(rect, from: display) else { restoreFocus(); return }
+                deliver(image, scale: display.scale, on: display.screen)
+            case let .window(display, window):
+                // The window on its own, whatever covered it. If it has gone meanwhile, the
+                // area it occupied in the display picture stands in.
+                Task {
+                    let image = (try? await ScreenCapture.captureWindow(window.id, scale: display.scale))
+                        ?? cut(window.frame, from: display)
+                    guard let image else { restoreFocus(); return }
+                    deliver(image, scale: display.scale, on: display.screen)
                 }
-                if SelectionOptions.current.copiesOnCapture {
-                    // The plain capture is on the clipboard at once; Copy in the editor replaces
-                    // it with the annotated one.
-                    _ = Export.copy(Document(width: image.width, height: image.height, scale: display.scale), source: image)
-                }
-                open(image: image, scale: display.scale, on: display.screen)
             }
         }
         selection?.show()
+    }
+
+    private func cut(_ rect: CGRect, from display: DisplayImage) -> CGImage? {
+        let pixels = SelectionRule.pixelRect(rect, scale: display.scale,
+                                             within: CGRect(x: 0, y: 0, width: display.image.width, height: display.image.height))
+        guard !pixels.isEmpty else { return nil }
+        return display.image.cropping(to: pixels)
+    }
+
+    private func deliver(_ image: CGImage, scale: CGFloat, on screen: NSScreen) {
+        if SelectionOptions.current.copiesOnCapture {
+            // The plain capture is on the clipboard at once; Copy in the editor replaces it
+            // with the annotated one.
+            _ = Export.copy(Document(width: image.width, height: image.height, scale: scale), source: image)
+        }
+        open(image: image, scale: scale, on: screen)
     }
 
     func open(image: CGImage, scale: CGFloat, on screen: NSScreen?) {

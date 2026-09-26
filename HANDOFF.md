@@ -33,8 +33,11 @@ activated again.
 (layer 0, not Shotts', at least 40 points each way), front to back, converted to the picker's
 space: the window server's origin is the primary display's top-left, so a display's rectangle
 there is `(frame.minX, primary.height - frame.maxY, …)` and window bounds are offset by that.
-The picker outlines the first window containing the pointer, and a click with no drag captures
-it, cut from the display picture like any selection.
+The picker outlines the first window containing the pointer, and a click with no drag reports
+it as `.window`; the flow then captures that window on its own through
+`SCContentFilter(desktopIndependentWindow:)`, so nothing covering it appears, without its shadow.
+A window that has gone since the displays were pictured falls back to its area of the display
+picture.
 
 The picker's magnifier reads the pointer's neighborhood from the display picture and its color
 through `PixelSampler`, which draws one pixel into a one-pixel context rather than parsing the
