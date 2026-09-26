@@ -110,7 +110,7 @@ public enum Renderer {
             ctx.strokePath()
 
         case let .obscure(rect):
-            drawPixelated(source, rect: rect.standardized.intersection(document.pixelBounds), cell: max(8 * s, 8), in: ctx)
+            drawPixelated(source, rect: rect, cell: max(10 * s, 10), in: ctx)
 
         case let .text(origin, string, size, alignment):
             drawText(string, at: origin, size: size, alignment: alignment, style: a.style, scale: s, shadow: shadow, in: ctx)
@@ -262,12 +262,20 @@ public enum Renderer {
         return make(CGColorSpace(name: CGColorSpace.sRGB)!)
     }
 
+    /// Blocks of about `cell` pixels over the source under `rect`, drawn from the source each
+    /// time rather than cached. The rect grows to whole pixels, so no pixel on its edge keeps a
+    /// share of what was there. Each block is its cell's mean color rounded to 16 levels a
+    /// channel: exact means are what Depix-style attacks match against text in a known font.
     static func drawPixelated(_ source: CGImage, rect: CGRect, cell: Double, in ctx: CGContext) {
+        let rect = rect.integral.intersection(CGRect(x: 0, y: 0, width: source.width, height: source.height))
         guard !rect.isEmpty, let piece = source.cropping(to: rect) else { return }
         let small = CGSize(width: max(1, (rect.width / cell).rounded(.up)), height: max(1, (rect.height / cell).rounded(.up)))
-        guard let tiny = bitmap(width: Int(small.width), height: Int(small.height), like: source) else { return }
+        guard let tiny = bitmap(width: Int(small.width), height: Int(small.height), like: source), let data = tiny.data else { return }
         tiny.interpolationQuality = .medium
         tiny.draw(piece, in: CGRect(origin: .zero, size: small))
+        // Rounding every byte alike keeps premultiplied color no greater than its alpha.
+        let bytes = UnsafeMutableRawBufferPointer(start: data, count: tiny.bytesPerRow * tiny.height)
+        for i in bytes.indices { bytes[i] = UInt8((Int(bytes[i]) + 8) / 17 * 17) }
         guard let blocks = tiny.makeImage() else { return }
         ctx.saveGState()
         ctx.translateBy(x: 0, y: rect.maxY + rect.minY)

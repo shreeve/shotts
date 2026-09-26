@@ -38,6 +38,21 @@ func pixels(_ image: CGImage, in name: CFString) -> [UInt8] {
                                      count: image.width * image.height * 4))
 }
 
+/// An sRGB picture whose every pixel differs from its neighbors, mostly in values that are not
+/// multiples of 17.
+func patternImage(_ width: Int, _ height: Int) -> CGImage {
+    let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    let p = ctx.data!.bindMemory(to: UInt8.self, capacity: width * height * 4)
+    for y in 0..<height {
+        for x in 0..<width {
+            let i = (y * width + x) * 4
+            (p[i], p[i + 1], p[i + 2], p[i + 3]) = (UInt8((x * 7 + y * 3) % 256), UInt8((x * 5) % 256), UInt8((y * 11) % 256), 255)
+        }
+    }
+    return ctx.makeImage()!
+}
+
 @MainActor @Suite struct ExportTests {
     /// A Retina capture is marked 144 dpi, so it pastes at its on-screen size, not twice that;
     /// the pasteboard gets PNG and TIFF from one render of the cropped picture.
@@ -73,6 +88,33 @@ func pixels(_ image: CGImage, in name: CFString) -> [UInt8] {
         for x in [0, 79] {
             let i = (20 * 80 + x) * 4
             #expect(Array(p[i..<i + 4]) == [255, 0, 0, 255], "at x \(x)")
+        }
+    }
+
+    /// An obscured area, dragged out at fractional pixels, covers every pixel it touches with
+    /// blocks whose colors are rounded to 16 levels, and leaves the pixels around it alone.
+    @Test func obscureCoversWholePixelsWithRoundedColors() throws {
+        let source = patternImage(80, 60)
+        var document = Document(width: 80, height: 60, scale: 1)
+        document.add(Annotation(shape: .obscure(CGRect(x: 10.4, y: 10.6, width: 45.3, height: 33.2)), style: .standard))
+        let exported = try #require(Renderer.image(of: document, source: source))
+        let before = rgba(source), after = rgba(exported)
+        func pixel(_ p: [UInt8], _ x: Int, _ y: Int) -> [UInt8] { Array(p[(y * 80 + x) * 4..<(y * 80 + x) * 4 + 4]) }
+        // Grown to whole pixels: x 10..<56, y 10..<44.
+        var changed = 0
+        for y in 10..<44 {
+            for x in 10..<56 {
+                let p = pixel(after, x, y)
+                #expect(p.allSatisfy { $0 % 17 == 0 }, "\(p) at \(x), \(y)")
+                if p != pixel(before, x, y) { changed += 1 }
+            }
+        }
+        #expect(changed > 46 * 34 * 9 / 10)
+        for y in 9...44 {
+            for x in [9, 56] { #expect(pixel(after, x, y) == pixel(before, x, y), "at \(x), \(y)") }
+        }
+        for x in 9...56 {
+            for y in [9, 44] { #expect(pixel(after, x, y) == pixel(before, x, y), "at \(x), \(y)") }
         }
     }
 
