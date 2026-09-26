@@ -139,6 +139,30 @@ func patternImage(_ width: Int, _ height: Int) -> CGImage {
         }
     }
 
+    /// Exports keep the capture's pixels exactly, but a canvas zoomed out below one device pixel
+    /// per image pixel smooths the picture: a one-pixel checkerboard at half size is gray, not
+    /// whichever squares nearest neighbor happened to land on.
+    @Test func thePictureIsExactInExportsAndSmoothWhenShrunk() throws {
+        let source = patternImage(80, 60)
+        let crop = CGRect(x: 5, y: 7, width: 50, height: 40)
+        let exported = try #require(Renderer.image(of: Document(width: 80, height: 60, scale: 2, crop: crop), source: source))
+        #expect(rgba(exported) == rgba(try #require(source.cropping(to: crop))))
+
+        let board = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 64 * 4,
+                              space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let squares = board.data!.bindMemory(to: UInt8.self, capacity: 64 * 64 * 4)
+        for i in 0..<64 * 64 {
+            let v: UInt8 = (i % 64 + i / 64) % 2 == 0 ? 0 : 255
+            (squares[i * 4], squares[i * 4 + 1], squares[i * 4 + 2], squares[i * 4 + 3]) = (v, v, v, 255)
+        }
+        let ctx = transparentContext(32, 32)
+        ctx.scaleBy(x: 0.5, y: 0.5)
+        Renderer.draw(Document(width: 64, height: 64, scale: 2), source: try #require(board.makeImage()), in: ctx)
+        let shown = UnsafeBufferPointer(start: ctx.data!.bindMemory(to: UInt8.self, capacity: 32 * 32 * 4), count: 32 * 32 * 4)
+        let reds = stride(from: 0, to: shown.count, by: 4).map { shown[$0] }
+        #expect(reds.allSatisfy { (64...192).contains($0) }, "\(Set(reds).sorted())")
+    }
+
     /// Nothing drawn means nothing to render: the export is the capture, not a copy of it.
     @Test func anUntouchedCaptureExportsItself() {
         let source = blankImage(60, 40)

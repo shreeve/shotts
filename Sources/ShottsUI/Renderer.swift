@@ -19,7 +19,10 @@ public enum Renderer {
         // over, so flip back around the image for this one call.
         ctx.translateBy(x: 0, y: bounds.height)
         ctx.scaleBy(x: 1, y: -1)
-        ctx.interpolationQuality = .none
+        // At a device pixel or more per image pixel, as in every export, nearest neighbor keeps
+        // the capture's pixels exact; below that, as in a small editor window, it would drop
+        // pixels and shimmer, so the picture is smoothed there.
+        ctx.interpolationQuality = ctx.userSpaceToDeviceSpaceTransform.a >= 1 ? .none : .medium
         ctx.draw(source, in: bounds)
         ctx.restoreGState()
 
