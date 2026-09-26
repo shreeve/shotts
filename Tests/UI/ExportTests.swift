@@ -186,6 +186,32 @@ func patternImage(_ width: Int, _ height: Int) -> CGImage {
         #expect(properties(try Data(contentsOf: second))?.dpi == 144)
     }
 
+    /// The plain capture copied in the background lands on the pasteboard like any copy.
+    @Test func aBackgroundCopyLands() async throws {
+        let pasteboard = privatePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        await Export.copyInBackground(blankImage(60, 40), scale: 2, to: pasteboard).value
+        for type in [NSPasteboard.PasteboardType.png, .tiff] {
+            let data = try #require(pasteboard.data(forType: type))
+            let p = try #require(properties(data))
+            #expect(p.dpi == 144 && p.width == 60 && p.height == 40)
+        }
+    }
+
+    /// A copy made while the plain capture is still being encoded is the one that stays.
+    @Test func aLaterCopyIsNeverReplacedByTheBackgroundOne() async throws {
+        let pasteboard = privatePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        let background = Export.copyInBackground(blankImage(60, 40), scale: 2, to: pasteboard)
+        var document = Document(width: 30, height: 20, scale: 2)
+        document.add(everyKind()[1])
+        #expect(Export.copy(document, source: blankImage(30, 20), to: pasteboard))
+        await background.value
+        let data = try #require(pasteboard.data(forType: .png))
+        let p = try #require(properties(data))
+        #expect(p.width == 30 && p.height == 20)
+    }
+
     /// Nothing drawn means nothing to render: the export is the capture, not a copy of it.
     @Test func anUntouchedCaptureExportsItself() {
         let source = blankImage(60, 40)

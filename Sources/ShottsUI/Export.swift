@@ -15,6 +15,20 @@ public enum Export {
         return true
     }
 
+    /// Copies a plain capture as it is taken without holding up the editor: encoding a 5K
+    /// capture takes a tenth of a second or more, so it happens off the main thread. The
+    /// pasteboard is written only if nothing has been copied since the call, so the editor's
+    /// Copy, or anything copied in another app meanwhile, is never replaced by the plain capture.
+    @discardableResult
+    public static func copyInBackground(_ image: CGImage, scale: Double, to pasteboard: NSPasteboard = .general) -> Task<Void, Never> {
+        let count = pasteboard.changeCount
+        return Task {
+            let data = await Task.detached(priority: .userInitiated) { pasteboardData(image, scale: scale) }.value
+            guard let data, pasteboard.changeCount == count else { return }
+            put(data, on: pasteboard)
+        }
+    }
+
     /// `Shotts 2026-09-26 at 10.12.34 PM.png`, named the way the Screenshot app names its files:
     /// the date year first, then the time as the user's locale writes it, 12 or 24 hour. Colons,
     /// which Finder shows as slashes, become dots, and the narrow space some locales put before
