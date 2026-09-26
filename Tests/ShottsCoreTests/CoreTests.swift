@@ -119,7 +119,7 @@ import Testing
     @Test func styleDecodesOlderSettings() throws {
         let old = Data(#"{"color":{"red":0,"green":0,"blue":1,"alpha":1},"strokeWidth":6,"fontSize":24,"shadow":false,"outline":true}"#.utf8)
         let style = try JSONDecoder().decode(Style.self, from: old)
-        #expect(style.strokeWidth == 6 && style.shadow == false && style.taperedArrows == true)
+        #expect(style.strokeWidth == 6 && style.shadow == false && style.taperedArrows == true && style.font == .rounded)
     }
 }
 

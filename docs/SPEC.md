@@ -68,9 +68,10 @@ open at once.
 | Crop | C | Drag the part to keep. Everything outside is left out of the export. |
 
 Every tool but Highlighter and Obscure draws with the chosen color and line width. Text uses
-the chosen size. The color swatch in the bar opens a panel with ten colors, a custom color, and
+the chosen size and font: Rounded (the system font's rounded design, the default), System, or
+Trebuchet, bold in each case. The color swatch in the bar opens a panel with ten colors, a custom color, and
 switches for the soft shadow under annotations, the outline on text, tapered arrows, and
-including a captured window's shadow. Color, width, size, and the switches are remembered across
+including a captured window's shadow. Color, width, size, font, and the switches are remembered across
 captures, as is the last tool used. Changing them with an annotation selected restyles it.
 
 ### Editing

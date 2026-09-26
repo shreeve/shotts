@@ -46,6 +46,24 @@ public struct RGBA: Hashable, Sendable, Codable {
     public var isLight: Bool { 0.299 * red + 0.587 * green + 0.114 * blue > 0.6 }
 }
 
+/// The typeface text annotations use, from the fonts every Mac has. Bold in each case.
+public enum FontChoice: String, CaseIterable, Sendable, Codable {
+    /// The system font's rounded design: friendly, a little soft, like Droid Sans Bold.
+    case rounded
+    /// The plain system font.
+    case system
+    /// Trebuchet MS: humanist, the closest of the built-in fonts to Droid Sans.
+    case trebuchet
+
+    public var title: String {
+        switch self {
+        case .rounded: "Rounded"
+        case .system: "System"
+        case .trebuchet: "Trebuchet"
+        }
+    }
+}
+
 /// How an annotation is drawn. Lengths are in points, independent of the capture's backing
 /// scale; the renderer multiplies by `Document.scale` so a 4-point stroke is 8 pixels on a
 /// Retina capture and looks the same size as it would on screen.
@@ -53,21 +71,23 @@ public struct Style: Hashable, Sendable, Codable {
     public var color: RGBA
     public var strokeWidth: Double
     public var fontSize: Double
+    public var font: FontChoice
     public var shadow: Bool
     public var outline: Bool
     /// Arrows as a thin tail widening into the head (true), or an even shaft with a head.
     public var taperedArrows: Bool
 
-    public init(color: RGBA, strokeWidth: Double, fontSize: Double, shadow: Bool = true, outline: Bool = true, taperedArrows: Bool = true) {
+    public init(color: RGBA, strokeWidth: Double, fontSize: Double, font: FontChoice = .rounded, shadow: Bool = true, outline: Bool = true, taperedArrows: Bool = true) {
         self.color = color
         self.strokeWidth = strokeWidth
         self.fontSize = fontSize
+        self.font = font
         self.shadow = shadow
         self.outline = outline
         self.taperedArrows = taperedArrows
     }
 
-    enum CodingKeys: String, CodingKey { case color, strokeWidth, fontSize, shadow, outline, taperedArrows }
+    enum CodingKeys: String, CodingKey { case color, strokeWidth, fontSize, font, shadow, outline, taperedArrows }
 
     /// Settings saved by an older build decode with today's defaults for what they lack.
     public init(from decoder: Decoder) throws {
@@ -75,6 +95,7 @@ public struct Style: Hashable, Sendable, Codable {
         color = try c.decodeIfPresent(RGBA.self, forKey: .color) ?? .red
         strokeWidth = try c.decodeIfPresent(Double.self, forKey: .strokeWidth) ?? 4
         fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? 28
+        font = try c.decodeIfPresent(FontChoice.self, forKey: .font) ?? .rounded
         shadow = try c.decodeIfPresent(Bool.self, forKey: .shadow) ?? true
         outline = try c.decodeIfPresent(Bool.self, forKey: .outline) ?? true
         taperedArrows = try c.decodeIfPresent(Bool.self, forKey: .taperedArrows) ?? true
