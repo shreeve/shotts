@@ -192,7 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(open)
         menu.addItem(.separator())
         menu.addItem(optionItem("Copy Capture to Clipboard", \.copiesOnCapture))
-        menu.addItem(optionItem("Keep the Shadow Around Captured Windows", \.dropShadow))
+        menu.addItem(optionItem("Include Window Shadow", \.dropShadow))
         menu.addItem(optionItem("Dim Outside the Selection", \.dims))
         menu.addItem(optionItem("Show Magnifier", \.magnifies))
         menu.addItem(optionItem("Show Hints", \.showsHints))
