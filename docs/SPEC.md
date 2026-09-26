@@ -18,10 +18,10 @@ user did not copy, save, or drag out.
 | F10, or Capture Area in the menu bar | Every display is pictured as it is at that moment, the pointer disappears, and a crosshair follows it over that picture. |
 | Move over a window | The window under the crosshair gets a blue outline. |
 | Click | Captures that window on its own, without whatever was covering it. With Include Window Shadow on, the window comes with the shadow macOS draws around it, on a transparent margin. |
-| Drag | Selects an area; everything outside it dims (unless Dim Outside the Selection is off). Its size in pixels shows in the magnifier. |
+| Drag | Selects an area; everything outside it dims (unless Dim Outside Selection is off). Its size in pixels shows in the magnifier. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
-| Release | Cuts the area out of the picture at the display's full resolution, puts it on the clipboard (unless Copy Capture to Clipboard is off), and opens the editor. |
+| Release | Cuts the area out of the picture at the display's full resolution, puts it on the clipboard (unless Copy to Clipboard is off), and opens the editor. |
 | Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
 | Escape, or a click on no window | Cancels. Nothing is kept. |
 
@@ -37,9 +37,9 @@ The menu bar menu holds the picker's options, remembered across launches:
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| Copy Capture to Clipboard | on | The capture is on the clipboard the moment it is taken, before any editing; Copy in the editor replaces it with the annotated one. |
+| Copy to Clipboard | on | The capture is on the clipboard the moment it is taken, before any editing; Copy in the editor replaces it with the annotated one. |
 | Include Window Shadow | off | A clicked window is captured with its own macOS shadow on a transparent margin, as the system's window screenshots are. An area cut from the screen never has one. |
-| Dim Outside the Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
+| Dim Outside Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
 | Show Magnifier | on | The magnifier and its color readout. |
 | Show Hints | on | The list of keys until the first drag. |
 
