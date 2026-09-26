@@ -10,8 +10,9 @@ public enum TextAlignment: Equatable, Sendable {
 public struct Annotation: Identifiable, Equatable, Sendable {
     public enum Shape: Equatable, Sendable {
         case arrow(from: CGPoint, to: CGPoint)
-        case rectangle(CGRect)
-        case ellipse(CGRect)
+        /// Stroked, or solid when `filled`.
+        case rectangle(CGRect, filled: Bool = false)
+        case ellipse(CGRect, filled: Bool = false)
         /// `size` is the text's layout box, measured by the UI when the text is set, so hit
         /// testing and bounds need no font machinery here. Lines wrap inside its width and sit
         /// against its left or right edge by `alignment`.
@@ -58,7 +59,7 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         case let .arrow(from, to):
             return CGRect(x: min(from.x, to.x), y: min(from.y, to.y),
                           width: abs(to.x - from.x), height: abs(to.y - from.y))
-        case let .rectangle(rect), let .ellipse(rect), let .obscure(rect):
+        case let .rectangle(rect, _), let .ellipse(rect, _), let .obscure(rect):
             return rect.standardized
         case let .text(origin, _, size, _):
             return CGRect(origin: origin, size: size)
@@ -75,10 +76,10 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         switch shape {
         case let .arrow(from, to):
             copy.shape = .arrow(from: from + delta, to: to + delta)
-        case let .rectangle(rect):
-            copy.shape = .rectangle(rect.offsetBy(dx: delta.x, dy: delta.y))
-        case let .ellipse(rect):
-            copy.shape = .ellipse(rect.offsetBy(dx: delta.x, dy: delta.y))
+        case let .rectangle(rect, filled):
+            copy.shape = .rectangle(rect.offsetBy(dx: delta.x, dy: delta.y), filled: filled)
+        case let .ellipse(rect, filled):
+            copy.shape = .ellipse(rect.offsetBy(dx: delta.x, dy: delta.y), filled: filled)
         case let .obscure(rect):
             copy.shape = .obscure(rect.offsetBy(dx: delta.x, dy: delta.y))
         case let .text(origin, string, size, alignment):
@@ -100,7 +101,7 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         switch shape {
         case let .arrow(from, to):
             return from.distance(to: to) < 3
-        case let .rectangle(rect), let .ellipse(rect), let .obscure(rect):
+        case let .rectangle(rect, _), let .ellipse(rect, _), let .obscure(rect):
             return rect.width < 3 || rect.height < 3
         case let .text(_, string, _, _):
             return string.isEmpty
