@@ -79,13 +79,14 @@ words back, or turns a wordless callout into a plain `.arrow`.
 
 ## The app icon
 
-`Support/AppIcon.icns` is generated, not drawn: `Scripts/make-app-icon.sh` runs
-`Scripts/lib/render-app-icon.swift`, which draws the menu bar's `camera.viewfinder` symbol in
-white on a gradient tile (Apple's grid: an 824-point tile with 100 points of margin on a
-1024 canvas, the Dock shadow in the margin) and lays a glass lens over the symbol's own lens
-disc, measured from the rendered symbol so it fits whatever the symbol's exact geometry is.
-Rerun the script after changing the renderer and commit the `.icns`; `package-app.sh` copies
-it into the bundle, where `Info.plist` already names it.
+`Support/AppIcon.svg` is the master: a camera in a viewfinder, drawn to look like the menu
+bar's `camera.viewfinder` symbol but with our own paths, because the SF Symbols license does
+not allow the symbols themselves in app icons. It follows Apple's grid (an 824-point tile with
+100 points of margin on a 1024 canvas) and uses gradients but no filters, which AppKit's SVG
+renderer ignores. `Scripts/make-app-icon.sh` runs `Scripts/lib/render-app-icon.swift` to
+rasterize it at every size with the Dock shadow in the margin, and packs
+`Support/AppIcon.icns` with iconutil. Rerun it after editing the SVG and commit the `.icns`;
+`package-app.sh` copies it into the bundle, where `Info.plist` already names it.
 
 ## Coordinates
 
