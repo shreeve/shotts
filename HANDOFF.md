@@ -77,6 +77,16 @@ the tail, the head moves the tip, anything else moves the whole. While its words
 document with empty text and the `TextEntry` carries its `calloutID`; `endTextEntry` puts the
 words back, or turns a wordless callout into a plain `.arrow`.
 
+## The app icon
+
+`Support/AppIcon.icns` is generated, not drawn: `Scripts/make-app-icon.sh` runs
+`Scripts/lib/render-app-icon.swift`, which draws the menu bar's `camera.viewfinder` symbol in
+white on a gradient tile (Apple's grid: an 824-point tile with 100 points of margin on a
+1024 canvas, the Dock shadow in the margin) and lays a glass lens over the symbol's own lens
+disc, measured from the rendered symbol so it fits whatever the symbol's exact geometry is.
+Rerun the script after changing the renderer and commit the `.icns`; `package-app.sh` copies
+it into the bundle, where `Info.plist` already names it.
+
 ## Coordinates
 
 Three spaces meet here. `AreaSelection` reports points from the screen's top-left corner, y
