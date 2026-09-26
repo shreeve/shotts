@@ -172,6 +172,20 @@ func patternImage(_ width: Int, _ height: Int) -> CGImage {
         #expect(Export.suggestedName(date: date, locale: Locale(identifier: "th_TH")).hasPrefix("Shotts 2026-09-26 at "))
     }
 
+    /// Each drag replaces the last drag's file rather than leaving another beside it.
+    @Test func onlyTheLatestDragIsLeftOnDisk() throws {
+        let document = Document(width: 30, height: 20, scale: 2)
+        let first = try Export.temporaryFile(document, source: blankImage(30, 20))
+        let folder = first.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let older = folder.appendingPathComponent("Shotts 2020-01-01 at 1.02.03 PM.png")
+        try Data([1]).write(to: older)
+        let second = try Export.temporaryFile(document, source: blankImage(30, 20))
+        #expect(second.deletingLastPathComponent() == folder)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == [second.lastPathComponent])
+        #expect(properties(try Data(contentsOf: second))?.dpi == 144)
+    }
+
     /// Nothing drawn means nothing to render: the export is the capture, not a copy of it.
     @Test func anUntouchedCaptureExportsItself() {
         let source = blankImage(60, 40)

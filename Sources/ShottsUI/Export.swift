@@ -38,11 +38,12 @@ public enum Export {
         try png.write(to: url, options: .atomic)
     }
 
-    /// A PNG in a fresh temporary folder, for a drag out of the editor. The folder is the
-    /// caller's to remove.
+    /// A PNG for a drag out of the editor. It goes in one temporary folder that is emptied
+    /// first, so no more than the latest drag's picture is ever left on disk: the app it was
+    /// dropped on has had its copy by the next drag.
     public static func temporaryFile(_ document: Document, source: CGImage) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Shotts-\(UUID().uuidString)", isDirectory: true)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Shotts Drag", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let url = folder.appendingPathComponent(suggestedName())
         try write(document, source: source, to: url)
