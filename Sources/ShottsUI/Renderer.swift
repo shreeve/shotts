@@ -19,7 +19,10 @@ public enum Renderer {
         // over, so flip back around the image for this one call.
         ctx.translateBy(x: 0, y: bounds.height)
         ctx.scaleBy(x: 1, y: -1)
-        ctx.interpolationQuality = .none
+        // At a device pixel or more per image pixel, as in every export, nearest neighbor keeps
+        // the capture's pixels exact; below that, as in a small editor window, it would drop
+        // pixels and shimmer, so the picture is smoothed there.
+        ctx.interpolationQuality = ctx.userSpaceToDeviceSpaceTransform.a >= 1 ? .none : .medium
         ctx.draw(source, in: bounds)
         ctx.restoreGState()
 
@@ -69,26 +72,30 @@ public enum Renderer {
                 drawText(text.string, at: text.origin, size: text.size, alignment: text.alignment, style: a.style, scale: s, shadow: shadow, in: ctx)
             }
 
+        // A stroke is drawn inside the shape. One no wider than its stroke would be all stroke,
+        // and the inset outline would be empty and draw nothing, so it is filled instead.
         case let .rectangle(rect, filled):
+            let r = rect.standardized
             setShadow(ctx, blur: shadow)
-            if filled {
+            if filled || min(r.width, r.height) <= width {
                 ctx.setFillColor(color)
-                ctx.fill(rect.standardized)
+                ctx.fill(r)
             } else {
                 ctx.setStrokeColor(color)
                 ctx.setLineWidth(width)
-                ctx.stroke(rect.standardized.insetBy(dx: width / 2, dy: width / 2))
+                ctx.stroke(r.insetBy(dx: width / 2, dy: width / 2))
             }
 
         case let .ellipse(rect, filled):
+            let r = rect.standardized
             setShadow(ctx, blur: shadow)
-            if filled {
+            if filled || min(r.width, r.height) <= width {
                 ctx.setFillColor(color)
-                ctx.fillEllipse(in: rect.standardized)
+                ctx.fillEllipse(in: r)
             } else {
                 ctx.setStrokeColor(color)
                 ctx.setLineWidth(width)
-                ctx.strokeEllipse(in: rect.standardized.insetBy(dx: width / 2, dy: width / 2))
+                ctx.strokeEllipse(in: r.insetBy(dx: width / 2, dy: width / 2))
             }
 
         case let .pen(points):
@@ -110,22 +117,20 @@ public enum Renderer {
             ctx.strokePath()
 
         case let .obscure(rect):
-            drawPixelated(source, rect: rect.standardized.intersection(document.pixelBounds), cell: max(8 * s, 8), in: ctx)
+            drawPixelated(source, rect: rect, cell: max(10 * s, 10), in: ctx)
 
         case let .text(origin, string, size, alignment):
             drawText(string, at: origin, size: size, alignment: alignment, style: a.style, scale: s, shadow: shadow, in: ctx)
         }
     }
 
-    /// The exported image: the visible (cropped) part with every annotation, at pixel size.
+    /// The exported image: the visible (cropped) part with every annotation, at pixel size. An
+    /// untouched capture is the source itself, with nothing to draw and no second bitmap.
     public static func image(of document: Document, source: CGImage) -> CGImage? {
+        if document.isBlank { return source }
         let visible = document.visibleRect
         let width = Int(visible.width), height = Int(visible.height)
-        guard width > 0, height > 0,
-              let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
-        else { return nil }
+        guard width > 0, height > 0, let ctx = bitmap(width: width, height: height, like: source) else { return nil }
         // Flip so the document's top-left origin lands at the bitmap's top-left.
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: 1, y: -1)
@@ -136,12 +141,6 @@ public enum Renderer {
         draw(document, source: source, in: ctx)
         NSGraphicsContext.restoreGraphicsState()
         return ctx.makeImage()
-    }
-
-    public static func pngData(of document: Document, source: CGImage) -> Data? {
-        guard let image = image(of: document, source: source) else { return nil }
-        let rep = NSBitmapImageRep(cgImage: image)
-        return rep.representation(using: .png, properties: [:])
     }
 
     /// The style's typeface, bold, at its size scaled to pixels.
@@ -259,15 +258,31 @@ public enum Renderer {
         ctx.endTransparencyLayer()
     }
 
+    /// A bitmap for drawing the source into, in the source's color space when a bitmap can use
+    /// it, so a Display P3 capture keeps the colors sRGB would clip; otherwise sRGB.
+    static func bitmap(width: Int, height: Int, like source: CGImage) -> CGContext? {
+        func make(_ space: CGColorSpace) -> CGContext? {
+            CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        }
+        if let space = source.colorSpace, space.model == .rgb, space.supportsOutput, let ctx = make(space) { return ctx }
+        return make(CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
+
+    /// Blocks of about `cell` pixels over the source under `rect`, drawn from the source each
+    /// time rather than cached. The rect grows to whole pixels, so no pixel on its edge keeps a
+    /// share of what was there. Each block is its cell's mean color rounded to 16 levels a
+    /// channel: exact means are what Depix-style attacks match against text in a known font.
     static func drawPixelated(_ source: CGImage, rect: CGRect, cell: Double, in ctx: CGContext) {
+        let rect = rect.integral.intersection(CGRect(x: 0, y: 0, width: source.width, height: source.height))
         guard !rect.isEmpty, let piece = source.cropping(to: rect) else { return }
         let small = CGSize(width: max(1, (rect.width / cell).rounded(.up)), height: max(1, (rect.height / cell).rounded(.up)))
-        guard let tiny = CGContext(data: nil, width: Int(small.width), height: Int(small.height), bitsPerComponent: 8,
-                                   bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                   bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
-        else { return }
+        guard let tiny = bitmap(width: Int(small.width), height: Int(small.height), like: source), let data = tiny.data else { return }
         tiny.interpolationQuality = .medium
         tiny.draw(piece, in: CGRect(origin: .zero, size: small))
+        // Rounding every byte alike keeps premultiplied color no greater than its alpha.
+        let bytes = UnsafeMutableRawBufferPointer(start: data, count: tiny.bytesPerRow * tiny.height)
+        for i in bytes.indices { bytes[i] = UInt8((Int(bytes[i]) + 8) / 17 * 17) }
         guard let blocks = tiny.makeImage() else { return }
         ctx.saveGState()
         ctx.translateBy(x: 0, y: rect.maxY + rect.minY)
