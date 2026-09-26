@@ -121,3 +121,35 @@ import Testing
         #expect(style.strokeWidth == 6 && style.shadow == false && style.taperedArrows == true)
     }
 }
+
+@Suite struct CalloutLayoutTests {
+    let bounds = CGRect(x: 0, y: 0, width: 1000, height: 600)
+
+    @Test func textSitsLeftOfATailWhoseArrowPointsRight() {
+        let l = CalloutLayout(tail: CGPoint(x: 500, y: 300), tip: CGPoint(x: 800, y: 200), lineHeight: 40, maxWidth: 300, in: bounds)
+        #expect(l.anchorsRight)
+        #expect(l.rightEdge == 480)          // half a line short of the tail
+        #expect(l.width == 300)
+        #expect(l.origin.y == 280)           // first line centered on the tail
+        #expect(l.origin(for: CGSize(width: 120, height: 40), in: bounds) == CGPoint(x: 360, y: 280))
+    }
+
+    @Test func textSitsRightOfATailWhoseArrowPointsLeft() {
+        let l = CalloutLayout(tail: CGPoint(x: 500, y: 300), tip: CGPoint(x: 100, y: 300), lineHeight: 40, maxWidth: 300, in: bounds)
+        #expect(!l.anchorsRight)
+        #expect(l.origin.x == 520)
+        #expect(l.width == 300)
+    }
+
+    @Test func noRoomOnTheFarSideFlipsIt() {
+        let l = CalloutLayout(tail: CGPoint(x: 30, y: 300), tip: CGPoint(x: 400, y: 300), lineHeight: 40, maxWidth: 300, in: bounds)
+        #expect(!l.anchorsRight && l.origin.x == 50)
+    }
+
+    @Test func widthAndPositionStayInsideThePicture() {
+        let l = CalloutLayout(tail: CGPoint(x: 900, y: 590), tip: CGPoint(x: 950, y: 500), lineHeight: 40, maxWidth: 300, in: bounds)
+        #expect(l.rightEdge == 880 && l.width == 300)
+        #expect(l.origin.y == 560)           // clamped to the bottom
+        #expect(l.origin(for: CGSize(width: 200, height: 120), in: bounds).y == 480) // grew, so moved up
+    }
+}

@@ -45,7 +45,10 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         canvas.style = Self.rememberedStyle
         showStyle(canvas.style)
         canvas.onChange = { [weak self] in self?.refresh() }
-        canvas.onToolChange = { [weak self] tool in self?.tools.selectedSegment = tool.rawValue }
+        canvas.onToolChange = { [weak self] tool in
+            self?.tools.selectedSegment = tool.rawValue
+            Self.rememberedTool = tool
+        }
         refresh()
     }
 
@@ -75,7 +78,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
             tools.setToolTip("\(tool.title) (\(tool.key.uppercased()))", forSegment: i)
             tools.setWidth(30, forSegment: i)
         }
-        tools.selectedSegment = Tool.arrow.rawValue
+        tools.selectedSegment = Self.rememberedTool.rawValue
+        canvas.tool = Self.rememberedTool
         tools.target = self
         tools.action = #selector(toolChanged)
 
@@ -157,7 +161,13 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     // MARK: - Actions
 
     @objc private func toolChanged() {
-        canvas.tool = Tool(rawValue: tools.selectedSegment) ?? .arrow
+        canvas.tool = Tool(rawValue: tools.selectedSegment) ?? .callout
+    }
+
+    /// The tool the last edit ended on; a new capture starts with it.
+    static var rememberedTool: Tool {
+        get { Tool(rawValue: UserDefaults.standard.integer(forKey: "editor.tool")) ?? .callout }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "editor.tool") }
     }
 
     @objc private func styleChanged() {

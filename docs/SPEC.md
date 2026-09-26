@@ -57,6 +57,7 @@ open at once.
 | Tool | Key | What it draws |
 | --- | --- | --- |
 | Select | V | Click an annotation to select it; drag to move it; Delete removes it. Double-click text to edit it. |
+| Arrow with text | N | Drag from the tail to what the arrow points at, then type: the text starts beside the tail, on the side away from the tip, wraps before the picture's edge, and stays inside the picture as it grows. The tool a new capture starts with. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
 | Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line. Escape, Command-Return, a click elsewhere, or another tool finishes. |
 | Rectangle | R | A stroked rectangle. Shift for a square. |
@@ -70,7 +71,7 @@ Every tool but Highlighter and Obscure draws with the chosen color and line widt
 the chosen size. The color swatch in the bar opens a panel with ten colors, a custom color, and
 switches for the soft shadow under annotations, the outline on text, tapered arrows, and the
 shadow around exported pictures. Color, width, size, and the switches are remembered across
-captures. Changing them with an annotation selected restyles it.
+captures, as is the last tool used. Changing them with an annotation selected restyles it.
 
 ### Editing
 

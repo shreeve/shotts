@@ -2,11 +2,12 @@ import AppKit
 import ShottsCore
 
 public enum Tool: Int, CaseIterable, Sendable {
-    case select, arrow, text, rectangle, ellipse, pen, highlighter, obscure, crop
+    case select, callout, arrow, text, rectangle, ellipse, pen, highlighter, obscure, crop
 
     public var title: String {
         switch self {
         case .select: "Select"
+        case .callout: "Arrow with text"
         case .arrow: "Arrow"
         case .text: "Text"
         case .rectangle: "Rectangle"
@@ -21,6 +22,7 @@ public enum Tool: Int, CaseIterable, Sendable {
     public var key: String {
         switch self {
         case .select: "v"
+        case .callout: "n"
         case .arrow: "a"
         case .text: "t"
         case .rectangle: "r"
@@ -35,6 +37,7 @@ public enum Tool: Int, CaseIterable, Sendable {
     public var symbol: String {
         switch self {
         case .select: "cursorarrow"
+        case .callout: "text.bubble"
         case .arrow: "arrow.up.right"
         case .text: "textformat"
         case .rectangle: "rectangle"
@@ -54,7 +57,7 @@ public final class CanvasView: NSView {
     public private(set) var history: History<Document>
     public let source: CGImage
     public var zoom: CGFloat
-    public var tool: Tool = .arrow { didSet { endTextEntry(commit: true); selectedID = nil; needsDisplay = true; resetCursorRects(); onToolChange?(tool) } }
+    public var tool: Tool = .callout { didSet { endTextEntry(commit: true); selectedID = nil; needsDisplay = true; resetCursorRects(); onToolChange?(tool) } }
     public var onToolChange: ((Tool) -> Void)?
     public var style: Style = .standard {
         didSet {
@@ -193,7 +196,7 @@ public final class CanvasView: NSView {
             }
         case .text:
             beginTextEntry(at: p, initial: "", style: style)
-        case .arrow:
+        case .arrow, .callout:
             live = Annotation(shape: .arrow(from: p, to: p), style: style)
         case .rectangle:
             live = Annotation(shape: .rectangle(CGRect(origin: p, size: .zero)), style: style)
@@ -222,7 +225,7 @@ public final class CanvasView: NSView {
                 d.replace(original.translated(by: p - anchor))
                 history = History(history: history, replacingCurrent: d)
             }
-        case .arrow:
+        case .arrow, .callout:
             live?.shape = .arrow(from: anchor, to: p)
         case .rectangle:
             live?.shape = .rectangle(SelectionRule.rect(anchor: anchor, pointer: p, square: shift))
@@ -262,6 +265,16 @@ public final class CanvasView: NSView {
                 d.setCrop(rect)
                 commit(d)
             }
+        case .callout:
+            // The arrow lands, and the text starts at once beside its tail.
+            if let live, !live.isDegenerate, case let .arrow(tail, tip) = live.shape {
+                var d = document
+                d.add(live)
+                commit(d)
+                let layout = CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
+                                           maxWidth: max(Double(document.width) * 0.45, 240 * document.scale), in: document.pixelBounds)
+                beginTextEntry(at: layout.origin, initial: "", style: style, layout: layout)
+            }
         default:
             if let live, !live.isDegenerate {
                 var d = document
@@ -275,8 +288,9 @@ public final class CanvasView: NSView {
 
     /// Typing happens on the picture: the canvas draws the text in its final style as a live
     /// annotation, and an invisible text view under it only supplies the caret and keystrokes.
-    private func beginTextEntry(at origin: CGPoint, initial: String, style: Style) {
+    private func beginTextEntry(at origin: CGPoint, initial: String, style: Style, layout: CalloutLayout? = nil) {
         let entry = TextEntry(style: style, origin: origin, zoom: zoom, scale: document.scale)
+        entry.layout = layout
         entry.string = initial
         entry.onChange = { [weak self] string in self?.updateLiveText(string) }
         entry.onFinish = { [weak self] in self?.endTextEntry(commit: true) }
@@ -290,8 +304,12 @@ public final class CanvasView: NSView {
 
     private func updateLiveText(_ string: String) {
         guard let entry = textField else { return }
-        let size = Renderer.textSize(string, style: entry.style, scale: document.scale)
-        live = Annotation(shape: .text(origin: entry.origin, string: string, size: size), style: entry.style)
+        let size = Renderer.textSize(string.isEmpty ? " " : string, style: entry.style, scale: document.scale, width: entry.layout?.width)
+        if let layout = entry.layout {
+            // A callout's text keeps to its anchored edge and stays inside the picture.
+            entry.origin = layout.origin(for: size, in: document.pixelBounds)
+        }
+        live = string.isEmpty ? nil : Annotation(shape: .text(origin: entry.origin, string: string, size: size), style: entry.style)
         entry.place(in: pictureRect)
         needsDisplay = true
     }
@@ -305,9 +323,10 @@ public final class CanvasView: NSView {
         window?.makeFirstResponder(self)
         needsDisplay = true
         guard commit, !string.isEmpty else { return }
-        let size = Renderer.textSize(string, style: entry.style, scale: document.scale)
+        let size = Renderer.textSize(string, style: entry.style, scale: document.scale, width: entry.layout?.width)
+        let origin = entry.layout?.origin(for: size, in: document.pixelBounds) ?? entry.origin
         var d = document
-        d.add(Annotation(shape: .text(origin: entry.origin, string: string, size: size), style: entry.style))
+        d.add(Annotation(shape: .text(origin: origin, string: string, size: size), style: entry.style))
         self.commit(d)
     }
 
@@ -357,7 +376,9 @@ public final class CanvasView: NSView {
 /// the canvas shows the text. Return adds a line; Escape or Command-Return finishes.
 final class TextEntry: NSTextView {
     let style: Style
-    let origin: CGPoint
+    var origin: CGPoint
+    /// Set for a callout: the box wraps at its width and keeps to its anchored edge.
+    var layout: CalloutLayout?
     private let zoom: CGFloat
     private let scale: Double
     var onChange: ((String) -> Void)?
@@ -392,11 +413,16 @@ final class TextEntry: NSTextView {
 
     /// Sits exactly over where the canvas draws the text, and grows with it.
     func place(in picture: CGRect) {
+        let pad = Renderer.outlineWidth(style, scale: scale) * zoom
+        if let layout {
+            // Wrap where the renderer will: the box width less the outline's room on each side.
+            textContainer?.containerSize = NSSize(width: (layout.width - Renderer.outlineWidth(style, scale: scale) * 2) * zoom, height: 4000)
+        }
         layoutManager?.ensureLayout(for: textContainer!)
         let used = layoutManager?.usedRect(for: textContainer!) ?? .zero
-        let pad = Renderer.outlineWidth(style, scale: scale) * zoom
+        let width = layout.map { ($0.width - Renderer.outlineWidth(style, scale: scale) * 2) * zoom } ?? (max(used.width, 4) + 4)
         frame = CGRect(x: origin.x * zoom + picture.minX + pad, y: origin.y * zoom + picture.minY,
-                       width: max(used.width, 4) + 4, height: max(used.height, font?.pointSize ?? 20))
+                       width: width, height: max(used.height, font?.pointSize ?? 20))
     }
 
     override func didChangeText() {
