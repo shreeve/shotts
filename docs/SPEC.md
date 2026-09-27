@@ -30,7 +30,9 @@ standard function keys" is on. If another app already holds F10, the menu says s
 | Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
 | Escape | Cancels, even mid-drag. Nothing is kept. |
 
-A click on no window does nothing, so a stray click does not end the capture. Switching to
+F10 leaves every window where it is, Shotts' editors included; Shotts itself comes to the front
+only when a capture's editor opens, or with Option-F10. A click on no window does nothing, so a
+stray click does not end the capture. Switching to
 another app, or a display being added, removed, or rearranged, cancels.
 
 The crosshair is a light line with a dark edge, visible on any background, and shows only on the
@@ -51,11 +53,11 @@ the editor), Check for Updates…, Quit, and the picker's options, remembered ac
 
 | Option | Default | Effect |
 | --- | --- | --- |
+| Show Magnifier | on | The magnifier and its color readout. |
+| Dim Outside Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
+| Include Window Shadow | off | A clicked window is captured with its own macOS shadow on a transparent margin, as the system's window screenshots are. An area cut from the screen never has one. |
 | Copy to Clipboard | on | The capture is on the clipboard the moment it is taken, before any editing; Copy in the editor replaces it with the annotated one. |
 | New Window per Capture | off | Each capture opens in an editor of its own. Off, a new capture takes the place of the open editor, where it was on screen, and the one it replaces becomes the last capture. |
-| Include Window Shadow | off | A clicked window is captured with its own macOS shadow on a transparent margin, as the system's window screenshots are. An area cut from the screen never has one. |
-| Dim Outside Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
-| Show Magnifier | on | The magnifier and its color readout. |
 
 The first F10 asks macOS for Screen Recording permission with the system's own dialog. Until it
 is granted, later presses explain where to turn it on and capture nothing. Screen Recording is
@@ -144,7 +146,7 @@ capture in memory until another editor closes and takes its place.
 | Copy (Command-C) | The picture, with its annotations and crop, goes to the clipboard as PNG and TIFF. The editor stays open. Command-C copies the picture even while typing. |
 | Save… (Command-S) | Asks where; suggests the Desktop and a name like `Shotts 2026-09-26 at 10.12.34 AM.png`, with the time as the system writes it. The editor stays open. |
 | Drag the hand icon | Drags a PNG file into another app or the Finder, even from the first press while another app is in front. The editor stays open. |
-| Print… (Command-P) | Prints the picture, with its annotations and crop, scaled to fit one page and turned sideways when it is wider than tall, in the standard Print window. The editor comes back to the front afterwards. |
+| Print… (Command-P) | Prints the picture, with its annotations and crop, scaled to fit one portrait page, turned a quarter turn onto it when it is wider than tall, in the standard Print window. The editor comes back to the front afterwards. |
 
 The copied, saved, and dragged pictures are identical to what the editor shows. They carry the
 capture's resolution (144 dpi from a Retina display), so they paste at their on-screen size,

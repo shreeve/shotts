@@ -14,7 +14,7 @@ open with Option-F10 to bring the last capture back, and added New Window per Ca
 printed through the standard Print window; 0.2.1 fixed 0.2.0's hidden bar. 0.2.0 is the revamp
 (shreeve/shotts#51, merge commit c24b093): a correctness, security, and performance pass over
 the whole app, plus Open Sans; `CHANGELOG.md` says what changed for users. The build has no
-warnings (warnings are errors) and `swift test` passes: 41 Core tests and 53 AppKit tests.
+warnings (warnings are errors) and `swift test` passes: 41 Core tests and 55 AppKit tests.
 
 Next, in order:
 
@@ -88,9 +88,9 @@ points and missed Retina barbs and highlighter bands.
 
 `CaptureFlow` runs one capture at a time: a `Capture` value holds the app to return to, the
 picker, and the live displays, from `begin()` until the editor opens or the capture ends, and F10
-does nothing meanwhile. The picker is live: `AreaSelection` shows at once, one clear borderless
-window per display at `.screenSaver` level with the cursor hidden, and the real screen goes on
-updating through it. Behind it, each `LiveDisplay` streams its display through an `SCStream`
+does nothing meanwhile. The picker is live: `AreaSelection` shows at once, one clear non-activating
+panel per display at `.screenSaver` level with a blank cursor, over whatever app is in front,
+which stays in front, and the real screen goes on updating through it. Behind it, each `LiveDisplay` streams its display through an `SCStream`
 (full resolution, BGRA, 30 frames a second, `ignoreShadowsDisplay` false) with only the picker's
 windows excluded, so Shotts' editors are captured like anything else on screen. Each frame
 becomes `DisplayImage.image` as a `CGImage` reading the frame's own memory, with no copy, and the
@@ -116,7 +116,7 @@ window that has gone meanwhile falls back to its area of the latest frame.
 
 Only the overlay under the pointer draws the crosshair, magnifier, hints, and window outline, and
 it takes key status as the pointer enters, so Escape, Space, and Command-C act on that display.
-The picker cancels when Shotts resigns active or the screen configuration changes. The magnifier
+The picker cancels when another app becomes active or the screen configuration changes. The magnifier
 samples its 15 by 15 neighborhood of the latest frame with `PixelSampler.colors(in:of:)`, which
 draws the pixels into a small context rather than parsing the capture's pixel format; its center is
 the color under the crosshair; a new frame redraws just the magnifier's panel. The selection is
@@ -281,8 +281,11 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   signature every time, so each rebuild would ask again and leave another row in System
   Settings. `Scripts/package-app.sh` signs every build with the Developer ID for that reason.
 - A menu bar app (`LSUIElement`) is not active when its windows appear, and on macOS 27 the
-  plain `NSApp.activate()` is refused for it: the overlay showed but Escape went to the app in
-  front. `activate(ignoringOtherApps: true)` works, and every activation uses it.
+  plain `NSApp.activate()` is refused for it. `activate(ignoringOtherApps: true)` works, and every
+  activation uses it; but activating brings all of an app's windows forward, so the picker does
+  not activate at all. Its overlays are non-activating panels (`.nonactivatingPanel`), which
+  become key and take keys and clicks while the app in front stays in front, and show a blank
+  cursor, since an app that is not active may not hide the pointer.
 - `CGImage.cropping(to:)` shares its parent's pixels: a cut-out made that way keeps the whole
   frame alive, and with it a buffer the stream needs back. `DisplayImage.cut` draws into a bitmap
   of its own.
@@ -294,7 +297,9 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   to fill can reach past the view. The canvas filled it and painted its dark field over the bar
   in 0.2.0; it sets `clipsToBounds` and fills only its bounds, and `BarTests` checks the bar
   shows.
-- Printing runs the operation on its own (`NSPrintOperation.run()`), in the standard Print window.
+- Printing runs the operation on its own (`NSPrintOperation.run()`), in the standard Print window,
+  on a portrait page with a wide picture turned onto it (`PrintSheet`): a landscape page made
+  the Print window's preview short and wide, its page badge over the picture.
   As a sheet on the editor it took the editor's dark look and was squeezed to the window's
   height, cutting off its options.
 - `NSWindowController.close()` and `NSWindow.close()` skip `windowShouldClose`; only
