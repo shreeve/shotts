@@ -84,11 +84,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         open.target = self
         menu.addItem(open)
         menu.addItem(.separator())
-        menu.addItem(optionItem("Copy to Clipboard", \.copiesOnCapture))
-        menu.addItem(optionItem("Include Window Shadow", \.dropShadow))
-        menu.addItem(optionItem("New Window per Capture", \.newWindows))
-        menu.addItem(optionItem("Dim Outside Selection", \.dims))
+        // In the order a capture meets them: aiming, dragging, clicking a window, taking it,
+        // and where it opens.
         menu.addItem(optionItem("Show Magnifier", \.magnifies))
+        menu.addItem(optionItem("Dim Outside Selection", \.dims))
+        menu.addItem(optionItem("Include Window Shadow", \.dropShadow))
+        menu.addItem(optionItem("Copy to Clipboard", \.copiesOnCapture))
+        menu.addItem(optionItem("New Window per Capture", \.newWindows))
         menu.delegate = self
         menu.addItem(.separator())
         menu.addItem(checkForUpdatesItem())

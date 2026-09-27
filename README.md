@@ -54,8 +54,9 @@ The arrow with text is one object: draw the arrow, type beside its tail, and the
 themselves out on the side away from the tip. Move the arrow and the words come along; move the
 words and the tail follows; move the head and the arrow reshapes.
 
-Options in the menu bar menu: copy to the clipboard the moment a capture is taken, include the
-window shadow, dim outside the selection, show the magnifier.
+Options in the menu bar menu: show the magnifier, dim outside the selection, include the window
+shadow, copy to the clipboard the moment a capture is taken, and open each capture in a new
+window.
 
 ## Building
 
