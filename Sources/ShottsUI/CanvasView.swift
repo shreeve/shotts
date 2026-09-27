@@ -174,11 +174,18 @@ public final class CanvasView: NSView {
     }
 
 
-    /// Escape: typing, then a drag in progress, then the selection. False when there was
+    /// Escape: typing, then a drag in progress, then the selection, each put back as it was
+    /// before. False when there was
     /// nothing to cancel.
     public func cancelCurrent() -> Bool {
-        if textField != nil {
-            endTextEntry(commit: true)
+        if let entry = textField {
+            // Typing is undone whole: new words go, a new callout goes with its arrow, and words
+            // being edited come back as they were.
+            textField = nil
+            entry.removeFromSuperview()
+            window?.makeFirstResponder(self)
+            if let base { history.replaceCurrent(base) }
+            base = nil
         } else if dragAnchor != nil {
             // A move is put back; a shape being drawn is dropped.
             if let base, dragOriginal != nil { history.replaceCurrent(base) }
@@ -405,8 +412,8 @@ public final class CanvasView: NSView {
 
     // MARK: - Callouts
 
-    /// The text may run to within a small margin of the picture's edge on its side; Return
-    /// breaks a line sooner. Only that margin wraps.
+    /// The text may run to within a small margin of the picture's edge on its side;
+    /// Shift-Return breaks a line sooner. Only that margin wraps.
     private func calloutLayout(tail: CGPoint, tip: CGPoint, style: Style) -> CalloutLayout {
         CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
                       maxWidth: Double(document.width), in: document.pixelBounds, margin: Self.textMargin * document.scale)
@@ -467,6 +474,7 @@ public final class CanvasView: NSView {
         entry.string = initial
         entry.onChange = { [weak self] string in self?.updateLiveText(string) }
         entry.onFinish = { [weak self] in self?.endTextEntry(commit: true) }
+        entry.onCancel = { [weak self] in _ = self?.cancelCurrent() }
         addSubview(entry)
         textField = entry
         window?.makeFirstResponder(entry)
@@ -577,8 +585,8 @@ public final class CanvasView: NSView {
 }
 
 /// The invisible text view words are typed into. It draws nothing but its caret; the canvas
-/// draws `preview`, the words in their final style. Return adds a line; Escape or Command-Return
-/// finishes. Its undo covers keystrokes only, and goes when it does.
+/// draws `preview`, the words in their final style. Return or Command-Return finishes, Escape
+/// cancels, and Shift-Return adds a line. Its undo covers keystrokes only, and goes when it does.
 final class TextEntry: NSTextView {
     private(set) var style = Style.standard
     var origin = CGPoint.zero
@@ -597,6 +605,7 @@ final class TextEntry: NSTextView {
     private var wordsFrame = CGRect.zero
     var onChange: ((String) -> Void)?
     var onFinish: (() -> Void)?
+    var onCancel: (() -> Void)?
 
     // NSTextView's designated initializer; `init(frame:)` calls it, and a subclass that does
     // not provide it traps the first time text entry opens.
@@ -687,17 +696,22 @@ final class TextEntry: NSTextView {
     }
 
     override func keyDown(with event: NSEvent) {
+        // An input method composing gets every key, Return and Escape included.
+        guard !hasMarkedText() else { return super.keyDown(with: event) }
         let isReturn = event.keyCode == 36 || event.keyCode == 76
-        // Escape and Command-Return finish, except while an input method is composing.
-        if !hasMarkedText(), event.keyCode == 53 || (isReturn && event.modifierFlags.contains(.command)) {
+        if isReturn, event.modifierFlags.contains(.shift) {
+            insertNewlineIgnoringFieldEditor(nil)
+        } else if isReturn {
             onFinish?()
-            return
+        } else if event.keyCode == 53 {
+            onCancel?()
+        } else {
+            super.keyDown(with: event)
         }
-        super.keyDown(with: event)
     }
 
     override func cancelOperation(_ sender: Any?) {
-        if !hasMarkedText() { onFinish?() }
+        if !hasMarkedText() { onCancel?() }
     }
 }
 

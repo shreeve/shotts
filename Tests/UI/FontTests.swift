@@ -35,6 +35,6 @@ import Testing
     }
 
     @Test func theFontMenuOffersOpenSans() {
-        #expect(FontChoice.allCases.map(\.title) == ["Rounded", "System", "Trebuchet", "Open Sans"])
+        #expect(FontChoice.allCases.map(\.title) == ["Rounded", "System", "Open Sans"])
     }
 }

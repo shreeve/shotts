@@ -56,7 +56,6 @@ the editor), Check for Updates…, Quit, and the picker's options, remembered ac
 | Include Window Shadow | off | A clicked window is captured with its own macOS shadow on a transparent margin, as the system's window screenshots are. An area cut from the screen never has one. |
 | Dim Outside Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
 | Show Magnifier | on | The magnifier and its color readout. |
-| Show Hints | on | The list of keys until the first drag. |
 
 The first F10 asks macOS for Screen Recording permission with the system's own dialog. Until it
 is granted, later presses explain where to turn it on and capture nothing. Screen Recording is
@@ -81,7 +80,7 @@ as the screen allows.
 | Select | V | Click an annotation to select it; drag to move it; Delete removes it. Double-click text or a callout's words to edit them. |
 | Arrow with text | N | An arrow with words at its tail, one object; see below. The tool a first capture starts with. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
-| Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line. Escape, Command-Return, a click elsewhere, or another tool finishes. Clicking an existing text edits it. |
+| Text | T | Click and type on the picture; the text appears in its final style as you go. Return finishes, as do a click elsewhere or another tool; Shift-Return starts a new line, and Escape cancels the text. Clicking an existing text edits it. |
 | Rectangle | R | A stroked rectangle. Shift for a square; Option for a solid one. |
 | Ellipse | E | A stroked ellipse. Shift for a circle; Option for a solid one. |
 | Pen | P | A smooth freehand stroke. |
@@ -93,8 +92,8 @@ After the first capture, a new capture starts with the drawing tool last used.
 
 Every tool but Obscure draws with the chosen color and line width; the highlighter uses them
 translucent and three times as wide, never under 12 points. Text uses the chosen size and font:
-Rounded (the system font's rounded design, the default), System, Trebuchet, or Open Sans, which
-ships inside the app, bold in each case. The color swatch in the bar opens a panel with ten
+Rounded (the system font's rounded design, the default), System, or Open Sans, which ships
+inside the app, bold in each case. The color swatch in the bar opens a panel with ten
 colors, a custom color, and switches for the soft shadow under annotations, the outline on
 text, and tapered arrows. Color, width,
 size, font, and the switches are remembered across captures. Changing one with an annotation
@@ -110,8 +109,8 @@ the tail:
   when to its right.
 - A mostly vertical arrow centers them on the tail horizontally, below it (arrow pointing up) or
   above it (pointing down), growing away from the arrow.
-- A line runs to within 8 points of the picture's edge before it wraps; Return breaks a line
-  sooner. The words keep that margin from every edge.
+- A line runs to within 8 points of the picture's edge before it wraps; Shift-Return breaks a
+  line sooner, and Return finishes. The words keep that margin from every edge.
 
 An arrow and its words are one object. With the select tool, or with either arrow tool clicking
 an existing arrow, dragging the shaft moves the whole; dragging the dot at the tail's end, or
@@ -124,11 +123,13 @@ to retype them; words left empty turn the callout into a plain arrow.
 | Action | Key |
 | --- | --- |
 | Undo, Redo | Command-Z, Shift-Command-Z. While typing, they undo and redo the typing. |
-| Finish typing, cancel the current drag, then clear the selection | Escape |
+| Cancel typing, then the current drag, then clear the selection | Escape |
 | Close the editor | Command-W, the red button, or Escape with nothing to cancel |
 | Bring the last capture back | Option-F10, or Show Last Capture in the menu bar menu |
 
-Undo covers annotations and the crop, not the capture itself. Drawing, moving, or typing an
+Escape while typing cancels the text: new words go, a new arrow with text goes with its arrow,
+and words being edited come back as they were. Undo covers annotations and the crop, not the
+capture itself. Drawing, moving, or typing an
 annotation is one step.
 
 The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.

@@ -77,8 +77,6 @@ public struct SelectionOptions: Equatable, Sendable {
     public var dims = true
     /// The magnifier beside the pointer, with the color under the crosshair.
     public var magnifies = true
-    /// The short list of keys, until the first drag.
-    public var showsHints = true
     /// Puts the capture on the clipboard as soon as the area is selected, before any editing.
     public var copiesOnCapture = true
     /// A captured window keeps the shadow macOS draws around it, on a transparent margin.
@@ -91,7 +89,7 @@ public struct SelectionOptions: Equatable, Sendable {
     /// The defaults, with the options that start on registered as on.
     private static let defaults: UserDefaults = {
         let d = UserDefaults.standard
-        d.register(defaults: ["selection.dimsDrag": true, "selection.magnifies": true, "selection.hints": true, "capture.copies": true])
+        d.register(defaults: ["selection.dimsDrag": true, "selection.magnifies": true, "capture.copies": true])
         return d
     }()
 
@@ -101,7 +99,6 @@ public struct SelectionOptions: Equatable, Sendable {
             var o = SelectionOptions()
             o.dims = d.bool(forKey: "selection.dimsDrag")
             o.magnifies = d.bool(forKey: "selection.magnifies")
-            o.showsHints = d.bool(forKey: "selection.hints")
             o.copiesOnCapture = d.bool(forKey: "capture.copies")
             o.dropShadow = d.bool(forKey: "export.shadow")
             o.newWindows = d.bool(forKey: "editor.newWindows")
@@ -111,7 +108,6 @@ public struct SelectionOptions: Equatable, Sendable {
             let d = defaults
             d.set(newValue.dims, forKey: "selection.dimsDrag")
             d.set(newValue.magnifies, forKey: "selection.magnifies")
-            d.set(newValue.showsHints, forKey: "selection.hints")
             d.set(newValue.copiesOnCapture, forKey: "capture.copies")
             d.set(newValue.dropShadow, forKey: "export.shadow")
             d.set(newValue.newWindows, forKey: "editor.newWindows")
@@ -451,7 +447,7 @@ final class OverlayView: NSView {
         let magnifier = options.magnifies ? magnifier(at: pointer) : nil
         magnifierPanel = magnifier?.panel
         if let magnifier { drawMagnifier(magnifier, in: ctx) }
-        if options.showsHints, !hasDragged { drawHints(near: pointer, clearOf: magnifier?.panel, in: ctx) }
+        if !hasDragged { drawHints(near: pointer, clearOf: magnifier?.panel, in: ctx) }
     }
 
     private func drawCrosshair(at p: CGPoint, in ctx: CGContext) {

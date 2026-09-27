@@ -36,7 +36,8 @@ read it before changing capture, the selection overlay, the editor, or export.
 - Coordinates: `Document` and every annotation live in image pixels. Screen points, backing
   scale, and display origins are converted at the edges (capture, overlay, canvas) and nowhere
   else. Style lengths are points; `Style`'s pixel metrics are the one place they become pixels.
-- Escape cancels the current thing and nothing more. In the editor: typing, then a drag, then
+- Escape cancels the current thing and nothing more, putting it back as it was. In the editor:
+  typing (new words go, and a new arrow with them; edited words come back), then a drag, then
   the selection, then the editor. In the picker it cancels the capture, as the Screenshot app's
   does.
 - The editor is an ordinary window: copying, saving, dragging out, and printing leave it open,

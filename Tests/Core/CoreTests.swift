@@ -260,6 +260,13 @@ import Testing
         #expect(try JSONDecoder().decode(Style.self, from: JSONEncoder().encode(style)).font == .openSans)
     }
 
+    /// Trebuchet was a font choice until 0.2.4; a style remembered with it comes back Rounded.
+    @Test func aRememberedTrebuchetBecomesRounded() throws {
+        let saved = Data(#"{"color":{"red":0,"green":0,"blue":1,"alpha":1},"strokeWidth":6,"fontSize":36,"font":"trebuchet"}"#.utf8)
+        let style = try JSONDecoder().decode(Style.self, from: saved)
+        #expect(style.font == .rounded && style.fontSize == 36 && style.strokeWidth == 6)
+    }
+
     @Test func anUnknownFontKeepsTheRest() throws {
         let newer = Data(#"{"color":{"red":0,"green":0,"blue":1,"alpha":1},"strokeWidth":10,"font":"serif"}"#.utf8)
         let style = try JSONDecoder().decode(Style.self, from: newer)

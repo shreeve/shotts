@@ -5,6 +5,16 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.2.4 — 2026-09-27
+
+- Return finishes typing, for text and for an arrow's words; Shift-Return starts a new line.
+  Command-Return and a click elsewhere still finish too.
+- Escape while typing cancels: new words go (a new arrow with text goes with its arrow), and
+  words being edited come back as they were.
+- Fewer choices, the same app: Trebuchet leaves the fonts (Open Sans is the one it stood in for;
+  a remembered Trebuchet becomes Rounded), and the key hints simply show until the first drag,
+  with no option to hide them.
+
 ## 0.2.3 — 2026-09-27
 
 - New Window per Capture, in the menu bar menu: off (the default), a new capture takes the

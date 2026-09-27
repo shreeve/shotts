@@ -14,6 +14,59 @@ import Testing
         #expect(string == "Hello there" && size.width > 0 && size.height > 0)
     }
 
+    /// Return finishes the words; Shift-Return starts a new line.
+    @Test func returnFinishesAndShiftReturnBreaksALine() throws {
+        let canvas = canvasInWindow()
+        canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
+        let entry = try #require(canvas.textField)
+        func key(_ flags: NSEvent.ModifierFlags) -> NSEvent {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: canvas.window!.windowNumber,
+                             context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!
+        }
+        entry.insertText("one", replacementRange: NSRange(location: NSNotFound, length: 0))
+        entry.keyDown(with: key(.shift))
+        entry.insertText("two", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(canvas.textField != nil)
+        entry.keyDown(with: key([]))
+        #expect(canvas.textField == nil)
+        guard case let .text(_, words, _, _)? = canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
+        #expect(words == "one\ntwo")
+    }
+
+    /// Escape cancels typing whole: a new text is never added.
+    @Test func escapeDropsANewText() {
+        let canvas = canvasInWindow()
+        canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
+        canvas.typeText("never mind")
+        #expect(canvas.cancelCurrent())
+        #expect(canvas.textField == nil && canvas.document.annotations.isEmpty && !canvas.history.canUndo)
+    }
+
+    /// Escape on a new arrow with text removes the arrow too: "I didn't mean to start this."
+    @Test func escapeDropsANewCalloutWithItsArrow() {
+        let canvas = canvasInWindow()
+        canvas.tool = .callout
+        Mouse(canvas: canvas).stroke(CGPoint(x: 100, y: 150), CGPoint(x: 300, y: 100))
+        canvas.typeText("oops")
+        #expect(canvas.cancelCurrent())
+        #expect(canvas.document.annotations.isEmpty && !canvas.history.canUndo)
+    }
+
+    /// Escape while re-editing words puts them back as they were, the text still in its place.
+    @Test func escapePutsEditedWordsBack() throws {
+        let canvas = canvasInWindow()
+        canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
+        canvas.typeText("first")
+        canvas.endTextEntry(commit: true)
+        let before = canvas.document
+        let text = try #require(before.annotations.first)
+        canvas.tool = .select
+        Mouse(canvas: canvas).doubleClick(CGPoint(x: text.bounds.midX, y: text.bounds.midY))
+        canvas.typeText("second")
+        #expect(canvas.cancelCurrent())
+        #expect(canvas.document == before)
+    }
+
     @Test func calloutWordsLandRightJustifiedAgainstTheTail() {
         let canvas = canvasInWindow()
         let tail = CGPoint(x: 300, y: 150), tip = CGPoint(x: 380, y: 100)
