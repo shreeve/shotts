@@ -9,6 +9,8 @@ Unreleased, whose heading becomes the version's when it ships.
 
 - The magnifier keeps its crosshair while you drag out an area, so the corner can be put on an
   exact pixel.
+- The magnifier is one size, with an even dark frame on the left, top, and right, instead of side
+  margins that grew and shrank with its label.
 
 ## 0.2.2 — 2026-09-26
 

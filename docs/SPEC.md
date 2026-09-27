@@ -32,16 +32,16 @@ menu says so: Capture Area (another app has F10). F10 does nothing while a captu
 A click on no window does nothing, so a stray click does not lose the picture. Switching to
 another app, or a display being added, removed, or rearranged, cancels.
 
-The crosshair is a light line with a dark edge, visible on any background, and shows only on
-the display the pointer is on; the keys act on that display. The selection stays on one
-display. Beside the pointer a magnifier shows the pixels under the crosshair, fifteen across,
-with a translucent cross whose arms are white or black by the pixel under each one and stop
-short of the marked pixel under the crosshair, and stay while dragging. Below it are the pixel's
-position and its color in hex, or the selection's size while dragging. Until the first drag, a short list of these keys
-shows on the other side of the pointer, except near a corner where it would cover the
-magnifier. Because the picture is taken when F10 is pressed, what you select is exactly what
-you get, even if the screen changes while you choose. A clicked window is the one exception: it
-is captured on its own as it is when clicked.
+The crosshair is a light line with a dark edge, visible on any background, and shows only on the
+display the pointer is on; the keys act on that display. The selection stays on one display.
+Beside the pointer a magnifier shows the pixels under the crosshair, fifteen across in a dark
+frame, with a translucent cross whose arms are white or black by the pixel under each one and
+stop short of the marked pixel under the crosshair, and stay while dragging. Below it are the
+pixel's position and its color in hex, or the selection's size while dragging. Until the first
+drag, a short list of these keys shows on the other side of the pointer, except near a corner
+where it would cover the magnifier. Because the picture is taken when F10 is pressed, what you
+select is exactly what you get, even if the screen changes while you choose. A clicked window is
+the one exception: it is captured on its own as it is when clicked.
 
 The menu bar menu holds Capture Area, Open Image… (a PNG, JPEG, or TIFF into the editor), Check
 for Updates…, Quit, and the picker's options, remembered across launches:

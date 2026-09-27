@@ -155,6 +155,25 @@ extension OverlayView {
         #expect(armShows(at: CGPoint(x: 60, y: 40)))
     }
 
+    /// The magnifier is one size wherever it is and whatever its label says: the pixels in a
+    /// frame two cells wide on the left, top, and right, and the longest label fits under them.
+    @Test func theMagnifierHasAnEvenFrameAndFixedSize() throws {
+        let view = try overlay()
+        let near = view.magnifier(at: CGPoint(x: 1, y: 1))
+        view.pressed(at: CGPoint(x: 0, y: 0))
+        view.dragged(to: CGPoint(x: 199, y: 149), square: false)
+        let far = view.magnifier(at: CGPoint(x: 199, y: 149))
+        #expect(near.panel.size == far.panel.size)
+        let frame = OverlayView.magnifierCell * 2
+        for m in [near, far] {
+            #expect(m.pixels.minX - m.panel.minX == frame)
+            #expect(m.panel.maxX - m.pixels.maxX == frame)
+            #expect(m.pixels.minY - m.panel.minY == frame)
+        }
+        let widest = "9999 × 9999   #FFFFFF" as NSString
+        #expect(widest.size(withAttributes: OverlayView.labelAttributes).width + 4 <= near.panel.width)
+    }
+
     /// The magnifier's color and Command-C's are the pixel under the crosshair.
     @Test func colorIsThePixelUnderThePointer() throws {
         let ctx = CGContext(data: nil, width: 400, height: 300, bitsPerComponent: 8, bytesPerRow: 0,

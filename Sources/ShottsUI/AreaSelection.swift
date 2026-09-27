@@ -432,7 +432,9 @@ final class OverlayView: NSView {
     static let magnifierCells = 15
     static let magnifierCell: CGFloat = 8
     private static let labelHeight: CGFloat = 22
-    private static let labelAttributes: [NSAttributedString.Key: Any] = [
+    /// The longest label (four-digit coordinates or size, and a color) fits the panel's fixed
+    /// width; the digits are all one width.
+    static let labelAttributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
         .foregroundColor: NSColor.white,
     ]
@@ -440,9 +442,10 @@ final class OverlayView: NSView {
     /// One frame's magnifier, worked out once: drawing it and keeping the hints clear of it
     /// use the same panel, and the pixels around the pointer are sampled once.
     struct Magnifier {
-        /// The whole panel: the pixel box and the label below it.
+        /// The whole panel: the pixel box in a frame two cells wide on the left, top, and right,
+        /// and the label below it.
         var panel: CGRect
-        /// The pixel box, centered in the panel.
+        /// The pixel box, inside the frame.
         var pixels: CGRect
         /// The picture's pixels shown, centered on the one under the pointer.
         var wanted: CGRect
@@ -470,10 +473,11 @@ final class OverlayView: NSView {
         } else {
             text = "\(center.x),\(center.y)   " + hex
         }
-        // Wide enough for the label, which grows while dragging; the pixels stay centered.
-        let width = max(box, ceil((text as NSString).size(withAttributes: Self.labelAttributes).width) + 16)
-        let panel = Self.panelRect(size: CGSize(width: width, height: box + Self.labelHeight), near: p, in: bounds, gap: 24)
-        let pixels = CGRect(x: panel.minX + (width - box) / 2, y: panel.minY, width: box, height: box)
+        // One size always, whatever the label says: the pixels in a two-cell frame on three
+        // sides, wide enough for the longest label, which goes below.
+        let frame = Self.magnifierCell * 2
+        let panel = Self.panelRect(size: CGSize(width: box + frame * 2, height: frame + box + Self.labelHeight), near: p, in: bounds, gap: 24)
+        let pixels = CGRect(x: panel.minX + frame, y: panel.minY + frame, width: box, height: box)
         return Magnifier(panel: panel, pixels: pixels, wanted: wanted, colors: colors, text: text)
     }
 
@@ -487,7 +491,7 @@ final class OverlayView: NSView {
         // The pixels: a crop of the display around the pointer, scaled up with no smoothing.
         let available = m.wanted.intersection(CGRect(x: 0, y: 0, width: display.image.width, height: display.image.height))
         ctx.setFillColor(CGColor(gray: 0.1, alpha: 1))
-        ctx.fill(CGRect(x: panel.minX, y: panel.minY, width: panel.width, height: pixels.height))
+        ctx.fill(CGRect(x: panel.minX, y: panel.minY, width: panel.width, height: pixels.maxY - panel.minY))
         if !available.isEmpty, let crop = display.image.cropping(to: available) {
             let dest = CGRect(x: pixels.minX + (available.minX - m.wanted.minX) * cell,
                               y: pixels.minY + (available.minY - m.wanted.minY) * cell,
