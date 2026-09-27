@@ -1,4 +1,5 @@
 import AppKit
+import ScreenCaptureKit
 import ShottsCore
 import ShottsUI
 
@@ -11,6 +12,9 @@ final class CaptureFlow {
     private var capture: Capture?
     /// The open editors, each with the app it gives focus back to when it closes.
     private var editors: [(editor: EditorWindowController, returnTo: NSRunningApplication?)] = []
+    /// The editor closed last, as it was: Option-F10 opens it again. Only this one capture is
+    /// kept after its editor closes, until another editor closes and takes its place.
+    private var lastClosed: (document: Document, source: CGImage)?
 
     private struct Capture {
         /// The app in front when the hot key fired, Shotts itself when an editor was: a capture
@@ -20,6 +24,8 @@ final class CaptureFlow {
         var returnTo: NSRunningApplication?
         /// The picker, which calls back once, to nothing, unless someone holds it.
         var selection: AreaSelection?
+        /// The displays, streaming while the picker is up.
+        var displays: [LiveDisplay] = []
     }
 
     func begin() {
@@ -30,10 +36,17 @@ final class CaptureFlow {
             askPermission()
             return
         }
+        // The picker goes up at once over the live screen; the streams it reads start behind it,
+        // leaving its own windows out.
+        let displays = LiveDisplay.all()
+        capture?.displays = displays
+        let selection = select(from: displays)
         Task {
             do {
-                select(from: try await ScreenCapture.captureDisplays())
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                for display in displays { try await display.start(in: content, excluding: selection.windowNumbers) }
             } catch {
+                selection.cancel()
                 fail("Shotts could not capture the screen", error)
             }
         }
@@ -47,21 +60,30 @@ final class CaptureFlow {
         return (editors.first { $0.editor.window?.isKeyWindow == true } ?? editors.last)?.returnTo
     }
 
-    private func select(from displays: [DisplayImage]) {
-        let selection = AreaSelection(displays: displays) { [weak self] outcome in
+    private func select(from displays: [LiveDisplay]) -> AreaSelection {
+        let selection = AreaSelection(displays: displays.map(\.display)) { [weak self] outcome in
             guard let self else { return }
+            let live = capture?.displays ?? []
             switch outcome {
             case .cancelled:
+                live.forEach { $0.stop() }
                 end()
             case let .selected(display, rect):
-                guard let image = display.cut(rect) else { end(); return }
-                deliver(image, scale: display.scale, on: display.screen)
+                // Cut from the frame at the moment of release, then stop streaming.
+                Task {
+                    _ = await live.first { $0.display === display }?.firstFrame()
+                    let image = display.cut(rect)
+                    live.forEach { $0.stop() }
+                    guard let image else { self.end(); return }
+                    self.deliver(image, scale: display.scale, on: display.screen)
+                }
             case let .window(display, window):
                 // The window on its own, whatever covered it. If it has gone meanwhile, the
-                // area it occupied in the display picture stands in.
+                // area it occupied on the display stands in.
                 Task {
                     let captured = (try? await ScreenCapture.captureWindow(window.id, shadow: SelectionOptions.current.dropShadow))
                         ?? display.cut(window.frame).map { ($0, display.scale) }
+                    live.forEach { $0.stop() }
                     guard let (image, scale) = captured else { end(); return }
                     deliver(image, scale: scale, on: display.screen)
                 }
@@ -69,6 +91,7 @@ final class CaptureFlow {
         }
         capture?.selection = selection
         selection.show()
+        return selection
     }
 
     private func deliver(_ image: CGImage, scale: CGFloat, on screen: NSScreen) {
@@ -85,15 +108,46 @@ final class CaptureFlow {
     /// Opens `image` in an editor that, when it closes as the window being worked in, gives focus
     /// back to `returnTo`. One closing in the background (Close All) leaves focus where it is.
     func open(image: CGImage, scale: CGFloat, on screen: NSScreen?, returningTo returnTo: NSRunningApplication?) {
-        let document = Document(width: image.width, height: image.height, scale: scale)
-        let editor = EditorWindowController(document: document, source: image, on: screen)
+        open(Document(width: image.width, height: image.height, scale: scale), source: image, on: screen, returningTo: returnTo)
+    }
+
+    /// Unless New Window per Capture is on, the new editor takes the place of the newest open
+    /// one, where it was on screen; the one replaced becomes the capture Option-F10 brings back.
+    private func open(_ document: Document, source: CGImage, on screen: NSScreen?, returningTo returnTo: NSRunningApplication?) {
+        let editor = EditorWindowController(document: document, source: source, on: screen)
         editor.onClose = { [weak self, weak editor] in
             let working = editor?.window?.isKeyWindow ?? false
+            if let editor { self?.lastClosed = (editor.canvas.document, editor.canvas.source) }
             self?.editors.removeAll { $0.editor === editor }
             if working { returnTo?.activate() }
         }
+        if !SelectionOptions.current.newWindows, let (replaced, _) = editors.popLast(), let old = replaced.window, let window = editor.window {
+            // Replaced, not closed by the user: it goes quietly, with no focus handed back.
+            replaced.onClose = { [weak self] in self?.lastClosed = (replaced.canvas.document, replaced.canvas.source) }
+            // Where the old one was, its top-left corner kept, and still on screen if the new
+            // picture is bigger.
+            window.setFrameTopLeftPoint(CGPoint(x: old.frame.minX, y: old.frame.maxY))
+            window.setFrame(window.constrainFrameRect(window.frame, to: old.screen), display: false)
+            replaced.close()
+        }
         editors.append((editor, returnTo))
         editor.present()
+    }
+
+    /// Whether Option-F10 has anything to show.
+    var hasLastCapture: Bool { !editors.isEmpty || lastClosed != nil }
+
+    /// Option-F10: the newest open editor, brought to the front; else the editor closed last,
+    /// opened again as it was, its annotations still editable.
+    func showLast() {
+        if let editor = editors.last?.editor {
+            editor.present()
+        } else if let (document, source) = lastClosed {
+            lastClosed = nil
+            open(document, source: source, on: NSScreen.main, returningTo: appToReturnTo())
+        } else {
+            NSSound.beep()
+        }
     }
 
     /// Ends a capture that opened no editor, leaving focus with the app that had it.

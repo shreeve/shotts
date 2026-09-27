@@ -26,20 +26,22 @@ read it before changing capture, the selection overlay, the editor, or export.
   (`Renderer`) from the same `Document`, so what the user sees is what they paste.
 - One source image per capture. Undo records annotation changes, never a copy of the pixels.
   Nothing caches a second full-size bitmap; obscure effects render from the source on demand.
-- Capture is frozen: every display is pictured once when the user presses the hot key, with
-  Shotts' own windows excluded. The picker shows that picture, the magnifier reads it, and an
-  area is cut from it into a bitmap of its own; the pictures are released the moment the picker
-  closes, and only the cut-out survives. A clicked window is the one exception: the user picked
-  that window, so it is captured on its own as it is then. The picker itself is never in a
-  capture.
+- Capture is live: the screen goes on updating under the picker, shadows and all, so the user
+  can wait for something to appear. Each display streams while the picker is up; the magnifier
+  reads the latest frame, and an area is cut from the frame at release into a bitmap of its
+  own. Streaming stops, and the frames go, the moment the picker closes; only the cut-out
+  survives. A clicked window is captured on its own. What is on screen is what is captured,
+  Shotts' editors included; only the picker's own windows are left out. The editor closed last is kept, cut-out and annotations, so Option-F10 can bring it
+  back; one, until another editor closes.
 - Coordinates: `Document` and every annotation live in image pixels. Screen points, backing
   scale, and display origins are converted at the edges (capture, overlay, canvas) and nowhere
   else. Style lengths are points; `Style`'s pixel metrics are the one place they become pixels.
 - Escape cancels the current thing and nothing more. In the editor: typing, then a drag, then
-  the selection, then the editor, asking only when there are annotations. In the picker it
-  cancels the capture, as the Screenshot app's does.
-- After a copy, save, or drag out that ends the edit, focus returns to the app that was frontmost
-  when the hot key fired.
+  the selection, then the editor. In the picker it cancels the capture, as the Screenshot app's
+  does.
+- The editor is an ordinary window: copying, saving, dragging out, and printing leave it open,
+  and closing it asks nothing, because Option-F10 brings the last one back. When the editor
+  being worked in closes, focus returns to the app that was frontmost when the hot key fired.
 - The hot key is a Carbon hot key, which needs no Accessibility permission. Screen Recording is
   the only permission Shotts asks for, and only when the first capture needs it.
 - Developer switches (`--edit`, `--render`, …) exist only in debug builds. A release build must

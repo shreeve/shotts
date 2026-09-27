@@ -16,11 +16,12 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2470EB" alt="MIT license"></a>
 </p>
 
-Shotts lives in the menu bar and does one thing well. Press F10 and the screen freezes under a
-crosshair with a magnifier. Drag out the area you want, or click a window to capture just that
+Shotts lives in the menu bar and does one thing well. Press F10 and a crosshair with a magnifier
+follows the pointer over your screen, which goes on updating. Drag out the area you want, or click a window to capture just that
 window. The capture opens in a small editor with arrows, callouts, text, shapes, a pen, a
-highlighter, and pixelation for things that should not leave your Mac. Copy it, save it, or drag
-it into another app, and Shotts gets out of the way and returns you to where you were.
+highlighter, and pixelation for things that should not leave your Mac. Copy it, save it, print
+it, or drag it into another app; the editor stays open like any window, and Option-F10 brings
+back the last one if you closed it.
 
 The annotations are made to look good on a busy screenshot: rounded strokes, tapered arrows,
 bold text with a contrasting outline, restrained shadows. The app is small, keeps its memory in
@@ -44,7 +45,7 @@ and drop `Shotts.app` into Applications.
 
 | Step | What happens |
 | --- | --- |
-| **Press F10** (fn-F10 on most Mac keyboards) | Every display is pictured as it is at that moment. A crosshair follows the pointer, with a magnifier that shows the pixels under it, their color in hex, and the selection's size. Command-C copies the color. |
+| **Press F10** (fn-F10 on most Mac keyboards) | A crosshair follows the pointer over the live screen, with a magnifier that shows the pixels under it, their color in hex, and the selection's size. Command-C copies the color. |
 | **Select** | Drag an area (Shift for a square, Space to move it), or click a window, outlined as the crosshair passes over it, to capture only that window, with the shadow macOS draws around it if you turn that on. Escape cancels. |
 | **Annotate** | Arrow with text, arrow, text, rectangle, ellipse, pen, highlighter, obscure, and crop, each on a single key. Undo and redo. A color and style popover remembers your choices. |
 | **Copy, save, print, drag** | Command-C puts the picture on the clipboard, Command-S saves a PNG, Command-P prints it to fit one page, and the hand icon drags a file into any app. Pictures keep the capture's resolution, so a Retina capture pastes at its on-screen size. |

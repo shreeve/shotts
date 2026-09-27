@@ -128,6 +128,76 @@ extension OverlayView {
         #expect(cut.width == 22 && cut.height == 22)
     }
 
+    /// The magnifier's crosshair arms show while aiming and go on showing while dragging, when
+    /// the corner is being put on a pixel.
+    @Test func theMagnifiersArmsStayWhileDragging() throws {
+        let view = try overlay()
+        func armShows(at p: CGPoint) -> Bool {
+            let m = view.magnifier(at: p)
+            let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+            view.cacheDisplay(in: view.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / view.bounds.width
+            func color(_ cellX: Int, _ cellY: Int) -> NSColor? {
+                let cell = OverlayView.magnifierCell
+                let x = m.pixels.minX + (CGFloat(cellX) + 0.5) * cell, y = m.pixels.minY + (CGFloat(cellY) + 0.5) * cell
+                return rep.colorAt(x: Int(x * scale), y: Int(y * scale))
+            }
+            // The top arm's first cell against the corner cell beside it: plain picture in both
+            // but for the arm.
+            let half = OverlayView.magnifierCells / 2
+            return color(half, 0) != color(0, 0)
+        }
+        view.point(at: CGPoint(x: 60, y: 40))
+        #expect(armShows(at: CGPoint(x: 60, y: 40)))
+        view.pressed(at: CGPoint(x: 30, y: 20))
+        view.dragged(to: CGPoint(x: 60, y: 40), square: false)
+        #expect(view.selection != nil)
+        #expect(armShows(at: CGPoint(x: 60, y: 40)))
+    }
+
+    /// The magnifier is one size wherever it is and whatever its label says: the pixels in a
+    /// frame two cells wide on the left, top, and right, and the longest label fits under them.
+    @Test func theMagnifierHasAnEvenFrameAndFixedSize() throws {
+        let view = try overlay()
+        let near = view.magnifier(at: CGPoint(x: 1, y: 1))
+        view.pressed(at: CGPoint(x: 0, y: 0))
+        view.dragged(to: CGPoint(x: 199, y: 149), square: false)
+        let far = view.magnifier(at: CGPoint(x: 199, y: 149))
+        #expect(near.panel.size == far.panel.size)
+        let frame = OverlayView.magnifierCell * 2
+        for m in [near, far] {
+            #expect(m.pixels.minX - m.panel.minX == frame)
+            #expect(m.panel.maxX - m.pixels.maxX == frame)
+            #expect(m.pixels.minY - m.panel.minY == frame)
+        }
+        let widest = "9999 × 9999   #FFFFFF" as NSString
+        #expect(widest.size(withAttributes: OverlayView.labelAttributes).width + 4 <= near.panel.width)
+    }
+
+    /// Live, the real screen shows through: the overlay is clear, still takes the mouse, draws
+    /// nothing where the pointer is not, and redraws the magnifier when a new frame comes.
+    @Test func aLiveOverlayShowsTheRealScreen() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let display = DisplayImage(screen: screen, image: nil, scale: 2, isLive: true)
+        #expect(display.pixelBounds.width == (screen.frame.width * 2).rounded())
+        let window = OverlayWindow(display: display, options: SelectionOptions())
+        #expect(!window.isOpaque && window.backgroundColor == .clear && !window.ignoresMouseEvents)
+        let view = window.overlayView
+        view.frame = CGRect(x: 0, y: 0, width: 200, height: 150)
+
+        view.pointerMoved(to: view.convert(CGPoint(x: -50, y: -50), to: nil))
+        let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let alpha = (0..<rep.pixelsHigh).flatMap { y in (0..<rep.pixelsWide).map { x in rep.colorAt(x: x, y: y)?.alphaComponent ?? 0 } }
+        #expect(alpha.allSatisfy { $0 == 0 })
+
+        view.point(at: CGPoint(x: 60, y: 40))
+        view.cacheDisplay(in: view.bounds, to: rep) // draws the magnifier, and notes where
+        view.needsDisplay = false
+        display.image = blankImage(400, 300)
+        #expect(view.needsDisplay)
+    }
+
     /// The magnifier's color and Command-C's are the pixel under the crosshair.
     @Test func colorIsThePixelUnderThePointer() throws {
         let ctx = CGContext(data: nil, width: 400, height: 300, bitsPerComponent: 8, bytesPerRow: 0,

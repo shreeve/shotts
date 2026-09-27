@@ -2,9 +2,8 @@ import AppKit
 import ScreenCaptureKit
 import ShottsUI
 
-/// The one place Shotts reads the screen: every display, once, the moment the user asks for a
-/// capture, at full resolution, through ScreenCaptureKit. The pictures live only as long as
-/// the area picker.
+/// The one place Shotts reads the screen, through ScreenCaptureKit: each display live while the
+/// picker is up (`LiveDisplay`), a clicked window on its own, and the window list.
 enum ScreenCapture {
     enum Failure: LocalizedError {
         case noDisplay
@@ -23,38 +22,6 @@ enum ScreenCapture {
     /// Asks macOS for permission. The system shows its own dialog, once per code signature, and
     /// records the answer; this returns before the user answers, so it reports nothing.
     static func requestPermission() { _ = CGRequestScreenCaptureAccess() }
-
-    /// Every display at once, and the windows on each from one reading of the window server,
-    /// so all of them show the same moment. Shotts' own windows are left out.
-    static func captureDisplays() async throws -> [DisplayImage] {
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        let own = content.applications.filter { $0.processID == ProcessInfo.processInfo.processIdentifier }
-        let onScreen = windowList()
-        let screens = NSScreen.screens.compactMap { screen -> (NSScreen, SCDisplay)? in
-            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
-                  let display = content.displays.first(where: { $0.displayID == CGDirectDisplayID(number.uint32Value) })
-            else { return nil }
-            return (screen, display)
-        }
-        // One capture per display, all started before any is awaited, so they overlap.
-        let captures = screens.map { screen, display in
-            let filter = SCContentFilter(display: display, excludingApplications: own, exceptingWindows: [])
-            let configuration = SCStreamConfiguration()
-            configuration.width = Int(screen.frame.width * screen.backingScaleFactor)
-            configuration.height = Int(screen.frame.height * screen.backingScaleFactor)
-            configuration.captureResolution = .best
-            configuration.showsCursor = false
-            configuration.scalesToFit = false
-            return Task { try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) }
-        }
-        var result: [DisplayImage] = []
-        for ((screen, display), capture) in zip(screens, captures) {
-            result.append(DisplayImage(screen: screen, image: try await capture.value, scale: screen.backingScaleFactor,
-                                       windows: windows(in: onScreen, on: display.displayID)))
-        }
-        guard !result.isEmpty else { throw Failure.noDisplay }
-        return result
-    }
 
     /// One window on its own, whatever covers it, at the window's own scale, which comes back
     /// with the picture. With `shadow`, the picture is the window with the shadow macOS draws
@@ -82,13 +49,13 @@ enum ScreenCapture {
     /// the primary display's top-left): layer 0, visible, at least 40 points each way, not
     /// Shotts' own, and not ones their app keeps out of captures, which ScreenCaptureKit
     /// would not picture.
-    private static func windowList() -> [(id: CGWindowID, frame: CGRect)] {
+    /// The ordinary windows on screen, front to back: Shotts' editors among them, since what is on
+    /// screen can be captured, but not the picker, which sits far above ordinary windows.
+    static func windowList() -> [(id: CGWindowID, frame: CGRect)] {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
         else { return [] }
-        let me = ProcessInfo.processInfo.processIdentifier
         return list.compactMap { w in
             guard (w[kCGWindowLayer as String] as? Int) == 0,
-                  (w[kCGWindowOwnerPID as String] as? pid_t) != me,
                   (w[kCGWindowAlpha as String] as? Double ?? 1) > 0,
                   (w[kCGWindowSharingState as String] as? Int) != 0,
                   let id = w[kCGWindowNumber as String] as? CGWindowID,
@@ -102,7 +69,8 @@ enum ScreenCapture {
 
     /// The windows that show on one display, in points from its top-left corner as the picker
     /// measures. `CGDisplayBounds` is the display in the window server's space.
-    private static func windows(in list: [(id: CGWindowID, frame: CGRect)], on display: CGDirectDisplayID) -> [WindowInfo] {
+    /// The windows in `list` that show on `display`, in points from its top-left corner.
+    static func windows(in list: [(id: CGWindowID, frame: CGRect)], on display: CGDirectDisplayID) -> [WindowInfo] {
         let bounds = CGDisplayBounds(display)
         return list.compactMap { id, frame in
             let visible = frame.intersection(bounds)

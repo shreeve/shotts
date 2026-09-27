@@ -5,6 +5,23 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.2.3 — 2026-09-27
+
+- New Window per Capture, in the menu bar menu: off (the default), a new capture takes the
+  place of the open editor; on, each capture opens in a window of its own.
+- The screen stays live while you capture: it goes on updating under the crosshair, windows keep
+  their shadows, and the area is captured as it is when you release, so you can wait for
+  something to appear. Shotts' own editors stay on screen and can be captured too. macOS may show
+  its screen-recording indicator while you pick.
+- The editor is an ordinary window: Copy, Save, drag out, and Print leave it open, and it closes
+  when you close it, with no question. Option-F10, or Show Last Capture in the menu bar menu,
+  brings the last capture back to the front, or reopens it as you left it if you closed it.
+- After printing, the editor comes back to the front.
+- The magnifier keeps its crosshair while you drag out an area, so the corner can be put on an
+  exact pixel.
+- The magnifier is one size, with an even dark frame on the left, top, and right, instead of side
+  margins that grew and shrank with its label.
+
 ## 0.2.2 — 2026-09-26
 
 - Print… opens the standard Print window, as other apps do, instead of a sheet squeezed into the

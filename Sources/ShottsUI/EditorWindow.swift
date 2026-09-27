@@ -21,7 +21,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     private let fonts = NSPopUpButton()
     private let undoButton = NSButton()
     private let redoButton = NSButton()
-    private var closing = false
+    /// Where Copy puts the picture; tests use a pasteboard of their own.
+    var pasteboard = NSPasteboard.general
     /// Wide enough for every control in the bar, whatever the picture's size.
     static let minimumWidth: CGFloat = 880
     /// The shortest the picture's longer side may be made by resizing, in points.
@@ -182,7 +183,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     private func refresh() {
         undoButton.isEnabled = canvas.history.canUndo
         redoButton.isEnabled = canvas.history.canRedo
-        window?.isDocumentEdited = !canvas.document.isBlank
     }
 
     // MARK: - Actions
@@ -249,9 +249,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 
     @objc public func copyPressed() {
         canvas.endTextEntry(commit: true)
-        if Export.copy(canvas.document, source: canvas.source) {
-            finish()
-        }
+        _ = Export.copy(canvas.document, source: canvas.source, to: pasteboard)
     }
 
     @objc public func savePressed() {
@@ -265,7 +263,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
             guard response == .OK, let url = panel.url else { return }
             do {
                 try Export.write(canvas.document, source: canvas.source, to: url)
-                finish()
             } catch {
                 NSAlert(error: error).beginSheetModal(for: window)
             }
@@ -273,7 +270,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     }
 
     /// Command-P: the picture as it would export, scaled to fit one page, sideways when it is
-    /// wider than tall. The editor stays open: printing is not a way of finishing.
+    /// wider than tall. The editor comes back to the front afterwards.
     @objc public func printPressed() {
         canvas.endTextEntry(commit: true)
         guard let (sheet, info) = Self.page(for: canvas.document, source: canvas.source) else { return }
@@ -282,6 +279,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         // The standard Print window, as other apps show it, rather than a sheet: a sheet takes the
         // editor's dark look and is squeezed to its height, which cut the panel's options off.
         operation.run()
+        present()
     }
 
     /// The page to print: the rendered picture and print settings that fit it to one sheet.
@@ -306,12 +304,6 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         return operation.run()
     }
     #endif
-
-    /// Closes after a copy, save, or drag out.
-    func finish() {
-        closing = true
-        close()
-    }
 
     // MARK: - Resizing
 
@@ -348,25 +340,12 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         return frame
     }
 
-    /// Closing a capture with annotations asks first, in a sheet; Discard closes it.
+    /// Closing is a window's ordinary close, with no question: Option-F10 opens the editor
+    /// closed last again, as it was.
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
-        // Words being typed count as annotations; a drag in progress is put back.
+        // Words being typed are kept, and a drag in progress is put back, before it goes.
         _ = canvas.cancelCurrent()
-        if closing || canvas.document.isBlank { return true }
-        guard sender.attachedSheet == nil else { return false }
-        askToDiscard(sender) { [weak self] in self?.finish() }
-        return false
-    }
-
-    /// Asks whether to discard, calling back only for Discard. Tests answer it themselves: a
-    /// sheet on a window that is never shown can end the test process.
-    var askToDiscard: (NSWindow, @escaping () -> Void) -> Void = { window, discard in
-        let alert = NSAlert()
-        alert.messageText = "Discard this capture?"
-        alert.informativeText = "It has annotations that were not copied or saved."
-        alert.addButton(withTitle: "Discard").hasDestructiveAction = true
-        alert.addButton(withTitle: "Cancel")
-        alert.beginSheetModal(for: window) { if $0 == .alertFirstButtonReturn { discard() } }
+        return true
     }
 
     public func windowWillClose(_ notification: Notification) {
@@ -375,7 +354,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         done?()
     }
 
-    /// Escape: whatever the canvas is in the middle of, else the editor, asking as Close does.
+    /// Escape: whatever the canvas is in the middle of, else the editor, closed as Close does.
     public override func cancelOperation(_ sender: Any?) {
         if !canvas.cancelCurrent() { window?.performClose(nil) }
     }
@@ -438,9 +417,5 @@ final class DragGrip: NSImageView {
 extension DragGrip: NSDraggingSource {
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
         .copy
-    }
-
-    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        if operation != [] { controller?.finish() }
     }
 }
