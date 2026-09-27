@@ -204,13 +204,31 @@ public final class CanvasView: NSView {
     /// One unmodified key picks a tool, as in most annotation editors: V select, N arrow with
     /// text, A arrow, T text, R rectangle, E ellipse, P pen, H highlighter, O obscure, C crop.
     public override func keyDown(with event: NSEvent) {
-        guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+        let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        if plain, let direction = Self.arrowKeys[event.keyCode], selectedID != nil, dragAnchor == nil {
+            nudge(direction, far: event.modifierFlags.contains(.shift))
+            return
+        }
+        guard plain,
               let key = event.charactersIgnoringModifiers?.lowercased(),
               let tool = Tool.allCases.first(where: { $0.key == key }) else {
             super.keyDown(with: event)
             return
         }
         self.tool = tool
+    }
+
+    private static let arrowKeys: [UInt16: CGPoint] = [123: CGPoint(x: -1, y: 0), 124: CGPoint(x: 1, y: 0),
+                                                       125: CGPoint(x: 0, y: 1), 126: CGPoint(x: 0, y: -1)]
+
+    /// The arrow keys move the selection a point, or ten with Shift, each press one undo step.
+    /// While typing they move the caret instead: the text view has the keys then.
+    func nudge(_ direction: CGPoint, far: Bool) {
+        guard let id = selectedID, let a = document.annotation(id) else { return }
+        let step = (far ? 10 : 1) * document.scale
+        var d = document
+        d.replace(a.translated(by: CGPoint(x: direction.x * step, y: direction.y * step)))
+        commit(d)
     }
 
     private func imagePoint(_ event: NSEvent) -> CGPoint {
@@ -586,7 +604,7 @@ public final class CanvasView: NSView {
 
 /// The invisible text view words are typed into. It draws nothing but its caret; the canvas
 /// draws `preview`, the words in their final style. Return or Command-Return finishes, Escape
-/// cancels, and Shift-Return adds a line. Its undo covers keystrokes only, and goes when it does.
+/// cancels, and Shift-Return or Option-Return adds a line. Its undo covers keystrokes only, and goes when it does.
 final class TextEntry: NSTextView {
     private(set) var style = Style.standard
     var origin = CGPoint.zero
@@ -699,7 +717,7 @@ final class TextEntry: NSTextView {
         // An input method composing gets every key, Return and Escape included.
         guard !hasMarkedText() else { return super.keyDown(with: event) }
         let isReturn = event.keyCode == 36 || event.keyCode == 76
-        if isReturn, event.modifierFlags.contains(.shift) {
+        if isReturn, !event.modifierFlags.isDisjoint(with: [.shift, .option]) {
             insertNewlineIgnoringFieldEditor(nil)
         } else if isReturn {
             onFinish?()

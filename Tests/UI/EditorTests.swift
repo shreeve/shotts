@@ -14,7 +14,7 @@ import Testing
         #expect(string == "Hello there" && size.width > 0 && size.height > 0)
     }
 
-    /// Return finishes the words; Shift-Return starts a new line.
+    /// Return finishes the words; Shift-Return and Option-Return start a new line.
     @Test func returnFinishesAndShiftReturnBreaksALine() throws {
         let canvas = canvasInWindow()
         canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
@@ -26,11 +26,13 @@ import Testing
         entry.insertText("one", replacementRange: NSRange(location: NSNotFound, length: 0))
         entry.keyDown(with: key(.shift))
         entry.insertText("two", replacementRange: NSRange(location: NSNotFound, length: 0))
+        entry.keyDown(with: key(.option))
+        entry.insertText("three", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(canvas.textField != nil)
         entry.keyDown(with: key([]))
         #expect(canvas.textField == nil)
         guard case let .text(_, words, _, _)? = canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
-        #expect(words == "one\ntwo")
+        #expect(words == "one\ntwo\nthree")
     }
 
     /// Escape cancels typing whole: a new text is never added.
@@ -199,6 +201,27 @@ import Testing
         canvas.tool = .select
         mouse.doubleClick(CGPoint(x: text.bounds.midX, y: text.bounds.midY))
         #expect(canvas.textField != nil && canvas.selectedID == nil)
+    }
+
+    /// The arrow keys nudge the selection a point (two pixels at 2x), ten with Shift, each
+    /// press one undo step.
+    @Test func arrowKeysNudgeTheSelection() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .rectangle
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 140, y: 140))
+        canvas.tool = .select
+        mouse.down(CGPoint(x: 40, y: 90)); mouse.up(CGPoint(x: 40, y: 90))
+        func arrow(_ code: UInt16, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: canvas.window!.windowNumber,
+                             context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
+        }
+        canvas.keyDown(with: arrow(124))              // right a point
+        canvas.keyDown(with: arrow(125, .shift))      // down ten
+        let moved = try #require(canvas.document.annotations.first).bounds
+        #expect(moved.origin == CGPoint(x: 42, y: 60))
+        canvas.undo(nil)
+        #expect(try #require(canvas.document.annotations.first).bounds.origin == CGPoint(x: 42, y: 40))
     }
 
     @Test func aMoveIsOneStep() {

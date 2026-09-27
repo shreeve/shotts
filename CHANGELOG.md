@@ -5,6 +5,13 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- The arrow keys nudge a selected annotation, a point at a time or ten with Shift.
+- Option-Return starts a new line while typing, as Shift-Return does.
+- With New Window per Capture off, a new capture replaces the editor in front, not the one
+  opened last.
+
 ## 0.2.5 — 2026-09-27
 
 - F10 no longer brings Shotts to the front, which pulled every open editor in front of what you

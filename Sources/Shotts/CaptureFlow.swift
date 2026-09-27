@@ -111,8 +111,8 @@ final class CaptureFlow {
         open(Document(width: image.width, height: image.height, scale: scale), source: image, on: screen, returningTo: returnTo)
     }
 
-    /// Unless New Window per Capture is on, the new editor takes the place of the newest open
-    /// one, where it was on screen; the one replaced becomes the capture Option-F10 brings back.
+    /// Unless New Window per Capture is on, the new editor takes the place of the open one in
+    /// front, where it was on screen; the one replaced becomes the capture Option-F10 brings back.
     private func open(_ document: Document, source: CGImage, on screen: NSScreen?, returningTo returnTo: NSRunningApplication?) {
         let editor = EditorWindowController(document: document, source: source, on: screen)
         editor.onClose = { [weak self, weak editor] in
@@ -121,13 +121,18 @@ final class CaptureFlow {
             self?.editors.removeAll { $0.editor === editor }
             if working { returnTo?.activate() }
         }
-        if !SelectionOptions.current.newWindows, let (replaced, _) = editors.popLast(), let old = replaced.window, let window = editor.window {
+        // The editor in front is the one replaced, else the newest.
+        let front = NSApp.orderedWindows.lazy.compactMap { window in self.editors.firstIndex { $0.editor.window === window } }.first
+        if !SelectionOptions.current.newWindows, let index = front ?? editors.indices.last, let window = editor.window {
+            let (replaced, _) = editors.remove(at: index)
             // Replaced, not closed by the user: it goes quietly, with no focus handed back.
             replaced.onClose = { [weak self] in self?.lastClosed = (replaced.canvas.document, replaced.canvas.source) }
-            // Where the old one was, its top-left corner kept, and still on screen if the new
-            // picture is bigger.
-            window.setFrameTopLeftPoint(CGPoint(x: old.frame.minX, y: old.frame.maxY))
-            window.setFrame(window.constrainFrameRect(window.frame, to: old.screen), display: false)
+            if let old = replaced.window {
+                // Where the old one was, its top-left corner kept, and still on screen if the
+                // new picture is bigger.
+                window.setFrameTopLeftPoint(CGPoint(x: old.frame.minX, y: old.frame.maxY))
+                window.setFrame(window.constrainFrameRect(window.frame, to: old.screen), display: false)
+            }
             replaced.close()
         }
         editors.append((editor, returnTo))

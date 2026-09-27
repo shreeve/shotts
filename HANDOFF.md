@@ -16,7 +16,7 @@ kept the editor open with Option-F10 to bring the last capture back, and added N
 Capture; 0.2.2 printed through the standard Print window; 0.2.1 fixed 0.2.0's hidden bar. 0.2.0
 is the revamp (shreeve/shotts#51, merge commit c24b093): a correctness, security, and
 performance pass over the whole app, plus Open Sans; `CHANGELOG.md` says what changed for users.
-The build has no warnings (warnings are errors) and `swift test` passes: 41 Core tests and 55
+The build has no warnings (warnings are errors) and `swift test` passes: 41 Core tests and 56
 AppKit tests.
 
 Next, in order:
@@ -29,12 +29,16 @@ Next, in order:
 
 Decided against, so they are not rebuilt:
 
-- Wrapping plain text at the picture's edge. The user breaks lines with Shift-Return; text that wrapped
+- Wrapping plain text at the picture's edge. The user breaks lines with Shift-Return (or Option-Return); text that wrapped
   on its own would either keep its line breaks when moved (a stranded narrow column) or reflow
   as it moves, and both are worse than lines that only change when the user says so.
 
 Deferred, with the reason each waits:
 
+- Configurable shortcuts. When F10 and Option-F10 become settable, also show that one is taken:
+  a small red dot on the menu bar icon whenever another app holds a Shotts shortcut (a failed
+  `HotKey.registerF10`), and the menu naming which. Today only Capture Area's title says so, and
+  Show Last Capture just loses its key glyph. The owner asked for this with the shortcut work.
 - The picker redraws its whole transparent overlay on each mouse move (the crosshair spans the
   display). Drawing the crosshair as two thin layers would leave only the magnifier to redraw.
 - Selecting an annotation does not show its style in the bar. Changing a style changes only what
@@ -143,12 +147,12 @@ shortcuts, the last drawing tool remembered), the color swatch that opens the wi
 Copy and Save. The editor is an ordinary window: copy, save, drag out, and print leave it open
 (print brings it back to the front after the Print window), and Command-W, the red button, or
 Escape with nothing left to cancel closes it with no question. Closing first keeps the words
-being typed and puts back a drag in progress. `CaptureFlow` keeps the document and picture of the
-editor closed last, and Option-F10 (`showLast`) brings the newest open editor forward or opens
-that one again; it is the only capture kept after its editor closes. Unless New Window per
-Capture is on (`editor.newWindows`), a new capture's editor takes the place of the newest open
-one at its top-left corner, and the one replaced becomes that kept capture, closed without
-handing focus back.
+being typed and puts back a drag in progress. `CaptureFlow` keeps the document and picture of
+the editor closed last, and Option-F10 (`showLast`) brings the newest open editor forward or
+opens that one again; it is the only capture kept after its editor closes. Unless New Window per
+Capture is on (`editor.newWindows`), a new capture's editor takes the place of the open editor
+in front (else the newest one) at its top-left corner, and the one replaced becomes that kept
+capture, closed without handing focus back.
 
 Resizing changes only the canvas's `zoom` (points per picture pixel), never the document.
 `EditorLayout` holds the rules: the zoom that fits a content size (capped at the picture's
@@ -163,7 +167,8 @@ and Option fills it, and either may change mid-drag. A change made in place (a m
 select tool, a text entry, a new callout with its words) keeps `base`, the document when it
 began, and ends with `History.record(since:)`: one undo step, or none if nothing changed. Escape
 during a move restores `base`. The arrow tools select an existing arrow or callout on click
-instead of drawing, and the text tool edits a text it clicks. Arrows and callouts show a dot at
+instead of drawing, and the text tool edits a text it clicks. The arrow keys nudge the selection (`nudge`), a
+point at a time or ten with Shift, one undo step each; while typing they are the text view's. Arrows and callouts show a dot at
 each end; everything else a dashed box. While dragging, only the extent of what moved is redrawn
 (`Renderer.extent`, converted to the view); a crop dims the whole picture and redraws it all.
 
@@ -177,7 +182,7 @@ Text is typed on the picture: `CanvasView.beginTextEntry` adds an invisible `Tex
 `NSTextView` with clear text and a colored caret) whose `preview` the canvas draws through the
 renderer, so what is typed looks exactly like the export. The entry has its own undo manager, so
 Command-Z while typing undoes keystrokes and nothing outlives it. Return or Command-Return
-finishes, Shift-Return breaks a line, and Escape cancels, restoring `base`: new words go, a new
+finishes, Shift-Return or Option-Return breaks a line, and Escape cancels, restoring `base`: new words go, a new
 callout goes with its arrow, and edited words come back. An input method composing gets every
 key. Closing the window keeps the words. A text shape's `size` is its layout
 box, which hugs the words, with the outline's room on every side: a callout's words wrap at
