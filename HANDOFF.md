@@ -5,19 +5,20 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.2.0 is released: tag `v0.2.0` on `main` (commit "Shotts 0.2.0"), the GitHub release with its
-notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#13).
-Installed 0.1.0 copies are offered it through Sparkle. 0.2.0 is the revamp (shreeve/shotts#51,
-merge commit c24b093): a correctness, security, and performance pass over the whole app, plus
-Open Sans; `CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
+0.2.1 is released: tag `v0.2.1` on `main` (commit "Shotts 0.2.1"), the GitHub release with its
+notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#14);
+installed copies are offered it through Sparkle. 0.2.1 (shreeve/shotts#52) fixes 0.2.0's
+editor, whose canvas painted over its bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit
+c24b093): a correctness, security, and performance pass over the whole app, plus Open Sans;
+`CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
 errors) and `swift test` passes: 40 Core tests and 46 AppKit tests.
 
 Next, in order:
 
-1. Use 0.2.0 by hand on a Retina and a non-Retina display (see "Checking by hand"); it was
-   verified by the tests, headless renders, and the packaged app's font, but no live capture
-   was taken during the revamp: a capture, every tool, copy into Mail or Notes (it should paste
-   at on-screen size), save, drag out, F10 from inside an editor, two displays.
+1. Use 0.2.1 by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
+   and headless renders check a lot, but they missed 0.2.0's hidden bar, which only a real window
+   showed: look at the bar first, then a capture, every tool, copy into Mail or Notes (it should
+   paste at on-screen size), save, drag out, F10 from inside an editor, two displays.
 2. Deferred work, below. New changes collect under a `## Unreleased` heading in `CHANGELOG.md`.
 
 Deferred, with the reason each waits:
