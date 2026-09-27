@@ -5,6 +5,12 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Fewer choices, the same app: Trebuchet leaves the fonts (Open Sans is the one it stood in for;
+  a remembered Trebuchet becomes Rounded), and the key hints simply show until the first drag,
+  with no option to hide them.
+
 ## 0.2.3 — 2026-09-27
 
 - New Window per Capture, in the menu bar menu: off (the default), a new capture takes the

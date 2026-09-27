@@ -54,8 +54,6 @@ public enum FontChoice: String, CaseIterable, Sendable, Codable {
     case rounded
     /// The plain system font.
     case system
-    /// Trebuchet MS: humanist, the closest of the built-in fonts to Droid Sans.
-    case trebuchet
     /// Open Sans: Droid Sans redrawn by its own designer. It ships inside the app under the SIL
     /// Open Font License (`Support/Fonts`).
     case openSans
@@ -64,7 +62,6 @@ public enum FontChoice: String, CaseIterable, Sendable, Codable {
         switch self {
         case .rounded: "Rounded"
         case .system: "System"
-        case .trebuchet: "Trebuchet"
         case .openSans: "Open Sans"
         }
     }

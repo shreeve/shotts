@@ -56,7 +56,6 @@ the editor), Check for Updates…, Quit, and the picker's options, remembered ac
 | Include Window Shadow | off | A clicked window is captured with its own macOS shadow on a transparent margin, as the system's window screenshots are. An area cut from the screen never has one. |
 | Dim Outside Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
 | Show Magnifier | on | The magnifier and its color readout. |
-| Show Hints | on | The list of keys until the first drag. |
 
 The first F10 asks macOS for Screen Recording permission with the system's own dialog. Until it
 is granted, later presses explain where to turn it on and capture nothing. Screen Recording is
@@ -93,8 +92,8 @@ After the first capture, a new capture starts with the drawing tool last used.
 
 Every tool but Obscure draws with the chosen color and line width; the highlighter uses them
 translucent and three times as wide, never under 12 points. Text uses the chosen size and font:
-Rounded (the system font's rounded design, the default), System, Trebuchet, or Open Sans, which
-ships inside the app, bold in each case. The color swatch in the bar opens a panel with ten
+Rounded (the system font's rounded design, the default), System, or Open Sans, which ships
+inside the app, bold in each case. The color swatch in the bar opens a panel with ten
 colors, a custom color, and switches for the soft shadow under annotations, the outline on
 text, and tapered arrows. Color, width,
 size, font, and the switches are remembered across captures. Changing one with an annotation

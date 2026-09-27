@@ -14,7 +14,7 @@ back, adds New Window per Capture, and keeps the magnifier's crosshair while dra
 0.2.0's editor, whose canvas painted over its bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit
 c24b093): a correctness, security, and performance pass over the whole app, plus Open Sans;
 `CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
-errors) and `swift test` passes: 40 Core tests and 49 AppKit tests.
+errors) and `swift test` passes: 41 Core tests and 49 AppKit tests.
 
 Next, in order:
 
@@ -47,7 +47,7 @@ Deferred, with the reason each waits:
 | --- | --- | --- |
 | ShottsCore | `Document.swift` | The seam: pixel size, scale, annotations, crop; `visibleRect` is what exports. |
 | | `Annotation.swift` | `Annotation.Shape` (arrow, callout, rectangle, ellipse, text, pen, highlighter, obscure), bounds, translation, `dragged(_:by:)` (what a drag on each part moves), degeneracy. |
-| | `Style.swift` | `Style` (color, stroke width, font size, font, shadow, outline, tapered arrows), its pixel metrics, `applying(from:to:)`, and decoding that tolerates older and newer saved styles. `FontChoice`: Rounded, System, Trebuchet, Open Sans. |
+| | `Style.swift` | `Style` (color, stroke width, font size, font, shadow, outline, tapered arrows), its pixel metrics, `applying(from:to:)`, and decoding that tolerates older and newer saved styles. `FontChoice`: Rounded, System, Open Sans. |
 | | `Arrow.swift` | `ArrowGeometry`: an arrow as one filled outline, and its head length. |
 | | `Callout.swift` | `CalloutLayout`: where a callout's words go, from the arrow alone. |
 | | `HitTest.swift` | Which annotation a point lands on, and which part of an arrow or callout. |
@@ -221,8 +221,9 @@ writes into `$TMPDIR/Shotts Drag/`, emptied before each drag, so at most one dra
 
 ## Fonts
 
-Text is bold Rounded (the default), System, Trebuchet, or Open Sans. The first three every Mac
-has. Open Sans, Droid Sans redrawn by its own designer, is bundled: `Support/Fonts` holds
+Text is bold Rounded (the default), System, or Open Sans. The first two every Mac has; Trebuchet,
+a stand-in for Droid Sans until Open Sans shipped, was dropped in 0.2.4, and a style remembered
+with it comes back Rounded. Open Sans, Droid Sans redrawn by its own designer, is bundled: `Support/Fonts` holds
 `OpenSans-Bold.ttf` from github.com/googlefonts/opensans with its license, `OFL.txt`, which
 must ship beside it. `package-app.sh` copies the folder into `Contents/Resources/Fonts`, and
 `ATSApplicationFontsPath` in `Info.plist` makes it Shotts' own font, installed nowhere else.

@@ -55,7 +55,7 @@ themselves out on the side away from the tip. Move the arrow and the words come 
 words and the tail follows; move the head and the arrow reshapes.
 
 Options in the menu bar menu: copy to the clipboard the moment a capture is taken, include the
-window shadow, dim outside the selection, show the magnifier, show the hints.
+window shadow, dim outside the selection, show the magnifier.
 
 ## Building
 

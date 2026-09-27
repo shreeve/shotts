@@ -152,7 +152,6 @@ public enum Renderer {
         switch style.font {
         case .system: return system
         case .rounded: return rounded
-        case .trebuchet: return NSFont(name: "TrebuchetMS-Bold", size: size) ?? system
         case .openSans: return NSFont(name: "OpenSans-Bold", size: size) ?? rounded
         }
     }

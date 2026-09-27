@@ -89,7 +89,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menu.addItem(optionItem("New Window per Capture", \.newWindows))
         menu.addItem(optionItem("Dim Outside Selection", \.dims))
         menu.addItem(optionItem("Show Magnifier", \.magnifies))
-        menu.addItem(optionItem("Show Hints", \.showsHints))
         menu.delegate = self
         menu.addItem(.separator())
         menu.addItem(checkForUpdatesItem())
