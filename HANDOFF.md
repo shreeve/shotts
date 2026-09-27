@@ -24,12 +24,16 @@ Next, in order:
    paste at on-screen size), save, drag out, F10 from inside an editor, two displays.
 2. Deferred work, below. New changes collect under a `## Unreleased` heading in `CHANGELOG.md`.
 
+Decided against, so they are not rebuilt:
+
+- Wrapping plain text at the picture's edge. The user breaks lines with Return; text that wrapped
+  on its own would either keep its line breaks when moved (a stranded narrow column) or reflow
+  as it moves, and both are worse than lines that only change when the user says so.
+
 Deferred, with the reason each waits:
 
 - The picker redraws its whole transparent overlay on each mouse move (the crosshair spans the
   display). Drawing the crosshair as two thin layers would leave only the magnifier to redraw.
-- Plain text never wraps: text typed past the picture's right edge is clipped. It could wrap at
-  the edge less the callout margin, as callouts do; `TextEntry.place` would grow a wrap width.
 - Selecting an annotation does not show its style in the bar. Changing a style changes only what
   changed (`Style.applying(from:to:)`), so nothing is lost, but the bar does not tell you the
   selection's width or font.
