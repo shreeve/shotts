@@ -405,8 +405,8 @@ public final class CanvasView: NSView {
 
     // MARK: - Callouts
 
-    /// The text may run to within a small margin of the picture's edge on its side; Return
-    /// breaks a line sooner. Only that margin wraps.
+    /// The text may run to within a small margin of the picture's edge on its side;
+    /// Shift-Return breaks a line sooner. Only that margin wraps.
     private func calloutLayout(tail: CGPoint, tip: CGPoint, style: Style) -> CalloutLayout {
         CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
                       maxWidth: Double(document.width), in: document.pixelBounds, margin: Self.textMargin * document.scale)
@@ -577,8 +577,8 @@ public final class CanvasView: NSView {
 }
 
 /// The invisible text view words are typed into. It draws nothing but its caret; the canvas
-/// draws `preview`, the words in their final style. Return adds a line; Escape or Command-Return
-/// finishes. Its undo covers keystrokes only, and goes when it does.
+/// draws `preview`, the words in their final style. Return, Escape, or Command-Return finishes;
+/// Shift-Return adds a line. Its undo covers keystrokes only, and goes when it does.
 final class TextEntry: NSTextView {
     private(set) var style = Style.standard
     var origin = CGPoint.zero
@@ -687,13 +687,16 @@ final class TextEntry: NSTextView {
     }
 
     override func keyDown(with event: NSEvent) {
+        // An input method composing gets every key, Return and Escape included.
+        guard !hasMarkedText() else { return super.keyDown(with: event) }
         let isReturn = event.keyCode == 36 || event.keyCode == 76
-        // Escape and Command-Return finish, except while an input method is composing.
-        if !hasMarkedText(), event.keyCode == 53 || (isReturn && event.modifierFlags.contains(.command)) {
+        if isReturn, event.modifierFlags.contains(.shift) {
+            insertNewlineIgnoringFieldEditor(nil)
+        } else if isReturn || event.keyCode == 53 {
             onFinish?()
-            return
+        } else {
+            super.keyDown(with: event)
         }
-        super.keyDown(with: event)
     }
 
     override func cancelOperation(_ sender: Any?) {
