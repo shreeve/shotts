@@ -5,18 +5,20 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.1.0 is released (GitHub, the Homebrew cask, Sparkle), and the repository is public. The
-`revamp` branch (from `main` at e945441) is a correctness, security, and performance pass over
-the whole app; `CHANGELOG.md`'s Unreleased section is what it changed for users. It builds with
-no warnings (warnings are errors) and `swift test` passes: 40 Core tests and 45 AppKit tests.
+0.2.0 is released: tag `v0.2.0` on `main` (commit "Shotts 0.2.0"), the GitHub release with its
+notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#13).
+Installed 0.1.0 copies are offered it through Sparkle. 0.2.0 is the revamp (shreeve/shotts#51,
+merge commit c24b093): a correctness, security, and performance pass over the whole app, plus
+Open Sans; `CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
+errors) and `swift test` passes: 40 Core tests and 45 AppKit tests.
 
 Next, in order:
 
-1. Exercise a Release build by hand on a Retina and a non-Retina display (see "Checking by
-   hand"): a capture, every tool, copy into Mail or Notes (it should paste at on-screen size),
-   save, drag out, F10 from inside an editor, two displays.
-2. Merge `revamp` and cut 0.2.0 with `Scripts/release.sh`.
-3. Deferred work, below.
+1. Use 0.2.0 by hand on a Retina and a non-Retina display (see "Checking by hand"); it was
+   verified by the tests, headless renders, and the packaged app's font, but no live capture
+   was taken during the revamp: a capture, every tool, copy into Mail or Notes (it should paste
+   at on-screen size), save, drag out, F10 from inside an editor, two displays.
+2. Deferred work, below. New changes collect under a `## Unreleased` heading in `CHANGELOG.md`.
 
 Deferred, with the reason each waits:
 
