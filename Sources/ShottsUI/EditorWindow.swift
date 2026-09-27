@@ -290,7 +290,10 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         info.verticalPagination = .fit
         info.isHorizontallyCentered = true
         info.isVerticallyCentered = true
-        info.orientation = image.width > image.height ? .landscape : .portrait
+        // The page stays portrait and a wide picture turns onto it, as other apps print: a
+        // landscape page made the Print window's preview short and wide, its page badge
+        // covering the picture.
+        info.orientation = .portrait
         return (PrintSheet(image: image, scale: document.scale), info)
     }
 
@@ -363,19 +366,30 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 
 /// The page's content: the rendered picture at its natural size in points, which pagination
 /// scales to fit the paper.
-private final class PrintSheet: NSView {
+final class PrintSheet: NSView {
     private let image: CGImage
+    /// Wider than tall: drawn a quarter turn counterclockwise, its top to the page's left edge.
+    let isTurned: Bool
 
     init(image: CGImage, scale: Double) {
         self.image = image
-        super.init(frame: NSRect(x: 0, y: 0, width: Double(image.width) / scale, height: Double(image.height) / scale))
+        isTurned = image.width > image.height
+        let width = Double(image.width) / scale, height = Double(image.height) / scale
+        super.init(frame: NSRect(x: 0, y: 0, width: isTurned ? height : width, height: isTurned ? width : height))
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSGraphicsContext.current?.cgContext.draw(image, in: bounds)
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        if isTurned {
+            ctx.translateBy(x: bounds.width, y: 0)
+            ctx.rotate(by: .pi / 2)
+            ctx.draw(image, in: CGRect(x: 0, y: 0, width: bounds.height, height: bounds.width))
+        } else {
+            ctx.draw(image, in: bounds)
+        }
     }
 }
 

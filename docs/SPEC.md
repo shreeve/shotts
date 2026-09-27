@@ -144,7 +144,7 @@ capture in memory until another editor closes and takes its place.
 | Copy (Command-C) | The picture, with its annotations and crop, goes to the clipboard as PNG and TIFF. The editor stays open. Command-C copies the picture even while typing. |
 | Save… (Command-S) | Asks where; suggests the Desktop and a name like `Shotts 2026-09-26 at 10.12.34 AM.png`, with the time as the system writes it. The editor stays open. |
 | Drag the hand icon | Drags a PNG file into another app or the Finder, even from the first press while another app is in front. The editor stays open. |
-| Print… (Command-P) | Prints the picture, with its annotations and crop, scaled to fit one page and turned sideways when it is wider than tall, in the standard Print window. The editor comes back to the front afterwards. |
+| Print… (Command-P) | Prints the picture, with its annotations and crop, scaled to fit one portrait page, turned a quarter turn onto it when it is wider than tall, in the standard Print window. The editor comes back to the front afterwards. |
 
 The copied, saved, and dragged pictures are identical to what the editor shows. They carry the
 capture's resolution (144 dpi from a Retina display), so they paste at their on-screen size,

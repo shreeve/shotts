@@ -14,7 +14,7 @@ open with Option-F10 to bring the last capture back, and added New Window per Ca
 printed through the standard Print window; 0.2.1 fixed 0.2.0's hidden bar. 0.2.0 is the revamp
 (shreeve/shotts#51, merge commit c24b093): a correctness, security, and performance pass over
 the whole app, plus Open Sans; `CHANGELOG.md` says what changed for users. The build has no
-warnings (warnings are errors) and `swift test` passes: 41 Core tests and 53 AppKit tests.
+warnings (warnings are errors) and `swift test` passes: 41 Core tests and 54 AppKit tests.
 
 Next, in order:
 
@@ -294,7 +294,9 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   to fill can reach past the view. The canvas filled it and painted its dark field over the bar
   in 0.2.0; it sets `clipsToBounds` and fills only its bounds, and `BarTests` checks the bar
   shows.
-- Printing runs the operation on its own (`NSPrintOperation.run()`), in the standard Print window.
+- Printing runs the operation on its own (`NSPrintOperation.run()`), in the standard Print window,
+  on a portrait page with a wide picture turned onto it (`PrintSheet`): a landscape page made
+  the Print window's preview short and wide, its page badge over the picture.
   As a sheet on the editor it took the editor's dark look and was squeezed to the window's
   height, cutting off its options.
 - `NSWindowController.close()` and `NSWindow.close()` skip `windowShouldClose`; only

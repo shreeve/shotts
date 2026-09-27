@@ -5,6 +5,14 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- The menu bar options are in the order a capture meets them: Show Magnifier, Dim Outside
+  Selection, Include Window Shadow, Copy to Clipboard, New Window per Capture.
+- A wide picture prints on a portrait page, turned onto it, as other apps print, so the Print
+  window's preview looks as it should instead of short and wide with its page badge over the
+  picture.
+
 ## 0.2.4 — 2026-09-27
 
 - Return finishes typing, for text and for an arrow's words; Shift-Return starts a new line.

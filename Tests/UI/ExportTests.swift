@@ -218,3 +218,37 @@ func patternImage(_ width: Int, _ height: Int) -> CGImage {
         #expect(Renderer.image(of: Document(width: 60, height: 40, scale: 2), source: source) === source)
     }
 }
+
+@MainActor @Suite struct PrintTests {
+    /// A wide picture prints on a portrait page, turned a quarter counterclockwise: its top-left
+    /// corner lands at the page's lower left, as other apps print.
+    @Test func aWidePictureTurnsOntoAPortraitPage() throws {
+        var document = Document(width: 400, height: 200, scale: 1)
+        var red = Style.standard
+        red.shadow = false
+        document.add(Annotation(shape: .rectangle(CGRect(x: 0, y: 0, width: 100, height: 50), filled: true), style: red))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("shotts-print-\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(EditorWindowController.printPDF(document, source: blankImage(400, 200, gray: 1), to: url))
+        let page = try #require(CGPDFDocument(url as CFURL)?.page(at: 1))
+        let box = page.getBoxRect(.mediaBox)
+        #expect(box.height > box.width)
+
+        let w = Int(box.width), h = Int(box.height)
+        let ctx = transparentContext(w, h)
+        ctx.scaleBy(x: 1, y: -1) // undo the helper's flip: PDF pages draw bottom-up
+        ctx.translateBy(x: 0, y: -CGFloat(h))
+        ctx.drawPDFPage(page)
+        let pixels = rgba(try #require(ctx.makeImage()))
+        var reds: [(x: Int, y: Int)] = []
+        for y in 0..<h {
+            for x in 0..<w {
+                let o = (y * w + x) * 4
+                if pixels[o] > 200, pixels[o + 1] < 90, pixels[o + 2] < 90, pixels[o + 3] > 200 { reds.append((x, y)) }
+            }
+        }
+        try #require(!reds.isEmpty)
+        let cx = reds.map(\.x).reduce(0, +) / reds.count, cy = reds.map(\.y).reduce(0, +) / reds.count
+        #expect(cx < w / 2 && cy > h / 2, "the red corner is at \(cx),\(cy) on a \(w) by \(h) page") // rows run top-first
+    }
+}
