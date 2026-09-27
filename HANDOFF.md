@@ -12,7 +12,7 @@ standard Print window, checked by hand. 0.2.1 (shreeve/shotts#52) fixed 0.2.0's 
 canvas painted over its bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit
 c24b093): a correctness, security, and performance pass over the whole app, plus Open Sans;
 `CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
-errors) and `swift test` passes: 40 Core tests and 47 AppKit tests.
+errors) and `swift test` passes: 40 Core tests and 48 AppKit tests.
 
 Next, in order:
 
