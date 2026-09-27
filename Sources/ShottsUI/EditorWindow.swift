@@ -276,10 +276,12 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     /// wider than tall. The editor stays open: printing is not a way of finishing.
     @objc public func printPressed() {
         canvas.endTextEntry(commit: true)
-        guard let window, let (sheet, info) = Self.page(for: canvas.document, source: canvas.source) else { return }
+        guard let (sheet, info) = Self.page(for: canvas.document, source: canvas.source) else { return }
         let operation = NSPrintOperation(view: sheet, printInfo: info)
         operation.jobTitle = Export.suggestedName().replacingOccurrences(of: ".png", with: "")
-        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        // The standard Print window, as other apps show it, rather than a sheet: a sheet takes the
+        // editor's dark look and is squeezed to its height, which cut the panel's options off.
+        operation.run()
     }
 
     /// The page to print: the rendered picture and print settings that fit it to one sheet.
