@@ -5,8 +5,12 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.2.0 — 2026-09-26
 
+A pass over the whole app for correctness, safety, and speed, and a new font.
+
+- Open Sans joins the fonts for text: Droid Sans redrawn by its own designer, bundled with the
+  app under the SIL Open Font License.
 - The editor's window can be resized. The picture scales with it, proportions kept, up to its
   on-screen size; annotations scale along, stay editable, and export unchanged. A capture as big
   as the screen now opens inside it.
