@@ -5,10 +5,46 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.2.0 — 2026-09-26
 
+A pass over the whole app for correctness, safety, and speed, and a new font.
+
+- Open Sans joins the fonts for text: Droid Sans redrawn by its own designer, bundled with the
+  app under the SIL Open Font License.
 - The editor's window can be resized. The picture scales with it, proportions kept, up to its
-  on-screen size; annotations scale along, stay editable, and export unchanged.
+  on-screen size; annotations scale along, stay editable, and export unchanged. A capture as big
+  as the screen now opens inside it.
+- Escape no longer closes an annotated capture without asking. Closing asks in a sheet, and words
+  still being typed count.
+- Copied, saved, and dragged pictures carry the capture's resolution (144 dpi from a Retina
+  display), so they paste at their on-screen size instead of twice it, and keep a wide-gamut
+  capture's colors.
+- Obscure hides what it covers: coarser blocks of flattened color, on whole pixels.
+- Undo takes back a whole callout, text edit, or move in one step. Command-Z while typing undoes
+  the typing. Escape during a move puts it back.
+- Editing words no longer hides them until the first keystroke, keeps the text in its place, and
+  takes style changes made while typing. Changing one style of a selected annotation changes only
+  that, and text is laid out again for a new font or size.
+- Arrows can be reshaped by their head and tail, like arrows with text, and a short arrow can
+  still be moved by its shaft. Arrows, highlighter strokes, and thin ellipses are selected where
+  they are drawn on Retina captures.
+- Dragging the picture out takes the words being typed with it, works from the first press while
+  another app is in front, and leaves at most one file in the temporary folder.
+- A click with the Crop tool clears the crop; the Text tool edits a text it clicks.
+- A rectangle or ellipse thinner than its line is drawn solid instead of vanishing, and a short,
+  thick arrow keeps a head wider than its shaft.
+- The picker shows its crosshair only on the display the pointer is on, keys act there, and it
+  cancels when another app comes to the front or the displays change.
+- The editor keeps only the area you captured in memory, not the whole display it came from, and
+  opens sooner: the capture is copied to the clipboard in the background.
+- With several editors open, each gives focus back to the app its capture came from. F10 does
+  nothing while a capture is under way, and the menu says when another app holds F10.
+- A clicked window is captured at the resolution of the display it is on.
+- The first capture shows only macOS's own permission prompt. Updates are checked once a day
+  without a prompt of their own.
+- Saved files are named with the time as the system writes it (`… at 10.12.34 AM.png`).
+- Editing is smoother on large captures: drawing redraws only what changed, and an annotated 5K
+  picture renders several times faster.
 
 ## 0.1.0 — 2026-09-26
 

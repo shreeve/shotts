@@ -2,19 +2,20 @@
 
 Shotts ships as an app signed with a Developer ID and notarized by Apple, installed with Homebrew
 from `shreeve/homebrew-tap`, and updated in place through [Sparkle](https://sparkle-project.org),
-with GitHub Releases as the only host. There is no server and no CI step. It is the same
-arrangement as Transfer and Lyte, with its own update key.
+with GitHub Releases as the only host. There is no server and no CI step. The repository must
+stay public: Homebrew and Sparkle download release files without signing in, and `release.sh`
+refuses to publish from a private one.
 
 ## How it fits together
 
 | Piece | Where | Does |
 | --- | --- | --- |
 | Install | `shreeve/homebrew-tap` → `Casks/shotts.rb` | `brew install --cask shreeve/tap/shotts` downloads the release's `Shotts-X.Y.Z.zip` into `/Applications`. `auto_updates true` leaves updating to Sparkle; `livecheck` reads the same feed. |
-| Build | `Scripts/package-app.sh` | Builds the app (`CONFIG=release` for releases) in `.build` or the folder `SCRATCH` names, embeds Sparkle, signs everything with the Developer ID, inner pieces first (a release build adds a secure timestamp), and prints the app's path, the only thing on stdout. Fails unless the bundle signs as `com.github.shreeve.shotts`. |
+| Build | `Scripts/package-app.sh` | Builds the app (`CONFIG=release` for releases) in `.build` or the folder `SCRATCH` names, copies in the bundled font, embeds Sparkle, signs everything with the Developer ID, inner pieces first (a release build adds a secure timestamp), and prints the app's path, the only thing on stdout. Fails unless the bundle signs as `com.github.shreeve.shotts`. |
 | Release | `Scripts/release.sh` | Stamps the version, builds, notarizes and staples, zips, writes and signs the feed with the version's notes from `CHANGELOG.md`, drafts the release, commits, tags, pushes, and publishes; undoes itself when a step fails. |
 | Cask | `Scripts/update-cask.sh` | Writes the cask for a published version with the archive's sha256 and opens the tap's pull request. |
 | Feed | `appcast.xml` on each release | Sparkle's list of the newest version, its download URL, and its EdDSA signature. |
-| App | `Support/Info.plist` | `SUFeedURL` points at the latest release's `appcast.xml`; `SUPublicEDKey` is the key updates must be signed with. Sparkle, a SwiftPM dependency, starts only when `SUPublicEDKey` is set; **Check for Updates…** is in the menu bar menu. |
+| App | `Support/Info.plist` | `SUFeedURL` points at the latest release's `appcast.xml`; `SUPublicEDKey` is the key updates must be signed with; `SUEnableAutomaticChecks` makes Sparkle, a SwiftPM dependency, check once a day without asking first. **Check for Updates…** is in the menu bar menu and the app menu. |
 
 Two signatures, for two jobs:
 
@@ -68,15 +69,6 @@ Keep a backup of the private key in a password manager, and delete any exported 
 Never commit it or leave it on disk. Losing it strands every installed copy on its version,
 because an app only trusts the key it shipped with. Anyone who has it can sign an update every
 installed copy will accept.
-
-## Before the first release
-
-The repository must be public: Homebrew and Sparkle download release files without signing in,
-and `release.sh` refuses to publish from a private one.
-
-```bash
-gh repo edit shreeve/shotts --visibility public --accept-visibility-change-consequences
-```
 
 ## Cutting a release
 

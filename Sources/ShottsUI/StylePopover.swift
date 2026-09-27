@@ -2,7 +2,7 @@ import AppKit
 import ShottsCore
 
 /// The popover behind the editor's color swatch: a grid of colors, a custom color, and the
-/// switches for how annotations and exports are drawn.
+/// switches for how annotations are drawn.
 final class StylePopover: NSViewController {
     var style: Style
     var onStyle: ((Style) -> Void)?
@@ -11,7 +11,7 @@ final class StylePopover: NSViewController {
     private let shadow = NSButton(checkboxWithTitle: "Shadow", target: nil, action: nil)
     private let outline = NSButton(checkboxWithTitle: "Outline on text", target: nil, action: nil)
     private let tapered = NSButton(checkboxWithTitle: "Tapered arrows", target: nil, action: nil)
-    private let imageShadow = NSButton(checkboxWithTitle: "Include window shadow", target: nil, action: nil)
+    private static let names = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "Gray", "White", "Black"]
 
     init(style: Style) {
         self.style = style
@@ -32,7 +32,8 @@ final class StylePopover: NSViewController {
             let button = NSButton(image: Self.swatch(color, size: 26), target: self, action: #selector(swatchPicked(_:)))
             button.isBordered = false
             button.tag = i
-            button.toolTip = color.hex
+            button.toolTip = Self.names[i]
+            button.setAccessibilityLabel(Self.names[i])
             button.setButtonType(.momentaryChange)
             swatches.append(button)
             row.append(button)
@@ -46,24 +47,21 @@ final class StylePopover: NSViewController {
         custom.bezelStyle = .texturedRounded
         custom.controlSize = .small
 
-        for (box, selector) in [(shadow, #selector(switchesChanged)), (outline, #selector(switchesChanged)),
-                                (tapered, #selector(switchesChanged)), (imageShadow, #selector(imageShadowChanged))] {
+        for box in [shadow, outline, tapered] {
             box.target = self
-            box.action = selector
+            box.action = #selector(switchesChanged)
         }
         show(style)
 
-        let first = separator(), second = separator()
-        let column = NSStackView(views: [grid, custom, first, shadow, outline, tapered, second, imageShadow])
+        let line = separator()
+        let column = NSStackView(views: [grid, custom, line, shadow, outline, tapered])
         column.orientation = .vertical
         column.alignment = .leading
         column.spacing = 8
         column.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
         column.setCustomSpacing(10, after: grid)
-        // The separators span whatever the widest row needs.
-        for line in [first, second] {
-            line.widthAnchor.constraint(equalTo: column.widthAnchor, constant: -24).isActive = true
-        }
+        // The separator spans whatever the widest row needs.
+        line.widthAnchor.constraint(equalTo: column.widthAnchor, constant: -24).isActive = true
         view = column
     }
 
@@ -81,7 +79,6 @@ final class StylePopover: NSViewController {
         shadow.state = style.shadow ? .on : .off
         outline.state = style.outline ? .on : .off
         tapered.state = style.taperedArrows ? .on : .off
-        imageShadow.state = SelectionOptions.current.dropShadow ? .on : .off
     }
 
     @objc private func swatchPicked(_ sender: NSButton) {
@@ -94,6 +91,9 @@ final class StylePopover: NSViewController {
         let panel = NSColorPanel.shared
         panel.color = NSColor(srgbRed: style.color.red, green: style.color.green, blue: style.color.blue, alpha: 1)
         panel.showsAlpha = false
+        // One change when the pointer is released, not one per step of a drag across the wheel:
+        // each change restyles the selection, and each restyle is an undo step.
+        panel.isContinuous = false
         panel.setTarget(self)
         panel.setAction(#selector(panelColorChanged(_:)))
         panel.orderFront(nil)
@@ -111,12 +111,6 @@ final class StylePopover: NSViewController {
         style.outline = outline.state == .on
         style.taperedArrows = tapered.state == .on
         onStyle?(style)
-    }
-
-    @objc private func imageShadowChanged() {
-        var options = SelectionOptions.current
-        options.dropShadow = imageShadow.state == .on
-        SelectionOptions.current = options
     }
 
     /// A round swatch; the selected one has a ring.
@@ -138,6 +132,7 @@ final class StylePopover: NSViewController {
     }
 }
 
+#if DEBUG
 /// The popover's content alone, for drawing it off screen in a check.
 public enum StylePopoverPreview {
     public static func write(to output: URL) -> Bool {
@@ -168,3 +163,4 @@ public enum StylePopoverPreview {
         do { try png.write(to: output); return true } catch { return false }
     }
 }
+#endif

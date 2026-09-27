@@ -1,39 +1,23 @@
 import AppKit
 import Carbon
 
-/// A system-wide key that starts a capture, registered through Carbon so it needs no
-/// Accessibility permission. Only the registered key reaches Shotts; nothing else is observed.
-/// A hot key lives as long as the app: there is no unregistering, by design.
-final class HotKey {
-    static let f10 = UInt32(kVK_F10)
+/// F10, system-wide, registered through Carbon so it needs no Accessibility permission. Only
+/// this key reaches Shotts; nothing else is observed. It lives as long as the app: there is no
+/// unregistering, by design.
+enum HotKey {
+    private static var action: (() -> Void)?
 
-    private var ref: EventHotKeyRef?
-    private let id: UInt32
-    private static var handlers: [UInt32: () -> Void] = [:]
-    private static var installed = false
-    private static var nextID: UInt32 = 1
-
-    init(keyCode: UInt32, modifiers: UInt32 = 0, handler: @escaping () -> Void) {
-        id = Self.nextID
-        Self.nextID += 1
-        Self.handlers[id] = handler
-        Self.installHandlerOnce()
-        let hotKeyID = EventHotKeyID(signature: 0x5348_5454, id: id) // 'SHTT'
-        RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &ref)
-    }
-
-    private static func installHandlerOnce() {
-        guard !installed else { return }
-        installed = true
+    /// Runs `action` whenever F10 is pressed. Returns false when F10 could not be registered,
+    /// which is what happens when another app already holds it.
+    static func registerF10(_ action: @escaping () -> Void) -> Bool {
+        self.action = action
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
-            var hotKeyID = EventHotKeyID()
-            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
-                              nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
-            MainActor.assumeIsolated {
-                HotKey.handlers[hotKeyID.id]?()
-            }
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+            MainActor.assumeIsolated { HotKey.action?() }
             return noErr
         }, 1, &spec, nil, nil)
+        var ref: EventHotKeyRef?
+        let id = EventHotKeyID(signature: 0x5348_5454, id: 1) // 'SHTT'
+        return RegisterEventHotKey(UInt32(kVK_F10), 0, id, GetApplicationEventTarget(), 0, &ref) == noErr
     }
 }

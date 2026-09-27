@@ -10,7 +10,12 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     private let tools = NSSegmentedControl()
     private let colorButton = NSButton()
     private let popover = NSPopover()
-    private var stylePopover: StylePopover?
+    /// One per window, so the color panel it targets lives as long as the window.
+    private lazy var stylePopover: StylePopover = {
+        let content = StylePopover(style: canvas.style)
+        content.onStyle = { [weak self] style in self?.apply(style) }
+        return content
+    }()
     private let widths = NSPopUpButton()
     private let sizes = NSPopUpButton()
     private let fonts = NSPopUpButton()
@@ -21,15 +26,14 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     static let minimumWidth: CGFloat = 880
     /// The shortest the picture's longer side may be made by resizing, in points.
     static let minimumPicture: CGFloat = 160
-    fileprivate(set) var barHeight: CGFloat = 44
+    /// The sizes the window may take; the bar's measured size is filled in once it is laid out.
+    private(set) var layout: EditorLayout
     private var canvasHeight: NSLayoutConstraint?
 
     public init(document: Document, source: CGImage, on screen: NSScreen? = NSScreen.main) {
-        let visible = (screen ?? NSScreen.screens[0]).visibleFrame
-        let natural = CGSize(width: CGFloat(document.width) / document.scale, height: CGFloat(document.height) / document.scale)
-        let fit = min(1, (visible.width - 40) / natural.width, (visible.height - 120) / natural.height)
-        let zoom = fit / document.scale
-        canvas = CanvasView(document: document, source: source, zoom: zoom)
+        layout = EditorLayout(picture: CGSize(width: document.width, height: document.height), scale: document.scale, barHeight: 44,
+                              minimumWidth: Self.minimumWidth, inset: CanvasView.inset, minimumPicture: Self.minimumPicture)
+        canvas = CanvasView(document: document, source: source, zoom: layout.naturalZoom)
 
         let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
@@ -40,14 +44,17 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         window.delegate = self
         let content = makeContent()
         window.contentView = content
-        // The bar's height plus the canvas, with the insets below; sized here rather than from
-        // `fittingSize`, which a stack view answers before it has laid out.
+        // The bar's size once laid out: a stack view's `fittingSize` before layout is not it.
         content.layoutSubtreeIfNeeded()
-        let barSize = content.subviews.first?.fittingSize ?? NSSize(width: 0, height: 44)
-        barHeight = barSize.height
-        let width = max(canvas.frame.width, barSize.width, Self.minimumWidth)
-        window.setContentSize(NSSize(width: width, height: barSize.height + canvas.frame.height))
-        window.contentMinSize = contentSize(forZoom: minimumZoom)
+        let bar = content.subviews.first?.fittingSize ?? NSSize(width: Self.minimumWidth, height: 44)
+        layout.barHeight = bar.height
+        layout.minimumWidth = max(Self.minimumWidth, bar.width.rounded(.up))
+        // Open at the picture's on-screen size, or smaller to fit the screen with the title bar.
+        let visible = (screen ?? NSScreen.screens[0]).visibleFrame
+        let room = window.contentRect(forFrameRect: visible).size
+        show(zoom: layout.zoom(fitting: room))
+        window.setContentSize(layout.contentSize(zoom: canvas.zoom))
+        window.contentMinSize = layout.contentSize(zoom: layout.minimumZoom)
         window.center()
         canvas.style = Self.rememberedStyle
         showStyle(canvas.style)
@@ -97,6 +104,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         colorButton.target = self
         colorButton.action = #selector(showStylePopover)
         colorButton.toolTip = "Color and style"
+        colorButton.setAccessibilityLabel("Color and style")
 
         for w in Style.strokeWidths {
             widths.addItem(withTitle: "\(Int(w)) pt")
@@ -203,10 +211,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 
     @objc private func showStylePopover() {
         if popover.isShown { popover.close(); return }
-        let content = StylePopover(style: canvas.style)
-        content.onStyle = { [weak self] style in self?.apply(style) }
-        stylePopover = content
-        popover.contentViewController = content
+        stylePopover.show(canvas.style)
+        popover.contentViewController = stylePopover
         popover.behavior = .transient
         popover.show(relativeTo: colorButton.bounds, of: colorButton, preferredEdge: .minY)
     }
@@ -223,7 +229,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         if let i = Style.strokeWidths.firstIndex(of: style.strokeWidth) { widths.selectItem(at: i) }
         if let i = Style.fontSizes.firstIndex(of: style.fontSize) { sizes.selectItem(at: i) }
         if let i = FontChoice.allCases.firstIndex(of: style.font) { fonts.selectItem(at: i) }
-        stylePopover?.show(style)
+        if popover.isShown { stylePopover.show(style) }
     }
 
     /// The style the last edit used, so the next capture starts with the same color and sizes.
@@ -288,6 +294,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         return (PrintSheet(image: image, scale: document.scale), info)
     }
 
+    #if DEBUG
     /// Developer check: the page as a PDF, exactly as printing would lay it out.
     public static func printPDF(_ document: Document, source: CGImage, to url: URL) -> Bool {
         guard let (sheet, info) = page(for: document, source: source) else { return false }
@@ -296,6 +303,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         operation.showsProgressPanel = false
         return operation.run()
     }
+    #endif
 
     /// Closes after a copy, save, or drag out.
     func finish() {
@@ -310,110 +318,64 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     // Annotations are in picture pixels, so they scale with it, old and new alike, stay editable,
     // and export exactly as before. The window keeps the picture's proportions (plus the bar).
 
-    private var naturalZoom: CGFloat { 1 / canvas.document.scale }
-
-    private var minimumZoom: CGFloat {
-        min(naturalZoom, Self.minimumPicture / CGFloat(max(canvas.document.width, canvas.document.height)))
-    }
-
-    /// The zoom at which the picture fits a content area of this size.
-    private func zoom(forContentSize size: NSSize) -> CGFloat {
-        let inset = CanvasView.inset * 2
-        let fit = min((size.width - inset) / CGFloat(canvas.document.width),
-                      (size.height - barHeight - inset) / CGFloat(canvas.document.height))
-        return min(naturalZoom, max(minimumZoom, fit))
-    }
-
-    /// The content size that holds the picture at this zoom: snug around it, no narrower than the bar.
-    private func contentSize(forZoom zoom: CGFloat) -> NSSize {
-        let inset = CanvasView.inset * 2
-        return NSSize(width: max(Self.minimumWidth, (CGFloat(canvas.document.width) * zoom + inset).rounded()),
-                      height: (barHeight + CGFloat(canvas.document.height) * zoom + inset).rounded())
+    /// Draws the picture at this zoom, the canvas as tall as the picture and its field need.
+    private func show(zoom: CGFloat) {
+        canvas.endTextEntry(commit: true) // an entry is placed for one zoom
+        canvas.zoom = zoom
+        canvasHeight?.constant = CGFloat(canvas.document.height) * zoom + CanvasView.inset * 2
     }
 
     public func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
         let content = sender.contentRect(forFrameRect: NSRect(origin: .zero, size: frameSize)).size
-        let snug = contentSize(forZoom: zoom(forContentSize: content))
+        let snug = layout.contentSize(zoom: layout.zoom(fitting: content))
         return sender.frameRect(forContentRect: NSRect(origin: .zero, size: snug)).size
-    }
-
-    public func windowWillStartLiveResize(_ notification: Notification) {
-        canvas.endTextEntry(commit: true) // the entry is placed at one zoom
     }
 
     public func windowDidResize(_ notification: Notification) {
         guard let window else { return }
-        let zoom = zoom(forContentSize: window.contentRect(forFrameRect: window.frame).size)
-        guard zoom != canvas.zoom else { return }
-        canvas.endTextEntry(commit: true)
-        canvas.zoom = zoom
-        canvasHeight?.constant = CGFloat(canvas.document.height) * zoom + CanvasView.inset * 2
+        let zoom = layout.zoom(fitting: window.contentRect(forFrameRect: window.frame).size)
+        if zoom != canvas.zoom { show(zoom: zoom) }
     }
 
     /// The green button: the picture at its on-screen size, or as large as the screen allows.
     public func windowWillUseStandardFrame(_ window: NSWindow, defaultFrame: NSRect) -> NSRect {
         let room = window.contentRect(forFrameRect: defaultFrame).size
-        let content = contentSize(forZoom: zoom(forContentSize: room))
+        let content = layout.contentSize(zoom: layout.zoom(fitting: room))
         var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: content))
         frame.origin = NSPoint(x: defaultFrame.midX - frame.width / 2, y: defaultFrame.maxY - frame.height)
         return frame
     }
 
+    /// Closing a capture with annotations asks first, in a sheet; Discard closes it.
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // Words being typed count as annotations; a drag in progress is put back.
+        _ = canvas.cancelCurrent()
         if closing || canvas.document.isBlank { return true }
+        guard sender.attachedSheet == nil else { return false }
+        askToDiscard(sender) { [weak self] in self?.finish() }
+        return false
+    }
+
+    /// Asks whether to discard, calling back only for Discard. Tests answer it themselves: a
+    /// sheet on a window that is never shown can end the test process.
+    var askToDiscard: (NSWindow, @escaping () -> Void) -> Void = { window, discard in
         let alert = NSAlert()
         alert.messageText = "Discard this capture?"
         alert.informativeText = "It has annotations that were not copied or saved."
-        alert.addButton(withTitle: "Discard")
+        alert.addButton(withTitle: "Discard").hasDestructiveAction = true
         alert.addButton(withTitle: "Cancel")
-        return alert.runModal() == .alertFirstButtonReturn
+        alert.beginSheetModal(for: window) { if $0 == .alertFirstButtonReturn { discard() } }
     }
 
     public func windowWillClose(_ notification: Notification) {
-        onClose?()
+        let done = onClose
         onClose = nil
+        done?()
     }
 
+    /// Escape: whatever the canvas is in the middle of, else the editor, asking as Close does.
     public override func cancelOperation(_ sender: Any?) {
-        if !canvas.cancelCurrent() { close() }
-    }
-}
-
-/// The handle you drag to put the picture somewhere: a file promise the drop target reads.
-/// Resizes an editor in a window that is never shown and checks that the picture's zoom follows
-/// the window: down when it shrinks, keeping the picture's proportions, and never past its
-/// on-screen size.
-public enum ResizeCheck {
-    public static func run() -> Bool {
-        guard let ctx = CGContext(data: nil, width: 1600, height: 1000, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
-              let source = ctx.makeImage() else { return false }
-        let controller = EditorWindowController(document: Document(width: 1600, height: 1000, scale: 2), source: source)
-        guard let window = controller.window else { return false }
-        let natural = controller.canvas.zoom
-        guard natural == 0.5 else { fputs("opened at zoom \(natural), not the on-screen size\n", stderr); return false }
-
-        // A user drag to a content area of 1000 by 400: the height limits, the width floor holds.
-        let asked = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 1000, height: 400)).size
-        let snug = window.contentRect(forFrameRect: NSRect(origin: .zero, size: controller.windowWillResize(window, to: asked))).size
-        let zoom = (snug.height - controller.barHeight - CanvasView.inset * 2) / 1000
-        guard zoom < natural, snug.width == EditorWindowController.minimumWidth,
-              abs(snug.height - (controller.barHeight + 1000 * zoom + CanvasView.inset * 2)) < 1 else {
-            fputs("snug size \(snug) does not fit the picture at zoom \(zoom)\n", stderr); return false
-        }
-        window.setContentSize(snug)
-        guard abs(controller.canvas.zoom - zoom) < 0.001 else {
-            fputs("after shrinking, zoom is \(controller.canvas.zoom), not \(zoom)\n", stderr); return false
-        }
-        guard controller.canvas.pictureRect.width < 1600 * natural else { return false }
-
-        // Growing past the on-screen size stops there.
-        window.setContentSize(NSSize(width: 3000, height: 2000))
-        guard controller.canvas.zoom == natural else {
-            fputs("grew past the on-screen size to zoom \(controller.canvas.zoom)\n", stderr); return false
-        }
-        return true
+        if !canvas.cancelCurrent() { window?.performClose(nil) }
     }
 }
 
@@ -435,6 +397,7 @@ private final class PrintSheet: NSView {
     }
 }
 
+/// The handle you drag to put the picture somewhere: a PNG file the drop target reads.
 final class DragGrip: NSImageView {
     private weak var controller: EditorWindowController?
 
@@ -443,17 +406,28 @@ final class DragGrip: NSImageView {
         super.init(frame: .zero)
         image = NSImage(systemSymbolName: "hand.draw", accessibilityDescription: "Drag out")
         toolTip = "Drag the picture into another app"
+        setAccessibilityRole(.button)
+        setAccessibilityLabel("Drag the picture into another app")
         widthAnchor.constraint(equalToConstant: 28).isActive = true
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
+    // The drag starts from the first press even while another app is in front, which is when a
+    // drag into it is wanted, without bringing the editor forward.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func shouldDelayWindowOrdering(for event: NSEvent) -> Bool { true }
+
     override func mouseDragged(with event: NSEvent) {
-        guard let controller, let file = try? Export.temporaryFile(controller.canvas.document, source: controller.canvas.source) else { return }
+        guard let controller else { return }
+        controller.canvas.endTextEntry(commit: true) // the words being typed go with the picture
+        guard let file = try? Export.temporaryFile(controller.canvas.document, source: controller.canvas.source) else { return }
         let item = NSDraggingItem(pasteboardWriter: file as NSURL)
-        let preview = NSImage(cgImage: controller.canvas.source, size: NSSize(width: 160, height: 160 * CGFloat(controller.canvas.document.height) / CGFloat(controller.canvas.document.width)))
-        item.setDraggingFrame(NSRect(origin: convert(event.locationInWindow, from: nil), size: preview.size), contents: preview)
+        // The picture as it will land, annotations and crop included, read back from the file.
+        let picture = NSImage(contentsOf: file) ?? NSImage(cgImage: controller.canvas.source, size: .zero)
+        let preview = NSSize(width: 160, height: 160 * picture.size.height / max(picture.size.width, 1))
+        item.setDraggingFrame(NSRect(origin: convert(event.locationInWindow, from: nil), size: preview), contents: picture)
         let session = beginDraggingSession(with: [item], event: event, source: self)
         session.animatesToStartingPositionsOnCancelOrFail = true
     }

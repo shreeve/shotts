@@ -32,6 +32,7 @@ public enum SelectionRule {
         return scaled.integral.intersection(pixelBounds)
     }
 
-    /// A selection this small is a click, not an area.
-    public static func isUsable(_ rect: CGRect) -> Bool { rect.width >= 4 && rect.height >= 4 }
+    /// A selection under `minimum` either way is a click, not an area. The picker measures in
+    /// points; the crop tool passes four points' worth of picture pixels.
+    public static func isUsable(_ rect: CGRect, minimum: Double = 4) -> Bool { rect.width >= minimum && rect.height >= minimum }
 }

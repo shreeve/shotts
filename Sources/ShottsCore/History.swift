@@ -2,7 +2,7 @@ import Foundation
 
 /// Undo and redo over whole documents. A `Document` is a few dozen values, so keeping every
 /// state is cheap and every edit is one `push`.
-public struct History<State: Equatable>: Equatable {
+public struct History<State: Equatable> {
     public private(set) var current: State
     private var past: [State] = []
     private var future: [State] = []
@@ -23,10 +23,19 @@ public struct History<State: Equatable>: Equatable {
         current = state
     }
 
-    /// Replaces the present without recording a step: a drag shows its progress this way and
-    /// records one step when it ends.
+    /// Replaces the present without recording a step: a drag or text entry shows its progress
+    /// this way, then ends with `record(since:)` or goes back with `replaceCurrent(base)`.
     public mutating func replaceCurrent(_ state: State) {
         current = state
+    }
+
+    /// Ends a change made in place: one step from `base`, the state when the change began, to
+    /// the present, or no step at all if they are equal. However many times the present was
+    /// replaced along the way, undo goes straight back to `base`.
+    public mutating func record(since base: State) {
+        let now = current
+        current = base
+        push(now)
     }
 
     @discardableResult

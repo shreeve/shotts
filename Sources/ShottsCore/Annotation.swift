@@ -1,12 +1,13 @@
 import CoreGraphics
 import Foundation
 
-/// One mark on a capture. Every coordinate is in image pixels with the origin at the top-left,
-/// the same space as the capture's bitmap.
+/// How the lines of a text sit in its box.
 public enum TextAlignment: Equatable, Sendable {
     case left, center, right
 }
 
+/// One mark on a capture. Every coordinate is in image pixels with the origin at the top-left,
+/// the same space as the capture's bitmap.
 public struct Annotation: Identifiable, Equatable, Sendable {
     public enum Shape: Equatable, Sendable {
         case arrow(from: CGPoint, to: CGPoint)
@@ -57,8 +58,7 @@ public struct Annotation: Identifiable, Equatable, Sendable {
     public var bounds: CGRect {
         switch shape {
         case let .arrow(from, to):
-            return CGRect(x: min(from.x, to.x), y: min(from.y, to.y),
-                          width: abs(to.x - from.x), height: abs(to.y - from.y))
+            return Self.bounds(of: [from, to])
         case let .rectangle(rect, _), let .ellipse(rect, _), let .obscure(rect):
             return rect.standardized
         case let .text(origin, _, size, _):
@@ -66,7 +66,7 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         case let .pen(points), let .highlighter(points):
             return Self.bounds(of: points)
         case let .callout(from, to, text):
-            let arrow = CGRect(x: min(from.x, to.x), y: min(from.y, to.y), width: abs(to.x - from.x), height: abs(to.y - from.y))
+            let arrow = Self.bounds(of: [from, to])
             return text.string.isEmpty ? arrow : arrow.union(text.frame)
         }
     }
@@ -96,23 +96,45 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         return copy
     }
 
-    /// Whether the shape has any extent worth keeping: a click without a drag makes nothing.
-    public var isDegenerate: Bool {
+    /// Whether the shape has nothing worth keeping: a click without a drag, words that are only
+    /// spaces, or a shape drawn wholly outside the picture, where it would never show or export.
+    public func isDegenerate(in picture: CGRect) -> Bool {
+        guard bounds.insetBy(dx: -1, dy: -1).intersects(picture) else { return true }
         switch shape {
-        case let .arrow(from, to):
+        case let .arrow(from, to), let .callout(from, to, _):
             return from.distance(to: to) < 3
         case let .rectangle(rect, _), let .ellipse(rect, _), let .obscure(rect):
-            return rect.width < 3 || rect.height < 3
+            return abs(rect.width) < 3 || abs(rect.height) < 3
         case let .text(_, string, _, _):
-            return string.isEmpty
+            return string.allSatisfy(\.isWhitespace)
         case let .pen(points), let .highlighter(points):
             return points.count < 2
-        case let .callout(from, to, _):
-            return from.distance(to: to) < 3
         }
     }
 
-    static func bounds(of points: [CGPoint]) -> CGRect {
+    /// The annotation as a drag of `delta` on one of its parts leaves it. An arrow's or callout's
+    /// tail end, or a callout's words, move the tail and its head moves the tip, the other end
+    /// staying put; the shaft, or anything else, moves the whole. A callout whose tail or tip moved
+    /// needs its words laid out again, which takes the UI's text measuring.
+    public func dragged(_ part: HitTest.ArrowPart?, by delta: CGPoint) -> Annotation {
+        var copy = self
+        switch (shape, part) {
+        case let (.arrow(from, to), .tail?):
+            copy.shape = .arrow(from: from + delta, to: to)
+        case let (.arrow(from, to), .head?):
+            copy.shape = .arrow(from: from, to: to + delta)
+        case let (.callout(from, to, text), .tail?), let (.callout(from, to, text), .text?):
+            copy.shape = .callout(from: from + delta, to: to, text: text)
+        case let (.callout(from, to, text), .head?):
+            copy.shape = .callout(from: from, to: to + delta, text: text)
+        default:
+            return translated(by: delta)
+        }
+        return copy
+    }
+
+    /// The smallest rectangle holding every point.
+    public static func bounds(of points: [CGPoint]) -> CGRect {
         guard let first = points.first else { return .zero }
         var minX = first.x, minY = first.y, maxX = first.x, maxY = first.y
         for p in points.dropFirst() {

@@ -18,10 +18,9 @@
 
 Shotts lives in the menu bar and does one thing well. Press F10 and the screen freezes under a
 crosshair with a magnifier. Drag out the area you want, or click a window to capture just that
-window, shadow and all. The capture opens in a small editor with arrows, callouts, text, shapes,
-a pen, a highlighter, and a blur for things that should not leave your Mac. Copy it, save it,
-print it, or drag it into another app, and Shotts gets out of the way and returns you to where
-you were.
+window. The capture opens in a small editor with arrows, callouts, text, shapes, a pen, a
+highlighter, and pixelation for things that should not leave your Mac. Copy it, save it, or drag
+it into another app, and Shotts gets out of the way and returns you to where you were.
 
 The annotations are made to look good on a busy screenshot: rounded strokes, tapered arrows,
 bold text with a contrasting outline, restrained shadows. The app is small, keeps its memory in
@@ -45,10 +44,10 @@ and drop `Shotts.app` into Applications.
 
 | Step | What happens |
 | --- | --- |
-| **Press F10** | Every display is pictured as it is at that moment. A crosshair follows the pointer, with a magnifier that shows the pixels under it, their color in hex, and the selection's size. Command-C copies the color. |
-| **Select** | Drag an area (Shift for a square, Space to move it), or click a window, outlined as the crosshair passes over it, to capture only that window with the shadow macOS draws around it. Escape cancels. |
+| **Press F10** (fn-F10 on most Mac keyboards) | Every display is pictured as it is at that moment. A crosshair follows the pointer, with a magnifier that shows the pixels under it, their color in hex, and the selection's size. Command-C copies the color. |
+| **Select** | Drag an area (Shift for a square, Space to move it), or click a window, outlined as the crosshair passes over it, to capture only that window, with the shadow macOS draws around it if you turn that on. Escape cancels. |
 | **Annotate** | Arrow with text, arrow, text, rectangle, ellipse, pen, highlighter, obscure, and crop, each on a single key. Undo and redo. A color and style popover remembers your choices. |
-| **Copy, save, print, drag** | Command-C puts the picture on the clipboard, Command-S saves a PNG, Command-P prints it to fit one page, and the hand icon drags a file into any app. |
+| **Copy, save, print, drag** | Command-C puts the picture on the clipboard, Command-S saves a PNG, Command-P prints it to fit one page, and the hand icon drags a file into any app. Pictures keep the capture's resolution, so a Retina capture pastes at its on-screen size. |
 
 The arrow with text is one object: draw the arrow, type beside its tail, and the words lay
 themselves out on the side away from the tip. Move the arrow and the words come along; move the
@@ -60,13 +59,17 @@ window shadow, dim outside the selection, show the magnifier, show the hints.
 ## Building
 
 ```bash
-swift build          # no warnings
-swift test
+swift build          # warnings are errors
+swift test           # Core, then AppKit in windows that are never shown
 open "$(Scripts/package-app.sh)"
 ```
 
-Every local build is signed with the same Developer ID as releases, so the Screen Recording
-grant survives rebuilds.
+`Scripts/package-app.sh` builds `Shotts.app` (debug unless `CONFIG=release`) and signs it with the
+same Developer ID as releases: macOS ties the Screen Recording grant to the code signature, so a
+stable signature keeps one grant across rebuilds. Without that certificate, `SIGN=-` signs ad hoc
+(macOS then asks for Screen Recording again after each build), or `SIGN="<your identity>"` uses
+your own. Debug builds also take developer switches for checking things by eye; `HANDOFF.md`
+lists them.
 
 ## Documents
 

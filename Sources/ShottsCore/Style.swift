@@ -1,8 +1,9 @@
+import CoreGraphics
 import Foundation
 
 /// A color as four components in 0...1. Core keeps no AppKit, so colors are plain values here
 /// and become `NSColor`/`CGColor` only in the renderer.
-public struct RGBA: Hashable, Sendable, Codable {
+public struct RGBA: Equatable, Sendable, Codable {
     public var red: Double
     public var green: Double
     public var blue: Double
@@ -46,7 +47,8 @@ public struct RGBA: Hashable, Sendable, Codable {
     public var isLight: Bool { 0.299 * red + 0.587 * green + 0.114 * blue > 0.6 }
 }
 
-/// The typeface text annotations use, from the fonts every Mac has. Bold in each case.
+/// The typeface text annotations use: the fonts every Mac has, and Open Sans, which the app
+/// bundles. Bold in each case.
 public enum FontChoice: String, CaseIterable, Sendable, Codable {
     /// The system font's rounded design: friendly, a little soft, like Droid Sans Bold.
     case rounded
@@ -54,12 +56,16 @@ public enum FontChoice: String, CaseIterable, Sendable, Codable {
     case system
     /// Trebuchet MS: humanist, the closest of the built-in fonts to Droid Sans.
     case trebuchet
+    /// Open Sans: Droid Sans redrawn by its own designer. It ships inside the app under the SIL
+    /// Open Font License (`Support/Fonts`).
+    case openSans
 
     public var title: String {
         switch self {
         case .rounded: "Rounded"
         case .system: "System"
         case .trebuchet: "Trebuchet"
+        case .openSans: "Open Sans"
         }
     }
 }
@@ -67,7 +73,7 @@ public enum FontChoice: String, CaseIterable, Sendable, Codable {
 /// How an annotation is drawn. Lengths are in points, independent of the capture's backing
 /// scale; the renderer multiplies by `Document.scale` so a 4-point stroke is 8 pixels on a
 /// Retina capture and looks the same size as it would on screen.
-public struct Style: Hashable, Sendable, Codable {
+public struct Style: Equatable, Sendable, Codable {
     public var color: RGBA
     public var strokeWidth: Double
     public var fontSize: Double
@@ -89,20 +95,50 @@ public struct Style: Hashable, Sendable, Codable {
 
     enum CodingKeys: String, CodingKey { case color, strokeWidth, fontSize, font, shadow, outline, taperedArrows }
 
-    /// Settings saved by an older build decode with today's defaults for what they lack.
+    /// Settings saved by another build decode with today's defaults for whatever is missing or
+    /// unknown (a font this build does not have), keeping the rest.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        color = try c.decodeIfPresent(RGBA.self, forKey: .color) ?? .red
-        strokeWidth = try c.decodeIfPresent(Double.self, forKey: .strokeWidth) ?? 4
-        fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? 28
-        font = try c.decodeIfPresent(FontChoice.self, forKey: .font) ?? .rounded
-        shadow = try c.decodeIfPresent(Bool.self, forKey: .shadow) ?? true
-        outline = try c.decodeIfPresent(Bool.self, forKey: .outline) ?? true
-        taperedArrows = try c.decodeIfPresent(Bool.self, forKey: .taperedArrows) ?? true
+        let d = Style.standard
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T { ((try? c.decodeIfPresent(T.self, forKey: key)) ?? nil) ?? fallback }
+        color = value(.color, d.color)
+        strokeWidth = value(.strokeWidth, d.strokeWidth)
+        fontSize = value(.fontSize, d.fontSize)
+        font = value(.font, d.font)
+        shadow = value(.shadow, d.shadow)
+        outline = value(.outline, d.outline)
+        taperedArrows = value(.taperedArrows, d.taperedArrows)
+    }
+
+    /// This style with whatever changed between `old` and `new` applied, and nothing else: picking
+    /// a color for a selected arrow recolors it without also resizing it to the bar's width.
+    public func applying(from old: Style, to new: Style) -> Style {
+        var s = self
+        if old.color != new.color { s.color = new.color }
+        if old.strokeWidth != new.strokeWidth { s.strokeWidth = new.strokeWidth }
+        if old.fontSize != new.fontSize { s.fontSize = new.fontSize }
+        if old.font != new.font { s.font = new.font }
+        if old.shadow != new.shadow { s.shadow = new.shadow }
+        if old.outline != new.outline { s.outline = new.outline }
+        if old.taperedArrows != new.taperedArrows { s.taperedArrows = new.taperedArrows }
+        return s
     }
 
     public static let standard = Style(color: .red, strokeWidth: 4, fontSize: 28)
 
     public static let strokeWidths: [Double] = [2, 4, 6, 10]
     public static let fontSizes: [Double] = [18, 24, 28, 36, 48]
+}
+
+/// Lengths in pixels at a capture's scale: the one place `Style`'s points become pixels, used by
+/// the renderer to draw and by hit testing to find what was drawn.
+extension Style {
+    public func stroke(scale: Double) -> Double { strokeWidth * scale }
+
+    /// A highlighter is three strokes wide, and never under 12 points.
+    public func highlighterWidth(scale: Double) -> Double { max(strokeWidth * 3, 12) * scale }
+
+    public func arrow(from: CGPoint, to: CGPoint, scale: Double) -> ArrowGeometry {
+        ArrowGeometry(from: from, to: to, width: stroke(scale: scale), tapered: taperedArrows)
+    }
 }

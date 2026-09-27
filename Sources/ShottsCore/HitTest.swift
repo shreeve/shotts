@@ -1,74 +1,85 @@
 import CoreGraphics
 import Foundation
 
-/// Which annotation a point lands on, topmost first. Strokes count within `tolerance` pixels
-/// of the line; filled kinds (text, obscure) count anywhere inside.
+/// Which annotation a point lands on, topmost first. Strokes count within `tolerance` pixels of
+/// the ink the renderer draws; solid kinds (text, obscure, filled rectangles and ellipses) count
+/// anywhere inside. Stroke widths come from `Style`'s pixel metrics at the document's scale, the
+/// same numbers the renderer uses.
 public enum HitTest {
     public static func annotation(at point: CGPoint, in document: Document, tolerance: Double) -> Annotation.ID? {
-        for annotation in document.annotations.reversed() where hits(point, annotation, tolerance: tolerance) {
-            return annotation.id
-        }
-        return nil
+        document.annotations.last { hits(point, $0, scale: document.scale, tolerance: tolerance) }?.id
     }
 
-    static func hits(_ p: CGPoint, _ a: Annotation, tolerance: Double) -> Bool {
-        let reach = tolerance + a.style.strokeWidth / 2
+    static func hits(_ p: CGPoint, _ a: Annotation, scale: Double, tolerance: Double) -> Bool {
+        let width = a.style.stroke(scale: scale)
+        let reach = tolerance + width / 2
         switch a.shape {
-        case let .arrow(from, to):
-            return distance(from: p, toSegment: from, to) <= reach
-                || ArrowGeometry(from: from, to: to, width: a.style.strokeWidth, tapered: a.style.taperedArrows).outline.contains(p)
+        case .arrow, .callout:
+            return arrowPart(at: p, of: a, scale: scale, tolerance: tolerance) != nil
         case let .rectangle(rect, filled):
-            // A stroked shape is hit on its line; a solid one anywhere inside.
+            // The stroke is drawn inside the rectangle, centered half a width in.
             let r = rect.standardized
-            return r.insetBy(dx: -reach, dy: -reach).contains(p) && (filled || !r.insetBy(dx: reach, dy: reach).contains(p))
+            let line = r.insetBy(dx: min(width / 2, r.width / 2), dy: min(width / 2, r.height / 2))
+            return line.insetBy(dx: -reach, dy: -reach).contains(p) && (filled || !line.insetBy(dx: reach, dy: reach).contains(p))
         case let .ellipse(rect, filled):
             let r = rect.standardized
-            guard r.width > 0, r.height > 0 else { return false }
-            let nx = (p.x - r.midX) / (r.width / 2)
-            let ny = (p.y - r.midY) / (r.height / 2)
-            let d = sqrt(nx * nx + ny * ny) // 1 on the ellipse
-            let band = reach / min(r.width, r.height) * 2
-            return filled ? d <= 1 + band : abs(d - 1) <= band
+            let line = r.insetBy(dx: min(width / 2, r.width / 2), dy: min(width / 2, r.height / 2))
+            guard line.width > 0, line.height > 0 else { return line.insetBy(dx: -reach, dy: -reach).contains(p) }
+            // Distance to the ellipse to first order: its implicit function over its gradient.
+            let a = line.width / 2, b = line.height / 2
+            let nx = (p.x - line.midX) / a, ny = (p.y - line.midY) / b
+            let f = nx * nx + ny * ny - 1
+            let gradient = 2 * hypot(nx / a, ny / b)
+            return (filled && f <= 0) || (gradient > 0 ? abs(f) / gradient <= reach : false)
         case .text, .obscure:
             return a.bounds.insetBy(dx: -tolerance, dy: -tolerance).contains(p)
-        case let .pen(points), let .highlighter(points):
-            if points.count == 1 { return points[0].distance(to: p) <= reach }
-            for i in 1..<points.count where distance(from: p, toSegment: points[i - 1], points[i]) <= reach {
-                return true
-            }
-            return false
-        case .callout:
-            return calloutPart(at: p, of: a, tolerance: tolerance) != nil
+        case let .pen(points):
+            return near(p, points, within: reach)
+        case let .highlighter(points):
+            return near(p, points, within: tolerance + a.style.highlighterWidth(scale: scale) / 2)
         }
     }
 
-    public enum CalloutPart: Equatable, Sendable {
-        /// The shaft: dragging it moves the whole callout.
-        case arrow
-        /// The words: dragging them moves the tail, the tip staying put.
+    /// The parts of an arrow or callout, each dragged differently (`Annotation.dragged`).
+    public enum ArrowPart: Equatable, Sendable {
+        /// The shaft: dragging it moves the whole.
+        case shaft
+        /// A callout's words: dragging them moves the tail, the tip staying put.
         case text
-        /// The head: dragging it moves the tip, the tail and words staying put.
+        /// The head: dragging it moves the tip, the tail staying put.
         case head
         /// The tail's end: dragging it moves the tail, the tip staying put.
         case tail
     }
 
-    /// Which part of a callout a point lands on: its words, the tail's end, its head, else its arrow.
-    public static func calloutPart(at p: CGPoint, of a: Annotation, tolerance: Double) -> CalloutPart? {
-        guard case let .callout(from, to, text) = a.shape else { return nil }
-        if !text.string.isEmpty, text.frame.insetBy(dx: -tolerance, dy: -tolerance).contains(p) { return .text }
-        // The end of the tail is a grip of its own, the size of the dot that marks it when selected.
-        if p.distance(to: from) <= max(a.style.strokeWidth * 2, tolerance * 3) { return .tail }
-        let geometry = ArrowGeometry(from: from, to: to, width: a.style.strokeWidth, tapered: a.style.taperedArrows)
-        let headLength = max(a.style.strokeWidth * 6, 18)
-        if p.distance(to: to) <= headLength + tolerance, geometry.outline.contains(p) || p.distance(to: to) <= tolerance + headLength / 2 {
-            return .head
+    /// Which part of an arrow or callout a point lands on: a callout's words, the tail's end, the
+    /// head, else the shaft. The tail's grip and the head each take at most a third of the arrow,
+    /// so even a short one keeps a shaft to move it by.
+    public static func arrowPart(at p: CGPoint, of a: Annotation, scale: Double, tolerance: Double) -> ArrowPart? {
+        let from: CGPoint, to: CGPoint
+        switch a.shape {
+        case let .arrow(f, t):
+            (from, to) = (f, t)
+        case let .callout(f, t, text):
+            if !text.string.isEmpty, text.frame.insetBy(dx: -tolerance, dy: -tolerance).contains(p) { return .text }
+            (from, to) = (f, t)
+        default:
+            return nil
         }
-        let reach = tolerance + a.style.strokeWidth / 2
-        if distance(from: p, toSegment: from, to) <= reach || geometry.outline.contains(p) {
-            return .arrow
-        }
-        return nil
+        let width = a.style.stroke(scale: scale)
+        let geometry = a.style.arrow(from: from, to: to, scale: scale)
+        let third = from.distance(to: to) / 3
+        // The tail's end is a round grip, drawn as a dot when selected.
+        if p.distance(to: from) <= min(max(width * 2, tolerance * 3), max(third, tolerance)) { return .tail }
+        guard distance(from: p, toSegment: from, to) <= tolerance + width / 2 || geometry.contains(p) else { return nil }
+        if p.distance(to: to) <= min(geometry.headLength + tolerance, max(third, tolerance)) { return .head }
+        return .shaft
+    }
+
+    static func near(_ p: CGPoint, _ points: [CGPoint], within reach: Double) -> Bool {
+        guard let first = points.first else { return false }
+        if points.count == 1 { return first.distance(to: p) <= reach }
+        return zip(points, points.dropFirst()).contains { distance(from: p, toSegment: $0, $1) <= reach }
     }
 
     static func distance(from p: CGPoint, toSegment a: CGPoint, _ b: CGPoint) -> Double {
@@ -77,22 +88,5 @@ public enum HitTest {
         guard len2 > 0 else { return p.distance(to: a) }
         let t = max(0, min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2))
         return p.distance(to: CGPoint(x: a.x + t * dx, y: a.y + t * dy))
-    }
-}
-
-extension Array where Element == CGPoint {
-    /// Whether a point is inside this polygon (even-odd).
-    func contains(_ p: CGPoint) -> Bool {
-        guard count >= 3 else { return false }
-        var inside = false
-        var j = count - 1
-        for i in 0..<count {
-            let a = self[i], b = self[j]
-            if (a.y > p.y) != (b.y > p.y), p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x {
-                inside.toggle()
-            }
-            j = i
-        }
-        return inside
     }
 }

@@ -53,6 +53,9 @@ public enum Tool: Int, CaseIterable, Sendable {
 /// The picture being edited, drawn by `Renderer`, with the mouse turning into annotations.
 /// The view's coordinates are image pixels times `zoom`, flipped, so converting a mouse point
 /// to the image is one division.
+///
+/// A change made in place (a drag, or typing) keeps `base`, the document as it was when the
+/// change began: the change ends as one undo step against it, or Escape puts it back.
 public final class CanvasView: NSView {
     public private(set) var history: History<Document>
     public let source: CGImage
@@ -61,38 +64,30 @@ public final class CanvasView: NSView {
         didSet {
             guard zoom != oldValue else { return }
             needsDisplay = true
-            invalidateIntrinsicContentSize()
             window?.invalidateCursorRects(for: self)
         }
     }
-    public var tool: Tool = .callout { didSet { endTextEntry(commit: true); selectedID = nil; needsDisplay = true; resetCursorRects(); onToolChange?(tool) } }
+    public var tool: Tool = .callout { didSet { endTextEntry(commit: true); selectedID = nil; needsDisplay = true; onToolChange?(tool) } }
     public var onToolChange: ((Tool) -> Void)?
-    public var style: Style = .standard {
-        didSet {
-            // Restyle the selected annotation, so picking a color recolors what is selected.
-            if let id = selectedID, var a = document.annotation(id) {
-                a.style = style
-                var d = document
-                d.replace(a)
-                commit(d)
-            }
-        }
-    }
+    /// The style new annotations get. Changing it restyles the text being typed, or else the
+    /// selected annotation, in whatever changed and nothing else.
+    public var style: Style = .standard { didSet { restyle(from: oldValue) } }
     public var onChange: (() -> Void)?
 
     public var document: Document { history.current }
     public private(set) var selectedID: Annotation.ID?
 
+    private var base: Document?
     private var live: Annotation?          // the shape being dragged out
     private var liveCrop: CGRect?
     private var dragAnchor: CGPoint?
     private var dragOriginal: Annotation?
-    /// For a callout being dragged with the select tool: which part was grabbed.
-    private var dragPart: HitTest.CalloutPart?
-    /// The tool the drag in progress behaves as: the current tool, or select when an arrow tool
-    /// clicked an existing arrow.
+    /// For an arrow or callout being dragged with the select tool: which part was grabbed.
+    private var dragPart: HitTest.ArrowPart?
+    /// The tool the drag in progress behaves as: the current tool, or select when a tool clicked
+    /// something it edits rather than draws over.
     private var dragTool: Tool = .select
-    fileprivate(set) var textField: TextEntry?
+    private(set) var textField: TextEntry?
 
     /// The dark field around the picture, and the room its shadow needs.
     public static let inset: CGFloat = 28
@@ -106,6 +101,8 @@ public final class CanvasView: NSView {
         super.init(frame: CGRect(x: 0, y: 0, width: CGFloat(document.width) * zoom + Self.inset * 2,
                                  height: CGFloat(document.height) * zoom + Self.inset * 2))
         wantsLayer = true
+        setAccessibilityRole(.image)
+        setAccessibilityLabel("Capture")
     }
 
     /// Where the picture sits in the view, in points: centered, on the field.
@@ -119,7 +116,6 @@ public final class CanvasView: NSView {
 
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { true }
-    public override var intrinsicContentSize: NSSize { frame.size }
 
     public override func resetCursorRects() {
         // The ordinary pointer for every tool: the crosshair belongs to the picker, not the editor.
@@ -140,36 +136,63 @@ public final class CanvasView: NSView {
         onChange?()
     }
 
+    /// Ends the change in progress as one undo step.
+    private func endChange() {
+        if let base { history.record(since: base) }
+        base = nil
+        needsDisplay = true
+        onChange?()
+    }
+
+    /// While typing, undo and redo work on the words; otherwise on the document. Never mid-drag.
     @objc public func undo(_ sender: Any?) {
+        guard dragAnchor == nil else { return }
+        if let words = textField?.undoManager, words.canUndo { words.undo(); return }
         endTextEntry(commit: true)
-        history.undo(); selectedID = nil; needsDisplay = true; onChange?()
+        if history.undo() != nil { selectedID = nil; needsDisplay = true; onChange?() }
     }
 
     @objc public func redo(_ sender: Any?) {
+        guard dragAnchor == nil else { return }
+        if let words = textField?.undoManager, words.canRedo { words.redo(); return }
         endTextEntry(commit: true)
-        history.redo(); selectedID = nil; needsDisplay = true; onChange?()
+        if history.redo() != nil { selectedID = nil; needsDisplay = true; onChange?() }
     }
 
+    /// There is nothing to select all of; this keeps Command-A from beeping.
+    public override func selectAll(_ sender: Any?) {}
+
     @objc public func delete(_ sender: Any?) {
-        guard let id = selectedID else { return }
+        guard let id = selectedID, dragAnchor == nil else { return }
         var d = document
         d.remove(id)
         selectedID = nil
         commit(d)
     }
 
-    public override func selectAll(_ sender: Any?) {}
 
-    /// Escape: an entry or drag in progress, then the selection.
+    /// Escape: typing, then a drag in progress, then the selection. False when there was
+    /// nothing to cancel.
     public func cancelCurrent() -> Bool {
-        if textField != nil { endTextEntry(commit: true); return true }
-        if live != nil || liveCrop != nil { live = nil; liveCrop = nil; dragAnchor = nil; needsDisplay = true; return true }
-        if selectedID != nil { selectedID = nil; needsDisplay = true; return true }
-        return false
+        if textField != nil {
+            endTextEntry(commit: true)
+        } else if dragAnchor != nil {
+            // A move is put back; a shape being drawn is dropped.
+            if let base, dragOriginal != nil { history.replaceCurrent(base) }
+            base = nil
+            dragAnchor = nil; dragOriginal = nil; dragPart = nil; live = nil; liveCrop = nil
+        } else if selectedID != nil {
+            selectedID = nil
+        } else {
+            return false
+        }
+        needsDisplay = true
+        onChange?()
+        return true
     }
 
-    /// One unmodified key picks a tool, as in most annotation editors: V select, A arrow,
-    /// T text, R rectangle, E ellipse, P pen, H highlighter, O obscure, C crop.
+    /// One unmodified key picks a tool, as in most annotation editors: V select, N arrow with
+    /// text, A arrow, T text, R rectangle, E ellipse, P pen, H highlighter, O obscure, C crop.
     public override func keyDown(with event: NSEvent) {
         guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
               let key = event.charactersIgnoringModifiers?.lowercased(),
@@ -203,34 +226,46 @@ public final class CanvasView: NSView {
     public override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         endTextEntry(commit: true)
+        // A drag whose mouse-up never came (a close asked mid-drag, say) is put back, not
+        // carried into this one.
+        if dragAnchor != nil { _ = cancelCurrent() }
         let p = imagePoint(event)
+        let hit = HitTest.annotation(at: p, in: document, tolerance: hitTolerance).flatMap(document.annotation)
         dragAnchor = p
         dragTool = tool
-        if tool == .callout || tool == .arrow,
-           let id = HitTest.annotation(at: p, in: document, tolerance: hitTolerance), let a = document.annotation(id), a.isArrowOrCallout {
-            // Clicking an arrow or callout with those tools selects it as the select tool
-            // would, so what was just drawn can be moved or reshaped without changing tools.
+        switch (tool, hit?.shape) {
+        case (.callout, .arrow?), (.callout, .callout?), (.arrow, .arrow?), (.arrow, .callout?):
+            // The arrow tools select an arrow or callout as the select tool would, so what was
+            // just drawn can be moved or reshaped without changing tools.
             dragTool = .select
-        } else if tool != .select {
-            selectedID = nil
+        case (.text, .text?):
+            // The text tool edits the text it clicks rather than typing over it.
+            selectedID = hit?.id
+            editText(hit!.id)
+            dragAnchor = nil
+            return
+        default:
+            if tool != .select { selectedID = nil }
         }
         switch dragTool {
         case .select:
-            selectedID = HitTest.annotation(at: p, in: document, tolerance: hitTolerance)
-            dragOriginal = selectedID.flatMap { document.annotation($0) }
-            dragPart = dragOriginal.flatMap { HitTest.calloutPart(at: p, of: $0, tolerance: hitTolerance) }
-            if event.clickCount == 2, let a = dragOriginal {
-                if case let .text(origin, string, _, _) = a.shape {
-                    var d = document
-                    d.remove(a.id)
-                    commit(d)
-                    beginTextEntry(at: origin, initial: string, style: a.style)
-                } else if case let .callout(from, to, text) = a.shape, dragPart == .text {
-                    editCalloutText(a.id, from: from, to: to, initial: text.string, style: a.style)
-                }
+            selectedID = hit?.id
+            guard let hit else { break }
+            dragPart = HitTest.arrowPart(at: p, of: hit, scale: document.scale, tolerance: hitTolerance)
+            if event.clickCount == 2, hit.isText || dragPart == .text {
+                // Double-click edits words; the rest of the click is not a drag.
+                editText(hit.id)
+                dragAnchor = nil
+                dragPart = nil
+            } else {
+                dragOriginal = hit
+                base = document
             }
         case .text:
-            beginTextEntry(at: p, initial: "", style: style)
+            // Words start on the picture, even for a click in the field around it.
+            let inside = CGPoint(x: min(max(p.x, 0), Double(document.width - 1)), y: min(max(p.y, 0), Double(document.height - 1)))
+            beginTextEntry(at: inside, initial: "", style: style)
+            dragAnchor = nil
         case .arrow, .callout:
             live = Annotation(shape: .arrow(from: p, to: p), style: style)
         case .rectangle:
@@ -250,8 +285,9 @@ public final class CanvasView: NSView {
     }
 
     public override func mouseDragged(with event: NSEvent) {
-        let p = imagePoint(event)
         guard let anchor = dragAnchor else { return }
+        let p = imagePoint(event)
+        let before = dragExtent
         let shift = event.modifierFlags.contains(.shift)
         // Option while drawing makes a rectangle or ellipse solid; either key may change mid-drag.
         let filled = event.modifierFlags.contains(.option)
@@ -260,7 +296,7 @@ public final class CanvasView: NSView {
             if let original = dragOriginal {
                 var d = document
                 d.replace(dragged(original, by: p - anchor))
-                history = History(history: history, replacingCurrent: d)
+                history.replaceCurrent(d)
             }
         case .arrow, .callout:
             live?.shape = .arrow(from: anchor, to: p)
@@ -279,41 +315,49 @@ public final class CanvasView: NSView {
         case .text:
             break
         }
-        needsDisplay = true
+        // Only what the drag touched is drawn again: on a big capture a whole redraw is many
+        // times the cost.
+        if let before, let after = dragExtent {
+            setNeedsDisplay(before.union(after))
+        } else {
+            needsDisplay = true
+        }
+    }
+
+    /// The part of the view a drag in progress can change: the shape being drawn or moved, its
+    /// shadow, and its selection marks. Nil when the whole view changes (a crop dims everything
+    /// outside it).
+    private var dragExtent: CGRect? {
+        guard liveCrop == nil, let a = live ?? dragOriginal.flatMap({ document.annotation($0.id) }) else { return nil }
+        return viewRect(Renderer.extent(of: a, scale: document.scale)).insetBy(dx: -12, dy: -12)
     }
 
     public override func mouseUp(with event: NSEvent) {
+        guard dragAnchor != nil else { return }
         defer { dragAnchor = nil; dragOriginal = nil; dragPart = nil; live = nil; liveCrop = nil; needsDisplay = true }
         switch dragTool {
         case .select:
-            // The drag edited the current state in place; make it an undo step against the
-            // state before the drag.
-            if let original = dragOriginal, let moved = document.annotation(original.id), moved != original {
-                var before = document
-                before.replace(original)
-                history = History(history: history, replacingCurrent: before)
-                var after = before
-                after.replace(moved)
-                commit(after)
-            }
+            // The drag edited the document in place; it becomes one undo step, or none.
+            if dragOriginal != nil { endChange() }
         case .crop:
-            if let rect = liveCrop, SelectionRule.isUsable(rect) {
-                var d = document
-                d.setCrop(rect)
-                commit(d)
-            }
+            // A click, or a drag too small to be one, clears the crop.
+            var d = document
+            if let rect = liveCrop, SelectionRule.isUsable(rect, minimum: 4 / zoom) { d.setCrop(rect) } else { d.setCrop(nil) }
+            commit(d)
         case .callout:
-            // The arrow lands as a callout with no words yet, and typing starts at its tail.
-            if let live, !live.isDegenerate, case let .arrow(tail, tip) = live.shape {
-                let layout = calloutLayout(tail: tail, tip: tip, style: live.style)
-                let callout = Annotation(shape: .callout(from: tail, to: tip, text: Annotation.TextBox(origin: layout.origin, string: "", size: .zero, alignment: layout.alignment)), style: live.style)
+            // The arrow lands as a callout with no words yet, and typing starts at its tail. The
+            // arrow and its words are one undo step.
+            if let live, !live.isDegenerate(in: document.pixelBounds), case let .arrow(tail, tip) = live.shape {
+                base = document
                 var d = document
+                let callout = relaid(Annotation(shape: .callout(from: tail, to: tip, text: Annotation.TextBox(origin: tail, string: "", size: .zero, alignment: .left)),
+                                                style: live.style), from: tail, to: tip, string: "")
                 d.add(callout)
-                commit(d)
-                editCalloutText(callout.id, from: tail, to: tip, initial: "", style: live.style)
+                history.replaceCurrent(d)
+                editText(callout.id)
             }
         default:
-            if let live, !live.isDegenerate {
+            if let live, !live.isDegenerate(in: document.pixelBounds) {
                 var d = document
                 d.add(live)
                 commit(d)
@@ -321,14 +365,48 @@ public final class CanvasView: NSView {
         }
     }
 
+    // MARK: - Style
+
+    private func restyle(from old: Style) {
+        if let entry = textField {
+            entry.restyle(entry.style.applying(from: old, to: style))
+            if let id = entry.editingID, let a = document.annotation(id) {
+                var d = document
+                d.replace(restyled(a, entry.style))
+                history.replaceCurrent(d)
+            }
+            updateLiveText(entry.string)
+            return
+        }
+        guard let id = selectedID, let a = document.annotation(id) else { return }
+        var d = document
+        d.replace(restyled(a, a.style.applying(from: old, to: style)))
+        commit(d)
+    }
+
+    /// The annotation in another style: text is measured again and a callout's words laid out
+    /// again, since both depend on the font.
+    private func restyled(_ a: Annotation, _ style: Style) -> Annotation {
+        var copy = a
+        copy.style = style
+        switch a.shape {
+        case let .text(origin, string, _, alignment):
+            copy.shape = .text(origin: origin, string: string, size: Renderer.textSize(string, style: style, scale: document.scale), alignment: alignment)
+        case let .callout(from, to, text):
+            copy = relaid(copy, from: from, to: to, string: text.string)
+        default:
+            break
+        }
+        return copy
+    }
+
     // MARK: - Callouts
 
     /// The text may run to within a small margin of the picture's edge on its side; Return
     /// breaks a line sooner. Only that margin wraps.
     private func calloutLayout(tail: CGPoint, tip: CGPoint, style: Style) -> CalloutLayout {
-        let margin = Self.textMargin * document.scale
-        return CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
-                             maxWidth: Double(document.width), in: document.pixelBounds.insetBy(dx: margin, dy: margin))
+        CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
+                      maxWidth: Double(document.width), in: document.pixelBounds, margin: Self.textMargin * document.scale)
     }
 
     /// A callout with its words laid out afresh for its arrow.
@@ -340,35 +418,43 @@ public final class CanvasView: NSView {
         return copy
     }
 
-    /// The annotation as a drag of `delta` leaves it: a callout moves by the part grabbed
-    /// (its words or the tail's end move the tail, the head moves the tip, the shaft moves all),
-    /// anything else moves whole.
+    /// The annotation as a drag of `delta` on the part grabbed leaves it, a callout whose arrow
+    /// changed shape with its words laid out afresh.
     private func dragged(_ original: Annotation, by delta: CGPoint) -> Annotation {
-        guard case let .callout(from, to, text) = original.shape else { return original.translated(by: delta) }
-        switch dragPart {
-        case .text, .tail: return relaid(original, from: from + delta, to: to, string: text.string)
-        case .head: return relaid(original, from: from, to: to + delta, string: text.string)
-        default: return original.translated(by: delta)
-        }
-    }
-
-    /// Opens typing for a callout's words. While typing, the callout shows its arrow only and
-    /// the live text; the words land in the callout on commit.
-    private func editCalloutText(_ id: Annotation.ID, from: CGPoint, to: CGPoint, initial: String, style: Style) {
-        var d = document
-        if let a = d.annotation(id) { d.replace(relaid(a, from: from, to: to, string: "")) }
-        history = History(history: history, replacingCurrent: d)
-        let layout = calloutLayout(tail: from, tip: to, style: style)
-        beginTextEntry(at: layout.origin, initial: initial, style: style, layout: layout)
-        textField?.calloutID = id
+        let moved = original.dragged(dragPart, by: delta)
+        guard case let .callout(from, to, text) = moved.shape, dragPart != .shaft, dragPart != nil else { return moved }
+        return relaid(moved, from: from, to: to, string: text.string)
     }
 
     // MARK: - Text entry
 
-    /// Typing happens on the picture: the canvas draws the text in its final style as a live
-    /// annotation, and an invisible text view under it only supplies the caret and keystrokes.
-    fileprivate func beginTextEntry(at origin: CGPoint, initial: String, style: Style, layout: CalloutLayout? = nil) {
-        let entry = TextEntry(style: style, origin: origin, zoom: zoom, scale: document.scale)
+    /// Opens typing for the words of a text or callout. They stay in the document without their
+    /// words while typed, so the text keeps its place in the stack, and land when typing ends.
+    func editText(_ id: Annotation.ID) {
+        guard let a = document.annotation(id) else { return }
+        if base == nil { base = document }
+        var d = document
+        switch a.shape {
+        case let .text(origin, string, size, alignment):
+            d.replace(Annotation(id: id, shape: .text(origin: origin, string: "", size: size, alignment: alignment), style: a.style))
+            history.replaceCurrent(d)
+            selectedID = nil // its box would stay at the old words' size while new ones are typed
+            beginTextEntry(at: origin, initial: string, style: a.style)
+        case let .callout(from, to, text):
+            d.replace(relaid(a, from: from, to: to, string: ""))
+            history.replaceCurrent(d)
+            beginTextEntry(at: from, initial: text.string, style: a.style, layout: calloutLayout(tail: from, tip: to, style: a.style))
+        default:
+            return
+        }
+        textField?.editingID = id
+    }
+
+    /// Typing happens on the picture: the canvas draws the text in its final style as the entry's
+    /// preview, and an invisible text view under it only supplies the caret and keystrokes.
+    func beginTextEntry(at origin: CGPoint, initial: String, style: Style, layout: CalloutLayout? = nil) {
+        if base == nil { base = document }
+        let entry = TextEntry(style: style, origin: layout?.origin ?? origin, zoom: zoom, scale: document.scale)
         entry.layout = layout
         switch layout?.alignment {
         case .right: entry.alignment = .right
@@ -380,7 +466,6 @@ public final class CanvasView: NSView {
         entry.onFinish = { [weak self] in self?.endTextEntry(commit: true) }
         addSubview(entry)
         textField = entry
-        entry.place(in: pictureRect)
         window?.makeFirstResponder(entry)
         entry.setSelectedRange(NSRange(location: (initial as NSString).length, length: 0))
         updateLiveText(initial)
@@ -389,44 +474,46 @@ public final class CanvasView: NSView {
     private func updateLiveText(_ string: String) {
         guard let entry = textField else { return }
         let size = Renderer.textSize(string.isEmpty ? " " : string, style: entry.style, scale: document.scale, width: entry.layout?.width)
-        if let layout = entry.layout {
-            // A callout's text hangs from its anchor and stays inside the picture.
-            entry.origin = layout.origin(for: size)
-            entry.box = size
-        }
-        live = string.isEmpty ? nil : Annotation(shape: .text(origin: entry.origin, string: string, size: size, alignment: entry.layout?.alignment ?? .left), style: entry.style)
+        // A callout's text hangs from its anchor and stays inside the picture.
+        if let layout = entry.layout { entry.origin = layout.origin(for: size) }
+        entry.box = size
+        entry.preview = string.isEmpty ? nil : Annotation(shape: .text(origin: entry.origin, string: string, size: size, alignment: entry.layout?.alignment ?? .left),
+                                                          style: entry.style)
         entry.place(in: pictureRect)
         needsDisplay = true
     }
 
+    /// Ends typing: the words land in the text or callout they belong to, or as a new text, and
+    /// the whole entry is one undo step. A text left without words goes; a callout left without
+    /// words becomes a plain arrow.
     func endTextEntry(commit: Bool) {
         guard let entry = textField else { return }
         textField = nil
-        live = nil
-        let string = entry.string.trimmingCharacters(in: .newlines)
         entry.removeFromSuperview()
         window?.makeFirstResponder(self)
-        needsDisplay = true
-        if let id = entry.calloutID {
-            // The words land in the callout; a callout left without words is a plain arrow.
-            guard let a = document.annotation(id), case let .callout(from, to, _) = a.shape else { return }
-            var d = document
-            if commit, !string.isEmpty {
-                d.replace(relaid(a, from: from, to: to, string: string))
-            } else {
-                var plain = a
-                plain.shape = .arrow(from: from, to: to)
-                d.replace(plain)
-            }
-            self.commit(d)
-            return
-        }
-        guard commit, !string.isEmpty else { return }
-        let size = Renderer.textSize(string, style: entry.style, scale: document.scale, width: entry.layout?.width)
-        let origin = entry.layout?.origin(for: size) ?? entry.origin
+        let typed = entry.string.trimmingCharacters(in: .newlines)
+        let words = commit && !typed.allSatisfy(\.isWhitespace) ? typed : ""
         var d = document
-        d.add(Annotation(shape: .text(origin: origin, string: string, size: size, alignment: entry.layout?.alignment ?? .left), style: entry.style))
-        self.commit(d)
+        if let id = entry.editingID, let a = d.annotation(id) {
+            switch a.shape {
+            case let .callout(from, to, _):
+                var styled = a
+                styled.style = entry.style
+                if words.isEmpty { styled.shape = .arrow(from: from, to: to) }
+                d.replace(words.isEmpty ? styled : relaid(styled, from: from, to: to, string: words))
+            default:
+                if words.isEmpty { d.remove(id) } else { d.replace(Annotation(id: id, shape: textShape(words, entry), style: entry.style)) }
+            }
+        } else if !words.isEmpty {
+            d.add(Annotation(shape: textShape(words, entry), style: entry.style))
+        }
+        history.replaceCurrent(d)
+        endChange()
+    }
+
+    private func textShape(_ words: String, _ entry: TextEntry) -> Annotation.Shape {
+        let size = Renderer.textSize(words, style: entry.style, scale: document.scale, width: entry.layout?.width)
+        return .text(origin: entry.layout?.origin(for: size) ?? entry.origin, string: words, size: size, alignment: entry.layout?.alignment ?? .left)
     }
 
     // MARK: - Drawing
@@ -436,7 +523,7 @@ public final class CanvasView: NSView {
         let picture = pictureRect
         // The field: dark, with the picture floating on it under a soft shadow.
         ctx.setFillColor(CGColor(gray: 0.16, alpha: 1))
-        ctx.fill(bounds)
+        ctx.fill(dirtyRect)
         ctx.saveGState()
         ctx.setShadow(offset: CGSize(width: 0, height: 4), blur: 18, color: CGColor(gray: 0, alpha: 0.7))
         ctx.setFillColor(CGColor(gray: 0.16, alpha: 1))
@@ -447,8 +534,10 @@ public final class CanvasView: NSView {
         ctx.clip(to: picture)
         ctx.translateBy(x: picture.minX, y: picture.minY)
         ctx.scaleBy(x: zoom, y: zoom)
-        Renderer.draw(document, source: source, in: ctx)
-        if let live { Renderer.draw(live, document: document, source: source, in: ctx) }
+        Renderer.draw(document, source: source, in: ctx, baseScale: zoom)
+        for extra in [live, textField?.preview] {
+            if let extra { Renderer.draw(extra, document: document, source: source, in: ctx, baseScale: zoom) }
+        }
         ctx.restoreGState()
 
         let crop = liveCrop ?? document.crop
@@ -465,9 +554,10 @@ public final class CanvasView: NSView {
             ctx.setStrokeColor(NSColor.controlAccentColor.cgColor)
             ctx.setLineWidth(1)
             ctx.setLineDash(phase: 0, lengths: [4, 3])
-            if case let .callout(from, to, text) = a.shape {
-                // A callout shows what each part does: a box around the words, a dot at each end.
-                if !text.string.isEmpty { ctx.stroke(viewRect(text.frame).insetBy(dx: -4, dy: -4)) }
+            switch a.shape {
+            case let .arrow(from, to), let .callout(from, to, _):
+                // An arrow shows its grips: a dot at each end, and a box around a callout's words.
+                if case let .callout(_, _, text) = a.shape, !text.string.isEmpty { ctx.stroke(viewRect(text.frame).insetBy(dx: -4, dy: -4)) }
                 ctx.setLineDash(phase: 0, lengths: [])
                 for p in [from, to] {
                     let v = viewPoint(p)
@@ -476,26 +566,32 @@ public final class CanvasView: NSView {
                     ctx.fillEllipse(in: dot)
                     ctx.strokeEllipse(in: dot)
                 }
-            } else {
+            default:
                 ctx.stroke(viewRect(a.bounds).insetBy(dx: -6, dy: -6))
             }
         }
     }
 }
 
-/// The invisible text view a text annotation is typed into. It draws nothing but its caret;
-/// the canvas shows the text. Return adds a line; Escape or Command-Return finishes.
+/// The invisible text view words are typed into. It draws nothing but its caret; the canvas
+/// draws `preview`, the words in their final style. Return adds a line; Escape or Command-Return
+/// finishes. Its undo covers keystrokes only, and goes when it does.
 final class TextEntry: NSTextView {
     private(set) var style = Style.standard
     var origin = CGPoint.zero
     /// Set for a callout: the box wraps at its width and hangs from its anchor.
     var layout: CalloutLayout?
-    /// For a callout: the measured box of the words, which the entry sits over exactly.
+    /// The measured box of the words, which the entry sits over exactly.
     var box = CGSize.zero
-    /// The callout these words belong to, when editing one.
-    var calloutID: Annotation.ID?
+    /// The text or callout these words belong to, when editing one.
+    var editingID: Annotation.ID?
+    /// The words as they will land, for the canvas to draw.
+    var preview: Annotation?
     private var zoom: CGFloat = 1
     private var scale: Double = 1
+    private let words = UndoManager()
+    /// Where the words are, in the canvas's coordinates: only clicks there reach the entry.
+    private var wordsFrame = CGRect.zero
     var onChange: ((String) -> Void)?
     var onFinish: (() -> Void)?
 
@@ -514,13 +610,12 @@ final class TextEntry: NSTextView {
         storage.addLayoutManager(manager)
         manager.addTextContainer(container)
         self.init(frame: .zero, textContainer: container)
-        self.style = style
         self.origin = origin
         self.zoom = zoom
         self.scale = scale
         drawsBackground = false
         isRichText = false
-        allowsUndo = false
+        allowsUndo = true
         isAutomaticQuoteSubstitutionEnabled = false
         isAutomaticDashSubstitutionEnabled = false
         isAutomaticTextReplacementEnabled = false
@@ -528,16 +623,23 @@ final class TextEntry: NSTextView {
         textContainerInset = .zero
         textContainer?.lineFragmentPadding = 0
         textContainer?.widthTracksTextView = false
-        textContainer?.containerSize = NSSize(width: 4000, height: 4000)
-        font = Renderer.font(for: style, scale: scale * zoom)
         textColor = .clear
-        insertionPointColor = NSColor(cgColor: Renderer.cgColor(style.color)) ?? .red
         isHorizontallyResizable = true
         isVerticallyResizable = true
+        restyle(style)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
+
+    /// Its own undo, so keystrokes never reach the document's history or outlive the entry.
+    override var undoManager: UndoManager? { words }
+
+    func restyle(_ style: Style) {
+        self.style = style
+        font = Renderer.font(for: style, scale: scale * zoom)
+        insertionPointColor = NSColor(cgColor: Renderer.cgColor(style.color)) ?? .red
+    }
 
     /// Sits exactly over where the canvas draws the text, and grows with it.
     func place(in picture: CGRect) {
@@ -566,7 +668,14 @@ final class TextEntry: NSTextView {
         layoutManager?.ensureLayout(for: textContainer!)
         let used = layoutManager?.usedRect(for: textContainer!) ?? .zero
         if layout == nil { width = max(used.width, 4) + 4 }
-        frame = CGRect(x: x, y: origin.y * zoom + picture.minY, width: width, height: max(used.height, font?.pointSize ?? 20))
+        frame = CGRect(x: x, y: origin.y * zoom + picture.minY + pad, width: width, height: max(used.height, font?.pointSize ?? 20))
+        wordsFrame = CGRect(x: origin.x * zoom + picture.minX, y: origin.y * zoom + picture.minY, width: box.width * zoom, height: box.height * zoom)
+    }
+
+    /// A callout's entry is as wide as its wrap, most of the picture for a vertical one; a click
+    /// beside the words belongs to the canvas, which finishes typing.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        wordsFrame.insetBy(dx: -4, dy: -4).contains(point) ? super.hitTest(point) : nil
     }
 
     override func didChangeText() {
@@ -576,7 +685,8 @@ final class TextEntry: NSTextView {
 
     override func keyDown(with event: NSEvent) {
         let isReturn = event.keyCode == 36 || event.keyCode == 76
-        if event.keyCode == 53 || (isReturn && event.modifierFlags.contains(.command)) {
+        // Escape and Command-Return finish, except while an input method is composing.
+        if !hasMarkedText(), event.keyCode == 53 || (isReturn && event.modifierFlags.contains(.command)) {
             onFinish?()
             return
         }
@@ -584,70 +694,23 @@ final class TextEntry: NSTextView {
     }
 
     override func cancelOperation(_ sender: Any?) {
-        onFinish?()
+        if !hasMarkedText() { onFinish?() }
     }
 }
 
-extension Annotation {
-    var isArrowOrCallout: Bool {
-        switch shape {
-        case .arrow, .callout: true
-        default: false
+extension CanvasView: NSMenuItemValidation {
+    public func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(undo(_:)): (textField?.undoManager?.canUndo ?? false) || history.canUndo
+        case #selector(redo(_:)): (textField?.undoManager?.canRedo ?? false) || history.canRedo
+        case #selector(delete(_:)): selectedID != nil
+        default: true
         }
     }
 }
 
-extension History {
-    /// The same past and future with a different present, for a drag that edits in place.
-    init(history: History, replacingCurrent state: State) {
-        self = history
-        self.replaceCurrent(state)
-    }
-}
-
-/// Opens text entry on a canvas in a window that is never shown, types into it, and commits,
-/// so the entry's construction and commit path can be checked without a display.
-public enum TextEntryCheck {
-    public static func run() -> Bool {
-        guard let ctx = CGContext(data: nil, width: 400, height: 300, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue),
-              let source = ctx.makeImage() else { return false }
-        let canvas = CanvasView(document: Document(width: 400, height: 300, scale: 2), source: source, zoom: 0.5)
-        let window = NSWindow(contentRect: canvas.frame, styleMask: .borderless, backing: .buffered, defer: false)
-        window.contentView = canvas
-        canvas.check_beginText(at: CGPoint(x: 40, y: 40), initial: "Hello")
-        canvas.check_typed("Hello there")
-        canvas.endTextEntry(commit: true)
-        guard canvas.document.annotations.count == 1, case let .text(_, string, size, _) = canvas.document.annotations[0].shape,
-              string == "Hello there", size.width > 0, size.height > 0 else { return false }
-        // A callout: its words land in it, right-justified against the tail.
-        let callout = Annotation(shape: .callout(from: CGPoint(x: 300, y: 150), to: CGPoint(x: 380, y: 100),
-                                                 text: Annotation.TextBox(origin: .zero, string: "", size: .zero, alignment: .left)), style: canvas.style)
-        var d = canvas.document
-        d.add(callout)
-        canvas.commit(d)
-        canvas.check_editCallout(callout.id, from: CGPoint(x: 300, y: 150), to: CGPoint(x: 380, y: 100))
-        canvas.check_typed("wrapped words beside the tail of the arrow")
-        canvas.endTextEntry(commit: true)
-        guard canvas.document.annotations.count == 2, case let .callout(from, _, text) = canvas.document.annotations[1].shape,
-              from == CGPoint(x: 300, y: 150), text.string.hasPrefix("wrapped"), text.alignment == .right, text.size.width > 0,
-              text.frame.maxX <= 300 else { return false }
-        return true
-    }
-}
-
-extension CanvasView {
-    func check_beginText(at origin: CGPoint, initial: String, layout: CalloutLayout? = nil) {
-        beginTextEntry(at: origin, initial: initial, style: style, layout: layout)
-    }
-
-    func check_editCallout(_ id: Annotation.ID, from: CGPoint, to: CGPoint) {
-        editCalloutText(id, from: from, to: to, initial: "", style: style)
-    }
-
-    func check_typed(_ string: String) {
-        textField?.string = string
-        textField?.didChangeText()
+extension Annotation {
+    var isText: Bool {
+        if case .text = shape { true } else { false }
     }
 }
