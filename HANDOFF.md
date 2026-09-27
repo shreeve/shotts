@@ -10,7 +10,7 @@ notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-
 Installed 0.1.0 copies are offered it through Sparkle. 0.2.0 is the revamp (shreeve/shotts#51,
 merge commit c24b093): a correctness, security, and performance pass over the whole app, plus
 Open Sans; `CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
-errors) and `swift test` passes: 40 Core tests and 45 AppKit tests.
+errors) and `swift test` passes: 40 Core tests and 46 AppKit tests.
 
 Next, in order:
 
@@ -267,6 +267,10 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   front. `activate(ignoringOtherApps: true)` works, and every activation uses it.
 - `CGImage.cropping(to:)` shares its parent's pixels: a cut-out made that way keeps the whole
   display picture alive. `DisplayImage.cut` draws into a bitmap of its own.
+- Views no longer clip their drawing to their bounds by default, and the rect `draw(_:)` is asked
+  to fill can reach past the view. The canvas filled it and painted its dark field over the bar
+  in 0.2.0; it sets `clipsToBounds` and fills only its bounds, and `BarTests` checks the bar
+  shows.
 - `NSWindowController.close()` and `NSWindow.close()` skip `windowShouldClose`; only
   `performClose` asks. Escape closed annotated captures without asking until it used
   `performClose`.

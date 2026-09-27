@@ -5,6 +5,11 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.2.1 — 2026-09-26
+
+- The editor's bar is back. In 0.2.0 the picture's dark field was painted over it, hiding the
+  tools, colors, fonts, undo, and Copy and Save (their keys still worked).
+
 ## 0.2.0 — 2026-09-26
 
 A pass over the whole app for correctness, safety, and speed, and a new font.

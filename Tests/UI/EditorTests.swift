@@ -313,6 +313,30 @@ import Testing
     }
 }
 
+@MainActor @Suite struct BarTests {
+    /// The canvas sits under the bar and must not paint over it: the bar's area, drawn with the
+    /// window's content, is not the canvas's dark field.
+    @Test func theCanvasLeavesTheBarVisible() throws {
+        let controller = EditorWindowController(document: Document(width: 1600, height: 1000, scale: 2), source: blankImage(1600, 1000))
+        let content = try #require(controller.window?.contentView)
+        content.layoutSubtreeIfNeeded()
+        let rep = try #require(content.bitmapImageRepForCachingDisplay(in: content.bounds))
+        content.cacheDisplay(in: content.bounds, to: rep)
+        let image = try #require(rep.cgImage)
+        let pixels = rgba(image)
+        let bar = controller.layout.barHeight * CGFloat(image.height) / content.bounds.height
+        // Rows are top-first. The field's color is read just below the bar, at the left edge;
+        // then the middle row of the bar is compared with it.
+        let sample = (Int(bar) + 8) * image.width * 4 + 8
+        let row = Int(bar / 2)
+        let field = (0..<image.width).filter { x in
+            let o = (row * image.width + x) * 4
+            return (0..<3).allSatisfy { abs(Int(pixels[o + $0]) - Int(pixels[sample + $0])) < 4 }
+        }.count
+        #expect(Double(field) / Double(image.width) < 0.5, "the bar's row is \(field) of \(image.width) pixels of the canvas's field")
+    }
+}
+
 @MainActor @Suite struct ResizeTests {
     /// A 1600 by 1000 Retina capture opens at its on-screen size, shrinks with its window keeping
     /// its proportions, and never grows past its on-screen size.
