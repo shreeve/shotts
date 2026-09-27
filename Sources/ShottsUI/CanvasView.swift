@@ -101,6 +101,9 @@ public final class CanvasView: NSView {
         super.init(frame: CGRect(x: 0, y: 0, width: CGFloat(document.width) * zoom + Self.inset * 2,
                                  height: CGFloat(document.height) * zoom + Self.inset * 2))
         wantsLayer = true
+        // Views no longer clip their drawing by default, and the rect AppKit asks the canvas to
+        // draw can reach past it; unclipped, the dark field was painted over the bar above.
+        clipsToBounds = true
         setAccessibilityRole(.image)
         setAccessibilityLabel("Capture")
     }
@@ -523,7 +526,7 @@ public final class CanvasView: NSView {
         let picture = pictureRect
         // The field: dark, with the picture floating on it under a soft shadow.
         ctx.setFillColor(CGColor(gray: 0.16, alpha: 1))
-        ctx.fill(dirtyRect)
+        ctx.fill(dirtyRect.intersection(bounds))
         ctx.saveGState()
         ctx.setShadow(offset: CGSize(width: 0, height: 4), blur: 18, color: CGColor(gray: 0, alpha: 0.7))
         ctx.setFillColor(CGColor(gray: 0.16, alpha: 1))
