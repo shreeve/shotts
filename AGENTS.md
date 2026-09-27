@@ -26,12 +26,12 @@ read it before changing capture, the selection overlay, the editor, or export.
   (`Renderer`) from the same `Document`, so what the user sees is what they paste.
 - One source image per capture. Undo records annotation changes, never a copy of the pixels.
   Nothing caches a second full-size bitmap; obscure effects render from the source on demand.
-- Capture is frozen: every display is pictured once when the user presses the hot key, with
-  Shotts' own windows excluded. The picker shows that picture, the magnifier reads it, and an
-  area is cut from it into a bitmap of its own; the pictures are released the moment the picker
-  closes, and only the cut-out survives. A clicked window is the one exception: the user picked
-  that window, so it is captured on its own as it is then. The picker itself is never in a
-  capture. The editor closed last is kept, cut-out and annotations, so Option-F10 can bring it
+- Capture is live: the screen goes on updating under the picker, shadows and all, so the user
+  can wait for something to appear. Each display streams while the picker is up; the magnifier
+  reads the latest frame, and an area is cut from the frame at release into a bitmap of its
+  own. Streaming stops, and the frames go, the moment the picker closes; only the cut-out
+  survives. A clicked window is captured on its own. What is on screen is what is captured,
+  Shotts' editors included; only the picker's own windows are left out. The editor closed last is kept, cut-out and annotations, so Option-F10 can bring it
   back; one, until another editor closes.
 - Coordinates: `Document` and every annotation live in image pixels. Screen points, backing
   scale, and display origins are converted at the edges (capture, overlay, canvas) and nowhere

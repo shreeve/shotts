@@ -1,29 +1,42 @@
 import AppKit
 import ShottsCore
 
-/// What one display looked like when the hot key fired: the picture the overlay shows, the
-/// magnifier reads, and the selection is cut from. Held only while the user selects; the
-/// cut-out shares none of its pixels.
-public struct DisplayImage {
-    public var screen: NSScreen
-    public var image: CGImage
-    public var scale: CGFloat
-    /// The windows on this display when it was pictured, front to back. A click on one
-    /// captures it.
+/// One display as the picker sees it: its picture, which the magnifier reads and the selection
+/// is cut from, and the windows on it. Live, a stream keeps both current and the overlay lets the
+/// real screen show through; a stand-in (the developer checks, the tests) has a fixed picture
+/// that the overlay draws. Held only while the user selects; the cut-out shares none of its
+/// pixels.
+public final class DisplayImage {
+    public let screen: NSScreen
+    public let scale: CGFloat
+    /// The display's pixels: the latest frame while live, nil until the first arrives.
+    public var image: CGImage? { didSet { onChange?() } }
+    /// The windows on this display, front to back. A click on one captures it.
     public var windows: [WindowInfo]
+    /// Whether the real screen shows through the overlay, rather than `image` drawn on it.
+    public let isLive: Bool
+    /// The overlay's hook for a new picture: the magnifier shows it.
+    var onChange: (() -> Void)?
 
-    public init(screen: NSScreen, image: CGImage, scale: CGFloat, windows: [WindowInfo] = []) {
+    public init(screen: NSScreen, image: CGImage?, scale: CGFloat, windows: [WindowInfo] = [], isLive: Bool = false) {
         self.screen = screen
         self.image = image
         self.scale = scale
         self.windows = windows
+        self.isLive = isLive
+    }
+
+    /// The whole display in pixels.
+    public var pixelBounds: CGRect {
+        if let image { return CGRect(x: 0, y: 0, width: image.width, height: image.height) }
+        return CGRect(x: 0, y: 0, width: (screen.frame.width * scale).rounded(), height: (screen.frame.height * scale).rounded())
     }
 
     /// The picture's pixels under `rect` (points from the display's top-left), whole pixels,
     /// inside the picture: the one conversion from the picker's points, so the size the picker
     /// shows is the size cut.
     public func pixelRect(for rect: CGRect) -> CGRect {
-        SelectionRule.pixelRect(rect, scale: scale, within: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        SelectionRule.pixelRect(rect, scale: scale, within: pixelBounds)
     }
 
     /// The area under `rect` as a picture of its own. `CGImage.cropping(to:)` alone would keep
@@ -32,7 +45,7 @@ public struct DisplayImage {
     /// pixel format so no color shifts.
     public func cut(_ rect: CGRect) -> CGImage? {
         let pixels = pixelRect(for: rect)
-        guard !pixels.isEmpty, let crop = image.cropping(to: pixels), let space = image.colorSpace else { return nil }
+        guard let image, !pixels.isEmpty, let crop = image.cropping(to: pixels), let space = image.colorSpace else { return nil }
         let w = crop.width, h = crop.height
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: image.bitsPerComponent, bytesPerRow: 0,
                                   space: space, bitmapInfo: image.bitmapInfo.rawValue)
@@ -135,6 +148,9 @@ public final class AreaSelection {
         }
     }
 
+    /// The picker's own windows, which a live capture leaves out.
+    public var windowNumbers: Set<Int> { Set(windows.map(\.windowNumber)) }
+
     public func show() {
         for window in windows {
             window.orderFrontRegardless()
@@ -155,6 +171,9 @@ public final class AreaSelection {
         // add a second, offset hotspot to look at.
         NSCursor.hide()
     }
+
+    /// Closes the picker, as Escape would.
+    public func cancel() { finish(.cancelled) }
 
     private func finish(_ outcome: Outcome) {
         guard let completion else { return }
@@ -179,8 +198,11 @@ final class OverlayWindow: NSWindow {
         // calls it, which a subclass must therefore provide.
         super.init(contentRect: display.screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
         level = .screenSaver
-        isOpaque = true
-        backgroundColor = .black
+        // Live, the real screen shows through, still updating, shadows and all.
+        isOpaque = !display.isLive
+        backgroundColor = display.isLive ? .clear : .black
+        // A clear window lets clicks through to what is under it unless told otherwise.
+        ignoresMouseEvents = false
         hasShadow = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         contentView = overlayView
@@ -206,6 +228,8 @@ final class OverlayView: NSView {
     private var lastPointer: CGPoint = .zero
     private var hasDragged = false
     private var tracking: NSTrackingArea?
+    /// Where the magnifier was last drawn: a new frame redraws only that.
+    private var magnifierPanel: CGRect?
 
     /// The frontmost window under the pointer, while nothing is being dragged.
     var hoveredWindow: CGRect? {
@@ -218,6 +242,10 @@ final class OverlayView: NSView {
         self.options = options
         super.init(frame: CGRect(origin: .zero, size: display.screen.frame.size))
         wantsLayer = true
+        display.onChange = { [weak self] in
+            guard let self, let panel = magnifierPanel else { return }
+            setNeedsDisplay(panel.insetBy(dx: -2, dy: -2))
+        }
     }
 
     @available(*, unavailable)
@@ -368,22 +396,26 @@ final class OverlayView: NSView {
 
     /// The color under the crosshair; nil while the pointer is on another display.
     func colorUnderPointer() -> RGBA? {
-        guard let pointer else { return nil }
+        guard let pointer, let image = display.image else { return nil }
         let p = pixel(at: pointer)
-        return PixelSampler.colors(in: CGRect(x: p.x, y: p.y, width: 1, height: 1), of: display.image)[0][0]
+        return PixelSampler.colors(in: CGRect(x: p.x, y: p.y, width: 1, height: 1), of: image)[0][0]
     }
 
     // MARK: - Drawing
 
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        // The display as it was. The bitmap's rows are stored top-first; flip around it.
-        ctx.saveGState()
-        ctx.translateBy(x: 0, y: bounds.height)
-        ctx.scaleBy(x: 1, y: -1)
-        ctx.interpolationQuality = .none
-        ctx.draw(display.image, in: bounds)
-        ctx.restoreGState()
+        if display.isLive {
+            ctx.clear(dirtyRect)
+        } else if let image = display.image {
+            // A stand-in's picture. The bitmap's rows are stored top-first; flip around it.
+            ctx.saveGState()
+            ctx.translateBy(x: 0, y: bounds.height)
+            ctx.scaleBy(x: 1, y: -1)
+            ctx.interpolationQuality = .none
+            ctx.draw(image, in: bounds)
+            ctx.restoreGState()
+        }
 
         // Everything outside a selection being dragged is dimmed, when the option is on.
         if let selection, options.dims {
@@ -413,6 +445,7 @@ final class OverlayView: NSView {
         }
         if selection == nil { drawCrosshair(at: pointer, in: ctx) }
         let magnifier = options.magnifies ? magnifier(at: pointer) : nil
+        magnifierPanel = magnifier?.panel
         if let magnifier { drawMagnifier(magnifier, in: ctx) }
         if options.showsHints, !hasDragged { drawHints(near: pointer, clearOf: magnifier?.panel, in: ctx) }
     }
@@ -462,7 +495,8 @@ final class OverlayView: NSView {
         let box = CGFloat(cells) * Self.magnifierCell
         let center = pixel(at: p)
         let wanted = CGRect(x: center.x - half, y: center.y - half, width: cells, height: cells)
-        let colors = PixelSampler.colors(in: wanted, of: display.image)
+        let colors = display.image.map { PixelSampler.colors(in: wanted, of: $0) }
+            ?? Array(repeating: Array(repeating: nil, count: cells), count: cells)
         let hex = colors[half][half]?.hex ?? ""
         // The pointer's pixel while aiming (a comma pair, as coordinates are written), the
         // selection's size while dragging (with ×, as sizes are), and the color under the pointer.
@@ -489,10 +523,10 @@ final class OverlayView: NSView {
         ctx.addPath(CGPath(roundedRect: panel, cornerWidth: 6, cornerHeight: 6, transform: nil))
         ctx.clip()
         // The pixels: a crop of the display around the pointer, scaled up with no smoothing.
-        let available = m.wanted.intersection(CGRect(x: 0, y: 0, width: display.image.width, height: display.image.height))
+        let available = m.wanted.intersection(display.pixelBounds)
         ctx.setFillColor(CGColor(gray: 0.1, alpha: 1))
         ctx.fill(CGRect(x: panel.minX, y: panel.minY, width: panel.width, height: pixels.maxY - panel.minY))
-        if !available.isEmpty, let crop = display.image.cropping(to: available) {
+        if !available.isEmpty, let crop = display.image?.cropping(to: available) {
             let dest = CGRect(x: pixels.minX + (available.minX - m.wanted.minX) * cell,
                               y: pixels.minY + (available.minY - m.wanted.minY) * cell,
                               width: available.width * cell, height: available.height * cell)

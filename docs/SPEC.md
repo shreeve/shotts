@@ -20,17 +20,17 @@ standard function keys" is on. If another app already holds F10, the menu says s
 
 | Action | Result |
 | --- | --- |
-| F10, or Capture Area in the menu bar | Every display is pictured as it is at that moment, the pointer disappears, and a crosshair follows it over that picture. |
+| F10, or Capture Area in the menu bar | The pointer becomes a crosshair over the screen, which goes on updating underneath, windows, shadows, and all. |
 | Move over a window | The window under the crosshair gets a blue outline. |
 | Click | Captures that window on its own, without whatever was covering it, at the resolution of the display it is on. With Include Window Shadow on, the window comes with the shadow macOS draws around it, on a transparent margin. |
 | Drag | Selects an area; everything outside it dims (unless Dim Outside Selection is off). Its size in pixels shows in the magnifier, or beside the selection when the magnifier is off. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
-| Release | Cuts the area out of the picture at the display's full resolution, puts it on the clipboard (unless Copy to Clipboard is off), and opens the editor. |
+| Release | Captures the area as it is at that moment, at the display's full resolution, puts it on the clipboard (unless Copy to Clipboard is off), and opens the editor. |
 | Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
 | Escape | Cancels, even mid-drag. Nothing is kept. |
 
-A click on no window does nothing, so a stray click does not lose the picture. Switching to
+A click on no window does nothing, so a stray click does not end the capture. Switching to
 another app, or a display being added, removed, or rearranged, cancels.
 
 The crosshair is a light line with a dark edge, visible on any background, and shows only on the
@@ -40,9 +40,11 @@ frame, with a translucent cross whose arms are white or black by the pixel under
 stop short of the marked pixel under the crosshair, and stay while dragging. Below it are the
 pixel's position and its color in hex, or the selection's size while dragging. Until the first
 drag, a short list of these keys shows on the other side of the pointer, except near a corner
-where it would cover the magnifier. Because the picture is taken when F10 is pressed, what you
-select is exactly what you get, even if the screen changes while you choose. A clicked window is
-the one exception: it is captured on its own as it is when clicked.
+where it would cover the magnifier. The screen stays live throughout, so you can wait for
+something to appear before you drag or click; the magnifier and the window outlines follow it.
+Whatever is on screen can be captured, Shotts' own editors included; only the crosshair,
+magnifier, dimming, and hints never are. While picking, macOS may show its screen-recording
+indicator in the menu bar.
 
 The menu bar menu holds Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into
 the editor), Check for Updates…, Quit, and the picker's options, remembered across launches:

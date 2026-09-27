@@ -7,6 +7,10 @@ Unreleased, whose heading becomes the version's when it ships.
 
 ## Unreleased
 
+- The screen stays live while you capture: it goes on updating under the crosshair, windows keep
+  their shadows, and the area is captured as it is when you release, so you can wait for
+  something to appear. Shotts' own editors stay on screen and can be captured too. macOS may show
+  its screen-recording indicator while you pick.
 - The editor is an ordinary window: Copy, Save, drag out, and Print leave it open, and it closes
   when you close it, with no question. Option-F10, or Show Last Capture in the menu bar menu,
   brings the last capture back to the front, or reopens it as you left it if you closed it.

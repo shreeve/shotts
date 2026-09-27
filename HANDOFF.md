@@ -12,7 +12,7 @@ standard Print window, checked by hand. 0.2.1 (shreeve/shotts#52) fixed 0.2.0's 
 canvas painted over its bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit
 c24b093): a correctness, security, and performance pass over the whole app, plus Open Sans;
 `CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
-errors) and `swift test` passes: 40 Core tests and 48 AppKit tests.
+errors) and `swift test` passes: 40 Core tests and 49 AppKit tests.
 
 Next, in order:
 
@@ -24,10 +24,8 @@ Next, in order:
 
 Deferred, with the reason each waits:
 
-- The picker redraws its whole overlay and holds a full-size backing store per display while it
-  is up (about 4 ms of CPU per mouse move and 88 MB per 6K display). Putting the frozen picture
-  in a layer's `contents` and drawing only the crosshair, magnifier, and hints over it would
-  remove both; it needs a two-layer overlay and a new `--preview-overlay` path.
+- The picker redraws its whole transparent overlay on each mouse move (the crosshair spans the
+  display). Drawing the crosshair as two thin layers would leave only the magnifier to redraw.
 - Plain text never wraps: text typed past the picture's right edge is clipped. It could wrap at
   the edge less the callout margin, as callouts do; `TextEntry.place` would grow a wrap width.
 - Selecting an annotation does not show its style in the bar. Changing a style changes only what
@@ -50,7 +48,7 @@ Deferred, with the reason each waits:
 | | `History.swift` | Undo and redo over any `Equatable` state, with `record(since:)` for changes made in place. |
 | | `Selection.swift` | `SelectionRule`: the drag rectangle rules the picker and the shape tools share. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
-| ShottsUI | `AreaSelection.swift` | The picker: `DisplayImage` (a display's frozen picture and `cut`), one overlay window per display, the crosshair, magnifier, hints, window outlines, `PixelSampler`. |
+| ShottsUI | `AreaSelection.swift` | The picker: `DisplayImage` (a display's latest picture, its windows, and `cut`), one overlay window per display, the crosshair, magnifier, hints, window outlines, `PixelSampler`. |
 | | `EditorWindow.swift` | `EditorWindowController`: the bar, copy, save, print, closing, resizing, the drag grip, remembered tool and style. |
 | | `CanvasView.swift` | The picture with its annotations, every tool's mouse handling, text entry (`TextEntry`), selection drawing. |
 | | `Renderer.swift` | Draws a `Document` into any `CGContext`; measures text; an annotation's extent. |
@@ -58,7 +56,8 @@ Deferred, with the reason each waits:
 | | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file. |
 | Shotts | `ShottsApp.swift` | `AppDelegate`: menu bar item and menu, main menu, Sparkle. |
 | | `CaptureFlow.swift` | One capture from hot key to editor, which app gets focus back, and the capture closed last. |
-| | `ScreenCapture.swift` | ScreenCaptureKit (every display, or one window) and the window list. |
+| | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list. |
+| | `LiveDisplay.swift` | A display streamed while the picker is up: its latest frame and windows. |
 | | `HotKey.swift` | The Carbon hot keys: F10 captures, Option-F10 brings the last capture back. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
 
@@ -81,40 +80,42 @@ points and missed Retina barbs and highlighter bands.
 
 ## Capture
 
-`CaptureFlow` runs one capture at a time: a `Capture` value holds the app to return to and the
-picker, from `begin()` until the editor opens or the capture ends, and F10 does nothing
-meanwhile. `ScreenCapture.captureDisplays()` reads the window list once, then pictures every
-display concurrently through `SCScreenshotManager` at backing resolution with Shotts' own
-windows excluded (by pid, in the filter and the list). `AreaSelection` shows them, one borderless
-window per display at `.screenSaver` level with the cursor hidden. When the user releases a
-usable rectangle, `DisplayImage.cut` redraws that area into a bitmap of its own, in the
-picture's color space; `CGImage.cropping` alone would share, and so keep alive, the whole display
-picture. The cut and the display's scale become a `Document` in an `EditorWindowController`. The
-display pictures live in the picker's windows and go when it closes.
+`CaptureFlow` runs one capture at a time: a `Capture` value holds the app to return to, the
+picker, and the live displays, from `begin()` until the editor opens or the capture ends, and F10
+does nothing meanwhile. The picker is live: `AreaSelection` shows at once, one clear borderless
+window per display at `.screenSaver` level with the cursor hidden, and the real screen goes on
+updating through it. Behind it, each `LiveDisplay` streams its display through an `SCStream`
+(full resolution, BGRA, 30 frames a second, `ignoreShadowsDisplay` false) with only the picker's
+windows excluded, so Shotts' editors are captured like anything else on screen. Each frame
+becomes `DisplayImage.image` as a `CGImage` reading the frame's own memory, with no copy, and the
+window list is read again a few times a second. When the user releases a usable rectangle,
+`DisplayImage.cut` redraws that area of the latest frame into a bitmap of its own, in its color
+space; `CGImage.cropping` alone would share, and so keep alive, the frame. The cut and the
+display's scale become a `Document` in an `EditorWindowController`, and the streams stop.
 
 Focus: the app to return to is the one in front at F10, or, if that was Shotts because an editor
 was in front, the app that editor returns to. Each editor keeps its own and activates it when it
 closes as the window being worked in; one closing in the background (Close All) leaves focus
 alone. A cancelled capture returns to it at once.
 
-The window list comes from `CGWindowListCopyWindowInfo` (layer 0, not Shotts', shareable, at
-least 40 points each way), front to back, placed on each display with `CGDisplayBounds`. The
+The window list comes from `CGWindowListCopyWindowInfo` (layer 0, which leaves out the picker,
+shareable, at least 40 points each way), front to back, placed on each display with `CGDisplayBounds`. The
 picker outlines the first window containing the pointer, and a click with no drag reports it as
 `.window`; the flow then captures that window on its own through
 `SCContentFilter(desktopIndependentWindow:)` at the filter's `pointPixelScale`, so nothing
 covering it appears. With the option on, `ignoreShadowsSingleWindow` is false and the picture is
 the window with the shadow macOS draws around it, on a transparent margin, sized from the
 filter's `contentRect`; that is the system's own look, which no synthesized shadow matched. A
-window that has gone since the displays were pictured falls back to its area of the display
-picture.
+window that has gone meanwhile falls back to its area of the latest frame.
 
 Only the overlay under the pointer draws the crosshair, magnifier, hints, and window outline, and
 it takes key status as the pointer enters, so Escape, Space, and Command-C act on that display.
 The picker cancels when Shotts resigns active or the screen configuration changes. The magnifier
-samples its 15 by 15 neighborhood once per frame with `PixelSampler.colors(in:of:)`, which draws
-the pixels into a small context rather than parsing the capture's pixel format; its center is
-the color under the crosshair. The selection is clipped to its display while dragging, and the
-size shown is `DisplayImage.pixelRect(for:)`, the same rectangle the cut uses.
+samples its 15 by 15 neighborhood of the latest frame with `PixelSampler.colors(in:of:)`, which
+draws the pixels into a small context rather than parsing the capture's pixel format; its center is
+the color under the crosshair; a new frame redraws just the magnifier's panel. The selection is
+clipped to its display while dragging, and the size shown is `DisplayImage.pixelRect(for:)`, the
+same rectangle the cut uses.
 
 The clipboard copy at capture time (`Export.copyInBackground`) encodes off the main thread and
 writes only if the pasteboard has not changed since, so the editor opens at once and a Copy made
@@ -271,7 +272,12 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   plain `NSApp.activate()` is refused for it: the overlay showed but Escape went to the app in
   front. `activate(ignoringOtherApps: true)` works, and every activation uses it.
 - `CGImage.cropping(to:)` shares its parent's pixels: a cut-out made that way keeps the whole
-  display picture alive. `DisplayImage.cut` draws into a bitmap of its own.
+  frame alive, and with it a buffer the stream needs back. `DisplayImage.cut` draws into a bitmap
+  of its own.
+- A filtered display capture leaves window shadows out unless `ignoreShadowsDisplay` is false;
+  the old frozen picker's screen looked shadowless for that reason.
+- A clear window lets clicks through its transparent parts unless `ignoresMouseEvents` is set to
+  false explicitly, even though false is what it reads by default; the live overlay sets it.
 - Views no longer clip their drawing to their bounds by default, and the rect `draw(_:)` is asked
   to fill can reach past the view. The canvas filled it and painted its dark field over the bar
   in 0.2.0; it sets `clipsToBounds` and fills only its bounds, and `BarTests` checks the bar

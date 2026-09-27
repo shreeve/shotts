@@ -174,6 +174,30 @@ extension OverlayView {
         #expect(widest.size(withAttributes: OverlayView.labelAttributes).width + 4 <= near.panel.width)
     }
 
+    /// Live, the real screen shows through: the overlay is clear, still takes the mouse, draws
+    /// nothing where the pointer is not, and redraws the magnifier when a new frame comes.
+    @Test func aLiveOverlayShowsTheRealScreen() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let display = DisplayImage(screen: screen, image: nil, scale: 2, isLive: true)
+        #expect(display.pixelBounds.width == (screen.frame.width * 2).rounded())
+        let window = OverlayWindow(display: display, options: SelectionOptions())
+        #expect(!window.isOpaque && window.backgroundColor == .clear && !window.ignoresMouseEvents)
+        let view = window.overlayView
+        view.frame = CGRect(x: 0, y: 0, width: 200, height: 150)
+
+        view.pointerMoved(to: view.convert(CGPoint(x: -50, y: -50), to: nil))
+        let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let alpha = (0..<rep.pixelsHigh).flatMap { y in (0..<rep.pixelsWide).map { x in rep.colorAt(x: x, y: y)?.alphaComponent ?? 0 } }
+        #expect(alpha.allSatisfy { $0 == 0 })
+
+        view.point(at: CGPoint(x: 60, y: 40))
+        view.cacheDisplay(in: view.bounds, to: rep) // draws the magnifier, and notes where
+        view.needsDisplay = false
+        display.image = blankImage(400, 300)
+        #expect(view.needsDisplay)
+    }
+
     /// The magnifier's color and Command-C's are the pixel under the crosshair.
     @Test func colorIsThePixelUnderThePointer() throws {
         let ctx = CGContext(data: nil, width: 400, height: 300, bitsPerComponent: 8, bytesPerRow: 0,

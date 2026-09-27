@@ -1,4 +1,5 @@
 import AppKit
+import ScreenCaptureKit
 import ShottsCore
 import ShottsUI
 
@@ -23,6 +24,8 @@ final class CaptureFlow {
         var returnTo: NSRunningApplication?
         /// The picker, which calls back once, to nothing, unless someone holds it.
         var selection: AreaSelection?
+        /// The displays, streaming while the picker is up.
+        var displays: [LiveDisplay] = []
     }
 
     func begin() {
@@ -33,10 +36,17 @@ final class CaptureFlow {
             askPermission()
             return
         }
+        // The picker goes up at once over the live screen; the streams it reads start behind it,
+        // leaving its own windows out.
+        let displays = LiveDisplay.all()
+        capture?.displays = displays
+        let selection = select(from: displays)
         Task {
             do {
-                select(from: try await ScreenCapture.captureDisplays())
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                for display in displays { try await display.start(in: content, excluding: selection.windowNumbers) }
             } catch {
+                selection.cancel()
                 fail("Shotts could not capture the screen", error)
             }
         }
@@ -50,21 +60,30 @@ final class CaptureFlow {
         return (editors.first { $0.editor.window?.isKeyWindow == true } ?? editors.last)?.returnTo
     }
 
-    private func select(from displays: [DisplayImage]) {
-        let selection = AreaSelection(displays: displays) { [weak self] outcome in
+    private func select(from displays: [LiveDisplay]) -> AreaSelection {
+        let selection = AreaSelection(displays: displays.map(\.display)) { [weak self] outcome in
             guard let self else { return }
+            let live = capture?.displays ?? []
             switch outcome {
             case .cancelled:
+                live.forEach { $0.stop() }
                 end()
             case let .selected(display, rect):
-                guard let image = display.cut(rect) else { end(); return }
-                deliver(image, scale: display.scale, on: display.screen)
+                // Cut from the frame at the moment of release, then stop streaming.
+                Task {
+                    _ = await live.first { $0.display === display }?.firstFrame()
+                    let image = display.cut(rect)
+                    live.forEach { $0.stop() }
+                    guard let image else { self.end(); return }
+                    self.deliver(image, scale: display.scale, on: display.screen)
+                }
             case let .window(display, window):
                 // The window on its own, whatever covered it. If it has gone meanwhile, the
-                // area it occupied in the display picture stands in.
+                // area it occupied on the display stands in.
                 Task {
                     let captured = (try? await ScreenCapture.captureWindow(window.id, shadow: SelectionOptions.current.dropShadow))
                         ?? display.cut(window.frame).map { ($0, display.scale) }
+                    live.forEach { $0.stop() }
                     guard let (image, scale) = captured else { end(); return }
                     deliver(image, scale: scale, on: display.screen)
                 }
@@ -72,6 +91,7 @@ final class CaptureFlow {
         }
         capture?.selection = selection
         selection.show()
+        return selection
     }
 
     private func deliver(_ image: CGImage, scale: CGFloat, on screen: NSScreen) {
