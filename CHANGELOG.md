@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.2.5 — 2026-09-27
 
 - F10 no longer brings Shotts to the front, which pulled every open editor in front of what you
   were about to capture. The picker works over whatever app is in front; only a new capture's
