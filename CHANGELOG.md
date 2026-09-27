@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.2.6 — 2026-09-27
 
 - The arrow keys nudge a selected annotation, a point at a time or ten with Shift.
 - Option-Return starts a new line while typing, as Shift-Return does.
