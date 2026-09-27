@@ -47,7 +47,8 @@ public struct RGBA: Equatable, Sendable, Codable {
     public var isLight: Bool { 0.299 * red + 0.587 * green + 0.114 * blue > 0.6 }
 }
 
-/// The typeface text annotations use, from the fonts every Mac has. Bold in each case.
+/// The typeface text annotations use: the fonts every Mac has, and Open Sans, which the app
+/// bundles. Bold in each case.
 public enum FontChoice: String, CaseIterable, Sendable, Codable {
     /// The system font's rounded design: friendly, a little soft, like Droid Sans Bold.
     case rounded
@@ -55,12 +56,16 @@ public enum FontChoice: String, CaseIterable, Sendable, Codable {
     case system
     /// Trebuchet MS: humanist, the closest of the built-in fonts to Droid Sans.
     case trebuchet
+    /// Open Sans: Droid Sans redrawn by its own designer. It ships inside the app under the SIL
+    /// Open Font License (`Support/Fonts`).
+    case openSans
 
     public var title: String {
         switch self {
         case .rounded: "Rounded"
         case .system: "System"
         case .trebuchet: "Trebuchet"
+        case .openSans: "Open Sans"
         }
     }
 }

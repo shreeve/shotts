@@ -134,7 +134,7 @@ enum DevSwitches {
         let style = Style.standard
         var blue = style; blue.color = .blue
         var yellow = style; yellow.color = .yellow
-        var big = style; big.fontSize = 36
+        var big = style; big.fontSize = 36; big.font = .openSans
         var even = style; even.taperedArrows = false
         document.add(Annotation(shape: .arrow(from: CGPoint(x: w * 0.15, y: h * 0.75), to: CGPoint(x: w * 0.4, y: h * 0.45)), style: style))
         document.add(Annotation(shape: .arrow(from: CGPoint(x: w * 0.4, y: h * 0.75), to: CGPoint(x: w * 0.2, y: h * 0.55)), style: even))

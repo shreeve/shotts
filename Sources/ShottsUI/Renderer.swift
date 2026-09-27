@@ -144,17 +144,16 @@ public enum Renderer {
     }
 
     /// The style's typeface, bold, at its size scaled to pixels.
+    /// A font missing from this build (Open Sans, outside the app bundle) falls back to Rounded.
     public static func font(for style: Style, scale: Double) -> NSFont {
         let size = style.fontSize * scale
         let system = NSFont.systemFont(ofSize: size, weight: .bold)
+        let rounded = system.fontDescriptor.withDesign(.rounded).flatMap { NSFont(descriptor: $0, size: size) } ?? system
         switch style.font {
-        case .system:
-            return system
-        case .rounded:
-            guard let descriptor = system.fontDescriptor.withDesign(.rounded), let font = NSFont(descriptor: descriptor, size: size) else { return system }
-            return font
-        case .trebuchet:
-            return NSFont(name: "TrebuchetMS-Bold", size: size) ?? system
+        case .system: return system
+        case .rounded: return rounded
+        case .trebuchet: return NSFont(name: "TrebuchetMS-Bold", size: size) ?? system
+        case .openSans: return NSFont(name: "OpenSans-Bold", size: size) ?? rounded
         }
     }
 

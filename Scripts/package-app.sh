@@ -26,6 +26,8 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Framewor
 cp "$bin_dir/Shotts" "$app/Contents/MacOS/Shotts"
 cp "$root/Support/Info.plist" "$app/Contents/Info.plist"
 cp "$root/Support/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
+# Open Sans and its license; ATSApplicationFontsPath in Info.plist makes it Shotts' own font.
+cp -R "$root/Support/Fonts" "$app/Contents/Resources/Fonts"
 
 # Sparkle is a binary framework. SwiftPM links it from the build directory, so the app needs
 # its own copy and an rpath that finds it.

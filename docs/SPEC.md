@@ -89,9 +89,10 @@ After the first capture, a new capture starts with the drawing tool last used.
 
 Every tool but Obscure draws with the chosen color and line width; the highlighter uses them
 translucent and three times as wide, never under 12 points. Text uses the chosen size and font:
-Rounded (the system font's rounded design, the default), System, or Trebuchet, bold in each
-case. The color swatch in the bar opens a panel with ten colors, a custom color, and switches
-for the soft shadow under annotations, the outline on text, and tapered arrows. Color, width,
+Rounded (the system font's rounded design, the default), System, Trebuchet, or Open Sans, which
+ships inside the app, bold in each case. The color swatch in the bar opens a panel with ten
+colors, a custom color, and switches for the soft shadow under annotations, the outline on
+text, and tapered arrows. Color, width,
 size, font, and the switches are remembered across captures. Changing one with an annotation
 selected, or while typing, changes that one thing on it and nothing else.
 

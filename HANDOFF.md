@@ -8,7 +8,7 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 0.1.0 is released (GitHub, the Homebrew cask, Sparkle), and the repository is public. The
 `revamp` branch (from `main` at e945441) is a correctness, security, and performance pass over
 the whole app; `CHANGELOG.md`'s Unreleased section is what it changed for users. It builds with
-no warnings (warnings are errors) and `swift test` passes: 39 Core tests and 43 AppKit tests.
+no warnings (warnings are errors) and `swift test` passes: 40 Core tests and 45 AppKit tests.
 
 Next, in order:
 
@@ -39,7 +39,7 @@ Deferred, with the reason each waits:
 | --- | --- | --- |
 | ShottsCore | `Document.swift` | The seam: pixel size, scale, annotations, crop; `visibleRect` is what exports. |
 | | `Annotation.swift` | `Annotation.Shape` (arrow, callout, rectangle, ellipse, text, pen, highlighter, obscure), bounds, translation, `dragged(_:by:)` (what a drag on each part moves), degeneracy. |
-| | `Style.swift` | `Style` (color, stroke width, font size, font, shadow, outline, tapered arrows), its pixel metrics, `applying(from:to:)`, and decoding that tolerates older and newer saved styles. |
+| | `Style.swift` | `Style` (color, stroke width, font size, font, shadow, outline, tapered arrows), its pixel metrics, `applying(from:to:)`, and decoding that tolerates older and newer saved styles. `FontChoice`: Rounded, System, Trebuchet, Open Sans. |
 | | `Arrow.swift` | `ArrowGeometry`: an arrow as one filled outline, and its head length. |
 | | `Callout.swift` | `CalloutLayout`: where a callout's words go, from the arrow alone. |
 | | `HitTest.swift` | Which annotation a point lands on, and which part of an arrow or callout. |
@@ -201,6 +201,16 @@ whose colors are rounded to 16 levels, drawn from the source every time and neve
 `Export.encode` is the one encoder: PNG and TIFF through ImageIO, marked at 72 × scale dpi, so a
 Retina capture pastes at its on-screen size. Copy renders once and writes both types; a drag
 writes into `$TMPDIR/Shotts Drag/`, emptied before each drag, so at most one drag file exists.
+
+## Fonts
+
+Text is bold Rounded (the default), System, Trebuchet, or Open Sans. The first three every Mac
+has. Open Sans, Droid Sans redrawn by its own designer, is bundled: `Support/Fonts` holds
+`OpenSans-Bold.ttf` from github.com/googlefonts/opensans with its license, `OFL.txt`, which
+must ship beside it. `package-app.sh` copies the folder into `Contents/Resources/Fonts`, and
+`ATSApplicationFontsPath` in `Info.plist` makes it Shotts' own font, installed nowhere else.
+Outside the bundle (`swift test`, a bare debug binary) it is missing and `Renderer.font` falls
+back to Rounded; `FontTests` registers the file for its own process.
 
 ## The app icon
 

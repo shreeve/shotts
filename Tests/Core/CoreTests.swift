@@ -254,6 +254,12 @@ import Testing
         #expect(style.strokeWidth == 6 && style.shadow == false && style.taperedArrows == true && style.font == .rounded)
     }
 
+    @Test func openSansIsRemembered() throws {
+        var style = Style.standard
+        style.font = .openSans
+        #expect(try JSONDecoder().decode(Style.self, from: JSONEncoder().encode(style)).font == .openSans)
+    }
+
     @Test func anUnknownFontKeepsTheRest() throws {
         let newer = Data(#"{"color":{"red":0,"green":0,"blue":1,"alpha":1},"strokeWidth":10,"font":"serif"}"#.utf8)
         let style = try JSONDecoder().decode(Style.self, from: newer)
