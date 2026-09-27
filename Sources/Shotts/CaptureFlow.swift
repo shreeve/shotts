@@ -11,6 +11,9 @@ final class CaptureFlow {
     private var capture: Capture?
     /// The open editors, each with the app it gives focus back to when it closes.
     private var editors: [(editor: EditorWindowController, returnTo: NSRunningApplication?)] = []
+    /// The editor closed last, as it was: Option-F10 opens it again. Only this one capture is
+    /// kept after its editor closes, until another editor closes and takes its place.
+    private var lastClosed: (document: Document, source: CGImage)?
 
     private struct Capture {
         /// The app in front when the hot key fired, Shotts itself when an editor was: a capture
@@ -85,15 +88,35 @@ final class CaptureFlow {
     /// Opens `image` in an editor that, when it closes as the window being worked in, gives focus
     /// back to `returnTo`. One closing in the background (Close All) leaves focus where it is.
     func open(image: CGImage, scale: CGFloat, on screen: NSScreen?, returningTo returnTo: NSRunningApplication?) {
-        let document = Document(width: image.width, height: image.height, scale: scale)
-        let editor = EditorWindowController(document: document, source: image, on: screen)
+        open(Document(width: image.width, height: image.height, scale: scale), source: image, on: screen, returningTo: returnTo)
+    }
+
+    private func open(_ document: Document, source: CGImage, on screen: NSScreen?, returningTo returnTo: NSRunningApplication?) {
+        let editor = EditorWindowController(document: document, source: source, on: screen)
         editor.onClose = { [weak self, weak editor] in
             let working = editor?.window?.isKeyWindow ?? false
+            if let editor { self?.lastClosed = (editor.canvas.document, editor.canvas.source) }
             self?.editors.removeAll { $0.editor === editor }
             if working { returnTo?.activate() }
         }
         editors.append((editor, returnTo))
         editor.present()
+    }
+
+    /// Whether Option-F10 has anything to show.
+    var hasLastCapture: Bool { !editors.isEmpty || lastClosed != nil }
+
+    /// Option-F10: the newest open editor, brought to the front; else the editor closed last,
+    /// opened again as it was, its annotations still editable.
+    func showLast() {
+        if let editor = editors.last?.editor {
+            editor.present()
+        } else if let (document, source) = lastClosed {
+            lastClosed = nil
+            open(document, source: source, on: NSScreen.main, returningTo: appToReturnTo())
+        } else {
+            NSSound.beep()
+        }
     }
 
     /// Ends a capture that opened no editor, leaving focus with the app that had it.

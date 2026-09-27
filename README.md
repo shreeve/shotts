@@ -19,8 +19,9 @@
 Shotts lives in the menu bar and does one thing well. Press F10 and the screen freezes under a
 crosshair with a magnifier. Drag out the area you want, or click a window to capture just that
 window. The capture opens in a small editor with arrows, callouts, text, shapes, a pen, a
-highlighter, and pixelation for things that should not leave your Mac. Copy it, save it, or drag
-it into another app, and Shotts gets out of the way and returns you to where you were.
+highlighter, and pixelation for things that should not leave your Mac. Copy it, save it, print
+it, or drag it into another app; the editor stays open like any window, and Option-F10 brings
+back the last one if you closed it.
 
 The annotations are made to look good on a busy screenshot: rounded strokes, tapered arrows,
 bold text with a contrasting outline, restrained shadows. The app is small, keeps its memory in

@@ -57,9 +57,9 @@ Deferred, with the reason each waits:
 | | `StylePopover.swift` | The color and style popover. |
 | | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file. |
 | Shotts | `ShottsApp.swift` | `AppDelegate`: menu bar item and menu, main menu, Sparkle. |
-| | `CaptureFlow.swift` | One capture from hot key to editor, and which app gets focus back. |
+| | `CaptureFlow.swift` | One capture from hot key to editor, which app gets focus back, and the capture closed last. |
 | | `ScreenCapture.swift` | ScreenCaptureKit (every display, or one window) and the window list. |
-| | `HotKey.swift` | The Carbon hot key for F10. |
+| | `HotKey.swift` | The Carbon hot keys: F10 captures, Option-F10 brings the last capture back. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
 
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
@@ -130,9 +130,12 @@ is signed with the Developer ID rather than ad hoc.
 `EditorWindowController` builds its bar by hand: a segmented control of `Tool`s (single-key
 shortcuts, the last drawing tool remembered), the color swatch that opens the window's one
 `StylePopover`, popups for stroke width, text size, and font, undo and redo, the drag grip, and
-Copy and Save. Copy, save, and a drag out finish the edit and close the window; print does not.
-Closing with annotations, words being typed included, asks in a sheet (`askToDiscard`), and
-Escape with nothing to cancel closes through `performClose`, so it asks too.
+Copy and Save. The editor is an ordinary window: copy, save, drag out, and print leave it open
+(print brings it back to the front after the Print window), and Command-W, the red button, or
+Escape with nothing left to cancel closes it with no question. Closing first keeps the words
+being typed and puts back a drag in progress. `CaptureFlow` keeps the document and picture of the
+editor closed last, and Option-F10 (`showLast`) brings the newest open editor forward or opens
+that one again; it is the only capture kept after its editor closes.
 
 Resizing changes only the canvas's `zoom` (points per picture pixel), never the document.
 `EditorLayout` holds the rules: the zoom that fits a content size (capped at the picture's
@@ -280,8 +283,7 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   `performClose` asks. Escape closed annotated captures without asking until it used
   `performClose`.
 - A sheet on a window that is never shown can end a test process quietly, and `swift test` then
-  reports only the other target, exiting 0. Tests answer `askToDiscard` themselves; never show a
-  real alert or sheet from a test.
+  reports only the other target, exiting 0. Never show a real alert or sheet from a test.
 - Core Graphics sizes a transparency layer to the clip: without the clip to an annotation's
   extent, every shadowed arrow and text allocated and composited a picture-sized layer (116 ms
   per arrow on a 5K capture).

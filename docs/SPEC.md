@@ -13,9 +13,10 @@ clipboard as soon as it is taken.
 
 ## Capturing
 
-F10 is the hot key. On a Mac keyboard whose top row controls the Mac, that is fn-F10, unless
-"Use F1, F2, etc. keys as standard function keys" is on. If another app already holds F10, the
-menu says so: Capture Area (another app has F10). F10 does nothing while a capture is under way.
+F10 is the hot key, and Option-F10 brings the last capture back (see The editor). On a Mac
+keyboard whose top row controls the Mac, that is fn-F10, unless "Use F1, F2, etc. keys as
+standard function keys" is on. If another app already holds F10, the menu says so: Capture Area
+(another app has F10). F10 does nothing while a capture is under way.
 
 | Action | Result |
 | --- | --- |
@@ -43,8 +44,8 @@ where it would cover the magnifier. Because the picture is taken when F10 is pre
 select is exactly what you get, even if the screen changes while you choose. A clicked window is
 the one exception: it is captured on its own as it is when clicked.
 
-The menu bar menu holds Capture Area, Open Image… (a PNG, JPEG, or TIFF into the editor), Check
-for Updates…, Quit, and the picker's options, remembered across launches:
+The menu bar menu holds Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into
+the editor), Check for Updates…, Quit, and the picker's options, remembered across launches:
 
 | Option | Default | Effect |
 | --- | --- | --- |
@@ -121,28 +122,33 @@ to retype them; words left empty turn the callout into a plain arrow.
 | --- | --- |
 | Undo, Redo | Command-Z, Shift-Command-Z. While typing, they undo and redo the typing. |
 | Finish typing, cancel the current drag, then clear the selection | Escape |
-| Close the editor | Command-W, or Escape with nothing to cancel |
+| Close the editor | Command-W, the red button, or Escape with nothing to cancel |
+| Bring the last capture back | Option-F10, or Show Last Capture in the menu bar menu |
 
 Undo covers annotations and the crop, not the capture itself. Drawing, moving, or typing an
-annotation is one step. Closing a window with unsaved annotations, including words still being
-typed, asks first.
+annotation is one step.
+
+The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.
+Option-F10 brings the newest open editor to the front, or, when none is open, opens the one
+closed last again exactly as it was, annotations still editable. Shotts keeps that one closed
+capture in memory until another editor closes and takes its place.
 
 ### Output
 
 | Action | Result |
 | --- | --- |
-| Copy (Command-C) | The picture, with its annotations and crop, goes to the clipboard as PNG and TIFF. The editor closes. Command-C copies the picture even while typing. |
-| Save… (Command-S) | Asks where; suggests the Desktop and a name like `Shotts 2026-09-26 at 10.12.34 AM.png`, with the time as the system writes it. The editor closes. |
-| Drag the hand icon | Drags a PNG file into another app or the Finder, even from the first press while another app is in front. The editor closes when the drop lands. |
-| Print… (Command-P) | Prints the picture, with its annotations and crop, scaled to fit one page and turned sideways when it is wider than tall. The editor stays open. |
+| Copy (Command-C) | The picture, with its annotations and crop, goes to the clipboard as PNG and TIFF. The editor stays open. Command-C copies the picture even while typing. |
+| Save… (Command-S) | Asks where; suggests the Desktop and a name like `Shotts 2026-09-26 at 10.12.34 AM.png`, with the time as the system writes it. The editor stays open. |
+| Drag the hand icon | Drags a PNG file into another app or the Finder, even from the first press while another app is in front. The editor stays open. |
+| Print… (Command-P) | Prints the picture, with its annotations and crop, scaled to fit one page and turned sideways when it is wider than tall, in the standard Print window. The editor comes back to the front afterwards. |
 
 The copied, saved, and dragged pictures are identical to what the editor shows. They carry the
 capture's resolution (144 dpi from a Retina display), so they paste at their on-screen size,
 and its color space.
 
-After an editor closes, the app that was in front when its F10 was pressed comes back to the
-front; with several editors open, each gives focus back to the app its own capture came from.
-A cancelled capture goes back to the app that was in front.
+When the editor you are working in closes, the app that was in front when its F10 was pressed
+comes back to the front; with several editors open, each gives focus back to the app its own
+capture came from. A cancelled capture goes back to the app that was in front.
 
 ## Not built
 

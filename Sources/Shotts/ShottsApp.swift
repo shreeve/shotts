@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import ShottsCore
 import ShottsUI
 import Sparkle
@@ -22,7 +23,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
-        makeStatusItem(hasHotKey: HotKey.registerF10 { [weak self] in self?.flow.begin() })
+        let capture = HotKey.registerF10 { [weak self] in self?.flow.begin() }
+        let showLast = HotKey.registerF10(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
+        makeStatusItem(hasHotKey: capture, hasShowLastKey: showLast)
         updater.startUpdater()
         #if DEBUG
         DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
@@ -30,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
+
+    @objc private func showLastCapture() {
+        flow.showLast()
+    }
 
     @objc private func captureArea() {
         flow.begin()
@@ -60,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     /// Without the hot key, because another app holds F10, Capture Area says so instead of
     /// showing a key that does nothing.
-    private func makeStatusItem(hasHotKey: Bool) {
+    private func makeStatusItem(hasHotKey: Bool, hasShowLastKey: Bool) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Shotts")
         let menu = NSMenu()
@@ -69,6 +76,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         capture.keyEquivalentModifierMask = []
         capture.target = self
         menu.addItem(capture)
+        let last = NSMenuItem(title: "Show Last Capture", action: #selector(showLastCapture), keyEquivalent: hasShowLastKey ? functionKey(NSF10FunctionKey) : "")
+        last.keyEquivalentModifierMask = .option
+        last.target = self
+        menu.addItem(last)
         let open = NSMenuItem(title: "Open Image…", action: #selector(openFile as () -> Void), keyEquivalent: "")
         open.target = self
         menu.addItem(open)
@@ -99,6 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     /// Sparkle says when a check can start: not before the updater has started, and not during one.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(checkForUpdates) { return updater.updater.canCheckForUpdates }
+        if item.action == #selector(showLastCapture) { return flow.hasLastCapture }
         return true
     }
 

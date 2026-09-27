@@ -253,63 +253,58 @@ import Testing
 }
 
 @MainActor @Suite struct ClosingTests {
-    /// An editor whose discard question is answered by `answer`, and a record of being asked.
-    func editor(annotated: Bool, answer discard: Bool = false) -> (EditorWindowController, asked: () -> Bool) {
+    func editor(annotated: Bool) -> EditorWindowController {
         let controller = EditorWindowController(document: Document(width: 400, height: 300, scale: 2), source: blankImage(400, 300))
         if annotated {
             var d = controller.canvas.document
             d.add(Annotation(shape: .rectangle(CGRect(x: 10, y: 10, width: 50, height: 50)), style: .standard))
             controller.canvas.commit(d)
         }
-        var asked = false
-        controller.askToDiscard = { _, done in
-            asked = true
-            if discard { done() }
-        }
-        return (controller, { asked })
+        return controller
     }
 
-    @Test func escapeAsksBeforeDiscardingAnnotations() {
-        let (kept, keptAsked) = editor(annotated: true)
-        var closed = false
-        kept.onClose = { closed = true }
-        kept.cancelOperation(nil)
-        #expect(keptAsked() && !closed)
-
-        let (discarded, _) = editor(annotated: true, answer: true)
-        var gone = false
-        discarded.onClose = { gone = true }
-        discarded.cancelOperation(nil)
-        #expect(gone)
+    /// The editor closes like any window, annotations or not, with no question: Option-F10
+    /// brings the one closed last back. What it closes with is what comes back.
+    @Test func escapeClosesLikeAnyWindowKeepingTheAnnotations() {
+        let controller = editor(annotated: true)
+        var closedWith: Document?
+        controller.onClose = { [unowned controller] in closedWith = controller.canvas.document }
+        controller.cancelOperation(nil)
+        #expect(closedWith?.annotations.count == 1)
     }
 
-    @Test func escapeClosesABlankCapture() {
-        let (controller, asked) = editor(annotated: false)
+    /// Copy leaves the editor open, like any other window.
+    @Test func copyKeepsTheEditorOpen() {
+        let controller = editor(annotated: true)
+        controller.pasteboard = NSPasteboard(name: NSPasteboard.Name("shotts-test-\(UUID().uuidString)"))
+        defer { controller.pasteboard.releaseGlobally() }
         var closed = false
         controller.onClose = { closed = true }
-        controller.cancelOperation(nil)
-        #expect(closed && !asked())
+        controller.copyPressed()
+        #expect(!closed)
+        #expect(controller.pasteboard.data(forType: .png) != nil)
     }
 
     @Test func closingMidDragPutsTheDragBack() {
-        let (controller, _) = editor(annotated: true)
+        let controller = editor(annotated: true)
         let canvas = controller.canvas
         let before = canvas.document
         let mouse = Mouse(canvas: canvas)
         canvas.tool = .select
         mouse.down(CGPoint(x: 10, y: 35))
         mouse.drag(CGPoint(x: 80, y: 35))
-        #expect(controller.windowShouldClose(controller.window!) == false)
+        #expect(controller.windowShouldClose(controller.window!))
         #expect(canvas.document == before)
-        canvas.undo(nil) // not stuck behind a drag that never ended
-        #expect(canvas.document.isBlank)
     }
 
-    @Test func wordsBeingTypedCountAsAnnotations() {
-        let (controller, asked) = editor(annotated: false)
+    /// Words still being typed are part of what closes, and so of what Option-F10 brings back.
+    @Test func wordsBeingTypedAreKeptWhenClosing() {
+        let controller = editor(annotated: false)
         controller.canvas.beginTextEntry(at: CGPoint(x: 20, y: 20), initial: "", style: .standard)
-        controller.canvas.typeText("unsaved")
-        #expect(controller.windowShouldClose(controller.window!) == false && asked())
+        controller.canvas.typeText("kept")
+        #expect(controller.windowShouldClose(controller.window!))
+        guard case let .text(_, words, _, _)? = controller.canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
+        #expect(words == "kept")
     }
 }
 

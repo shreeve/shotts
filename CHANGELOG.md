@@ -7,6 +7,10 @@ Unreleased, whose heading becomes the version's when it ships.
 
 ## Unreleased
 
+- The editor is an ordinary window: Copy, Save, drag out, and Print leave it open, and it closes
+  when you close it, with no question. Option-F10, or Show Last Capture in the menu bar menu,
+  brings the last capture back to the front, or reopens it as you left it if you closed it.
+- After printing, the editor comes back to the front.
 - The magnifier keeps its crosshair while you drag out an area, so the corner can be put on an
   exact pixel.
 - The magnifier is one size, with an even dark frame on the left, top, and right, instead of side
