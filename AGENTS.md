@@ -43,6 +43,9 @@ read it before changing capture, the selection overlay, the editor, or export.
 - The editor is an ordinary window: copying, saving, dragging out, and printing leave it open,
   and closing it asks nothing, because Option-F10 brings the last one back. When the editor
   being worked in closes, focus returns to the app that was frontmost when the hot key fired.
+- F10 never activates Shotts: activating an app brings all its windows forward, and that would
+  change the very screen being captured. Only a new editor opening, or Option-F10, brings Shotts
+  to the front.
 - The hot key is a Carbon hot key, which needs no Accessibility permission. Screen Recording is
   the only permission Shotts asks for, and only when the first capture needs it.
 - Developer switches (`--edit`, `--render`, …) exist only in debug builds. A release build must

@@ -30,7 +30,9 @@ standard function keys" is on. If another app already holds F10, the menu says s
 | Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
 | Escape | Cancels, even mid-drag. Nothing is kept. |
 
-A click on no window does nothing, so a stray click does not end the capture. Switching to
+F10 leaves every window where it is, Shotts' editors included; Shotts itself comes to the front
+only when a capture's editor opens, or with Option-F10. A click on no window does nothing, so a
+stray click does not end the capture. Switching to
 another app, or a display being added, removed, or rearranged, cancels.
 
 The crosshair is a light line with a dark edge, visible on any background, and shows only on the

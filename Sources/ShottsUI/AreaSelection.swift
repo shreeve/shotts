@@ -129,7 +129,7 @@ public final class AreaSelection {
 
     private var windows: [OverlayWindow] = []
     private var completion: ((Outcome) -> Void)?
-    private var observers: [NSObjectProtocol] = []
+    private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 
     public init(displays: [DisplayImage], options: SelectionOptions = .current, completion: @escaping (Outcome) -> Void) {
         self.completion = completion
@@ -138,14 +138,19 @@ public final class AreaSelection {
             window.overlayView.onFinish = { [weak self] outcome in self?.finish(outcome) }
             return window
         }
-        // A display added, removed, or re-moded leaves the pictures describing screens that no
-        // longer exist, and once another app is active the picker gets no keys, not even
+        // A display added, removed, or re-moded leaves the overlays over screens that no longer
+        // exist, and once the user switches to another app the picker gets no keys, not even
         // Escape: either way it cancels.
-        observers = [NSApplication.didChangeScreenParametersNotification, NSApplication.didResignActiveNotification].map { name in
-            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.finish(.cancelled) }
-            }
+        let cancel: @Sendable (Notification) -> Void = { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            guard app?.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+            MainActor.assumeIsolated { self?.finish(.cancelled) }
         }
+        observers = [
+            (.default, NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main, using: cancel)),
+            (NSWorkspace.shared.notificationCenter,
+             NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main, using: cancel)),
+        ]
     }
 
     /// The picker's own windows, which a live capture leaves out.
@@ -155,11 +160,10 @@ public final class AreaSelection {
         for window in windows {
             window.orderFrontRegardless()
         }
-        // A menu bar app is not the active app when its hot key fires, and only the active
-        // app's key window gets Escape. The plain `activate()` is refused here (measured on
-        // macOS 27: the app stays inactive and Escape goes to whatever app was in front), so
-        // this is the form that ignores other apps. Keys go to the display the pointer is on.
-        NSApp.activate(ignoringOtherApps: true)
+        // Shotts is not activated: activating an app brings all its windows forward, and an open
+        // editor would jump in front of what is about to be captured. The overlays are
+        // non-activating panels, which take keys and clicks while the app in front stays in
+        // front. Keys go to the display the pointer is on.
         let mouse = NSEvent.mouseLocation
         (windows.first { $0.frame.contains(mouse) } ?? windows.first)?.makeKeyAndOrderFront(nil)
         // Start with the crosshair where the pointer already is, not at a corner waiting for
@@ -168,7 +172,8 @@ public final class AreaSelection {
             window.overlayView.pointerMoved(to: window.convertPoint(fromScreen: mouse))
         }
         // The crosshair is the pointer while the picker is up; an arrow beside it would only
-        // add a second, offset hotspot to look at.
+        // add a second, offset hotspot to look at. An app that is not active may not hide the
+        // pointer, so the overlays also show a blank one (`OverlayView.resetCursorRects`).
         NSCursor.hide()
     }
 
@@ -178,7 +183,7 @@ public final class AreaSelection {
     private func finish(_ outcome: Outcome) {
         guard let completion else { return }
         self.completion = nil
-        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.forEach { $0.center.removeObserver($0.token) }
         observers = []
         NSCursor.unhide()
         for window in windows {
@@ -189,14 +194,18 @@ public final class AreaSelection {
     }
 }
 
-final class OverlayWindow: NSWindow {
+/// A non-activating panel: it takes keys and clicks without making Shotts the active app, so
+/// nothing on screen is reordered by pressing the hot key.
+final class OverlayWindow: NSPanel {
     let overlayView: OverlayView
 
     init(display: DisplayImage, options: SelectionOptions) {
         overlayView = OverlayView(display: display, options: options)
         // The four-argument initializer is the designated one; the variant taking a screen
         // calls it, which a subclass must therefore provide.
-        super.init(contentRect: display.screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        super.init(contentRect: display.screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        hidesOnDeactivate = false
+        becomesKeyOnlyIfNeeded = false
         level = .screenSaver
         // Live, the real screen shows through, still updating, shadows and all.
         isOpaque = !display.isLive
@@ -253,6 +262,22 @@ final class OverlayView: NSView {
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+
+    /// A blank pointer over the picker: the crosshair stands in for it, and an app that is not
+    /// active may not hide the pointer outright.
+    static let blankCursor = NSCursor(image: NSImage(size: NSSize(width: 1, height: 1)), hotSpot: .zero)
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: Self.blankCursor)
+    }
+
+    /// Command-C, whether or not the key reaches the main menu of an app that is not active.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+              event.charactersIgnoringModifiers == "c" else { return super.performKeyEquivalent(with: event) }
+        copy(nil)
+        return true
+    }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     #if DEBUG

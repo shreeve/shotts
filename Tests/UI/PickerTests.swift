@@ -176,6 +176,14 @@ extension OverlayView {
 
     /// Live, the real screen shows through: the overlay is clear, still takes the mouse, draws
     /// nothing where the pointer is not, and redraws the magnifier when a new frame comes.
+    /// The picker never activates Shotts, which would bring every editor in front of what is
+    /// about to be captured: its windows are non-activating panels that still take keys.
+    @Test func thePickerDoesNotActivateShotts() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let window = OverlayWindow(display: DisplayImage(screen: screen, image: nil, scale: 2, isLive: true), options: SelectionOptions())
+        #expect(window.styleMask.contains(.nonactivatingPanel) && window.canBecomeKey && !window.hidesOnDeactivate)
+    }
+
     @Test func aLiveOverlayShowsTheRealScreen() throws {
         let screen = try #require(NSScreen.screens.first)
         let display = DisplayImage(screen: screen, image: nil, scale: 2, isLive: true)
@@ -218,12 +226,16 @@ extension OverlayView {
     /// A display change or another app coming to the front cancels the picker.
     @Test func screenChangeOrLosingActiveCancels() async throws {
         let screen = try #require(NSScreen.screens.first)
-        for name in [NSApplication.didChangeScreenParametersNotification, NSApplication.didResignActiveNotification] {
+        let changes: [(NotificationCenter, Notification.Name)] = [
+            (.default, NSApplication.didChangeScreenParametersNotification),
+            (NSWorkspace.shared.notificationCenter, NSWorkspace.didActivateApplicationNotification),
+        ]
+        for (center, name) in changes {
             var outcome: AreaSelection.Outcome?
             let selection = AreaSelection(displays: [DisplayImage(screen: screen, image: blankImage(40, 30), scale: 2)], options: SelectionOptions()) {
                 outcome = $0
             }
-            NotificationCenter.default.post(name: name, object: NSApp)
+            center.post(name: name, object: NSWorkspace.shared)
             try await Task.sleep(for: .milliseconds(20))
             guard case .cancelled? = outcome else { Issue.record("\(name.rawValue) left the picker up"); continue }
             _ = selection

@@ -7,6 +7,9 @@ Unreleased, whose heading becomes the version's when it ships.
 
 ## Unreleased
 
+- F10 no longer brings Shotts to the front, which pulled every open editor in front of what you
+  were about to capture. The picker works over whatever app is in front; only a new capture's
+  editor, or Option-F10, brings Shotts forward.
 - The menu bar options are in the order a capture meets them: Show Magnifier, Dim Outside
   Selection, Include Window Shadow, Copy to Clipboard, New Window per Capture.
 - A wide picture prints on a portrait page, turned onto it, as other apps print, so the Print
