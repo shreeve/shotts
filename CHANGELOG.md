@@ -8,7 +8,9 @@ Unreleased, whose heading becomes the version's when it ships.
 ## Unreleased
 
 - Return finishes typing, for text and for an arrow's words; Shift-Return starts a new line.
-  Escape, Command-Return, and a click elsewhere still finish too.
+  Command-Return and a click elsewhere still finish too.
+- Escape while typing cancels: new words go (a new arrow with text goes with its arrow), and
+  words being edited come back as they were.
 - Fewer choices, the same app: Trebuchet leaves the fonts (Open Sans is the one it stood in for;
   a remembered Trebuchet becomes Rounded), and the key hints simply show until the first drag,
   with no option to hide them.

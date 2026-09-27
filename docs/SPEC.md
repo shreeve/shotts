@@ -80,7 +80,7 @@ as the screen allows.
 | Select | V | Click an annotation to select it; drag to move it; Delete removes it. Double-click text or a callout's words to edit them. |
 | Arrow with text | N | An arrow with words at its tail, one object; see below. The tool a first capture starts with. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
-| Text | T | Click and type on the picture; the text appears in its final style as you go. Return finishes, as do Escape, a click elsewhere, or another tool; Shift-Return starts a new line. Clicking an existing text edits it. |
+| Text | T | Click and type on the picture; the text appears in its final style as you go. Return finishes, as do a click elsewhere or another tool; Shift-Return starts a new line, and Escape cancels the text. Clicking an existing text edits it. |
 | Rectangle | R | A stroked rectangle. Shift for a square; Option for a solid one. |
 | Ellipse | E | A stroked ellipse. Shift for a circle; Option for a solid one. |
 | Pen | P | A smooth freehand stroke. |
@@ -123,11 +123,13 @@ to retype them; words left empty turn the callout into a plain arrow.
 | Action | Key |
 | --- | --- |
 | Undo, Redo | Command-Z, Shift-Command-Z. While typing, they undo and redo the typing. |
-| Finish typing, cancel the current drag, then clear the selection | Escape |
+| Cancel typing, then the current drag, then clear the selection | Escape |
 | Close the editor | Command-W, the red button, or Escape with nothing to cancel |
 | Bring the last capture back | Option-F10, or Show Last Capture in the menu bar menu |
 
-Undo covers annotations and the crop, not the capture itself. Drawing, moving, or typing an
+Escape while typing cancels the text: new words go, a new arrow with text goes with its arrow,
+and words being edited come back as they were. Undo covers annotations and the crop, not the
+capture itself. Drawing, moving, or typing an
 annotation is one step.
 
 The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.

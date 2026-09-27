@@ -14,7 +14,7 @@ back, adds New Window per Capture, and keeps the magnifier's crosshair while dra
 0.2.0's editor, whose canvas painted over its bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit
 c24b093): a correctness, security, and performance pass over the whole app, plus Open Sans;
 `CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
-errors) and `swift test` passes: 41 Core tests and 50 AppKit tests.
+errors) and `swift test` passes: 41 Core tests and 53 AppKit tests.
 
 Next, in order:
 
@@ -173,9 +173,10 @@ words laid out again.
 Text is typed on the picture: `CanvasView.beginTextEntry` adds an invisible `TextEntry` (an
 `NSTextView` with clear text and a colored caret) whose `preview` the canvas draws through the
 renderer, so what is typed looks exactly like the export. The entry has its own undo manager, so
-Command-Z while typing undoes keystrokes and nothing outlives it. Return, Escape, or
-Command-Return finishes and Shift-Return breaks a line, except while an input method is
-composing, which gets every key. A text shape's `size` is its layout
+Command-Z while typing undoes keystrokes and nothing outlives it. Return or Command-Return
+finishes, Shift-Return breaks a line, and Escape cancels, restoring `base`: new words go, a new
+callout goes with its arrow, and edited words come back. An input method composing gets every
+key. Closing the window keeps the words. A text shape's `size` is its layout
 box, which hugs the words, with the outline's room on every side: a callout's words wrap at
 `CalloutLayout.width` but the box is only as wide as the widest line, so it can be centered on
 the tail and its selection outline fits the words. `Renderer.textSize` measures it and `drawText`

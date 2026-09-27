@@ -344,6 +344,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     /// closed last again, as it was.
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
         // Words being typed are kept, and a drag in progress is put back, before it goes.
+        canvas.endTextEntry(commit: true)
         _ = canvas.cancelCurrent()
         return true
     }
