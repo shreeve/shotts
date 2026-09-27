@@ -63,7 +63,7 @@ Deferred, with the reason each waits:
 
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
-`capture.askedPermission` once the system's permission prompt has been shown; the editor's last
+`capture.askedPermission` once the system's permission prompt has been shown, `editor.newWindows`; the editor's last
 style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 
 ## The seam
@@ -136,7 +136,10 @@ Copy and Save. The editor is an ordinary window: copy, save, drag out, and print
 Escape with nothing left to cancel closes it with no question. Closing first keeps the words
 being typed and puts back a drag in progress. `CaptureFlow` keeps the document and picture of the
 editor closed last, and Option-F10 (`showLast`) brings the newest open editor forward or opens
-that one again; it is the only capture kept after its editor closes.
+that one again; it is the only capture kept after its editor closes. Unless New Window per
+Capture is on (`editor.newWindows`), a new capture's editor takes the place of the newest open
+one at its top-left corner, and the one replaced becomes that kept capture, closed without
+handing focus back.
 
 Resizing changes only the canvas's `zoom` (points per picture pixel), never the document.
 `EditorLayout` holds the rules: the zoom that fits a content size (capped at the picture's

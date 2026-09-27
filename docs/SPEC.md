@@ -52,6 +52,7 @@ the editor), Check for Updates…, Quit, and the picker's options, remembered ac
 | Option | Default | Effect |
 | --- | --- | --- |
 | Copy to Clipboard | on | The capture is on the clipboard the moment it is taken, before any editing; Copy in the editor replaces it with the annotated one. |
+| New Window per Capture | off | Each capture opens in an editor of its own. Off, a new capture takes the place of the open editor, where it was on screen, and the one it replaces becomes the last capture. |
 | Include Window Shadow | off | A clicked window is captured with its own macOS shadow on a transparent margin, as the system's window screenshots are. An area cut from the screen never has one. |
 | Dim Outside Selection | on | Darkens everything outside the area while it is being dragged out. Aiming and clicking a window never dim. |
 | Show Magnifier | on | The magnifier and its color readout. |

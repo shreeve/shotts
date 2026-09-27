@@ -83,6 +83,8 @@ public struct SelectionOptions: Equatable, Sendable {
     public var copiesOnCapture = true
     /// A captured window keeps the shadow macOS draws around it, on a transparent margin.
     public var dropShadow = false
+    /// Each capture opens an editor of its own; otherwise it takes the place of the open one.
+    public var newWindows = false
 
     public init() {}
 
@@ -102,6 +104,7 @@ public struct SelectionOptions: Equatable, Sendable {
             o.showsHints = d.bool(forKey: "selection.hints")
             o.copiesOnCapture = d.bool(forKey: "capture.copies")
             o.dropShadow = d.bool(forKey: "export.shadow")
+            o.newWindows = d.bool(forKey: "editor.newWindows")
             return o
         }
         set {
@@ -111,6 +114,7 @@ public struct SelectionOptions: Equatable, Sendable {
             d.set(newValue.showsHints, forKey: "selection.hints")
             d.set(newValue.copiesOnCapture, forKey: "capture.copies")
             d.set(newValue.dropShadow, forKey: "export.shadow")
+            d.set(newValue.newWindows, forKey: "editor.newWindows")
         }
     }
 }

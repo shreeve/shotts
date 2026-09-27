@@ -7,6 +7,8 @@ Unreleased, whose heading becomes the version's when it ships.
 
 ## Unreleased
 
+- New Window per Capture, in the menu bar menu: off (the default), a new capture takes the
+  place of the open editor; on, each capture opens in a window of its own.
 - The screen stays live while you capture: it goes on updating under the crosshair, windows keep
   their shadows, and the area is captured as it is when you release, so you can wait for
   something to appear. Shotts' own editors stay on screen and can be captured too. macOS may show

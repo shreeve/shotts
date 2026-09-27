@@ -86,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menu.addItem(.separator())
         menu.addItem(optionItem("Copy to Clipboard", \.copiesOnCapture))
         menu.addItem(optionItem("Include Window Shadow", \.dropShadow))
+        menu.addItem(optionItem("New Window per Capture", \.newWindows))
         menu.addItem(optionItem("Dim Outside Selection", \.dims))
         menu.addItem(optionItem("Show Magnifier", \.magnifies))
         menu.addItem(optionItem("Show Hints", \.showsHints))
