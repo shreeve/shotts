@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.2.3 — 2026-09-27
 
 - New Window per Capture, in the menu bar menu: off (the default), a new capture takes the
   place of the open editor; on, each capture opens in a window of its own.
