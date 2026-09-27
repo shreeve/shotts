@@ -5,6 +5,11 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- The magnifier keeps its crosshair while you drag out an area, so the corner can be put on an
+  exact pixel.
+
 ## 0.2.2 — 2026-09-26
 
 - Print… opens the standard Print window, as other apps do, instead of a sheet squeezed into the

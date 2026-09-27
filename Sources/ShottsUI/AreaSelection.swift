@@ -511,18 +511,18 @@ final class OverlayView: NSView {
         // The crosshair, magnified with the pixels: four arms a cell wide that stop two cells
         // short of the pixel under the pointer, leaving it clear. Each cell of an arm is white
         // or black by the pixel under it, at half opacity either way, so the arms read on any
-        // picture. No dark edge here: it hid the very pixels being looked at.
+        // picture. No dark edge here: it hid the very pixels being looked at. They stay while
+        // dragging, when the corner is being put on a pixel, though the crosshair across the
+        // screen gives way to the selection's edges.
         let centerCell = CGRect(x: pixels.minX + CGFloat(half) * cell, y: pixels.minY + CGFloat(half) * cell, width: cell, height: cell)
-        if selection == nil {
-            func arm(_ i: Int, _ j: Int) {
-                let under = m.colors[j][i]
-                ctx.setFillColor(CGColor(gray: under.map { $0.isLight ? 0 : 1 } ?? 1, alpha: 0.5))
-                ctx.fill(CGRect(x: pixels.minX + CGFloat(i) * cell, y: pixels.minY + CGFloat(j) * cell, width: cell, height: cell))
-            }
-            for k in 0..<(half - 2) {
-                arm(half, k); arm(half, cells - 1 - k)  // above and below
-                arm(k, half); arm(cells - 1 - k, half)  // left and right
-            }
+        func arm(_ i: Int, _ j: Int) {
+            let under = m.colors[j][i]
+            ctx.setFillColor(CGColor(gray: under.map { $0.isLight ? 0 : 1 } ?? 1, alpha: 0.5))
+            ctx.fill(CGRect(x: pixels.minX + CGFloat(i) * cell, y: pixels.minY + CGFloat(j) * cell, width: cell, height: cell))
+        }
+        for k in 0..<(half - 2) {
+            arm(half, k); arm(half, cells - 1 - k)  // above and below
+            arm(k, half); arm(cells - 1 - k, half)  // left and right
         }
         // The pixel under the pointer: a white box with a dark edge, like the crosshair itself.
         ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.8)); ctx.setLineWidth(3); ctx.stroke(centerCell.insetBy(dx: -1, dy: -1))
