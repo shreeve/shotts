@@ -272,6 +272,9 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   to fill can reach past the view. The canvas filled it and painted its dark field over the bar
   in 0.2.0; it sets `clipsToBounds` and fills only its bounds, and `BarTests` checks the bar
   shows.
+- Printing runs the operation on its own (`NSPrintOperation.run()`), in the standard Print window.
+  As a sheet on the editor it took the editor's dark look and was squeezed to the window's
+  height, cutting off its options.
 - `NSWindowController.close()` and `NSWindow.close()` skip `windowShouldClose`; only
   `performClose` asks. Escape closed annotated captures without asking until it used
   `performClose`.
