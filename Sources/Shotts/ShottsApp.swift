@@ -75,6 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Shotts")
         let menu = NSMenu()
+        menu.addItem(aboutItem())
+        menu.addItem(.separator())
         let capture = NSMenuItem(title: hasHotKey ? "Capture Area" : "Capture Area (another app has F10)", action: #selector(captureArea),
                                  keyEquivalent: hasHotKey ? functionKey(NSF10FunctionKey) : "")
         capture.keyEquivalentModifierMask = []
@@ -103,6 +105,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         statusItem = item
     }
 
+    private func aboutItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "About Shotts", action: #selector(showAbout), keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
+    /// The standard About window: icon, name, version, the copyright from Info.plist, and a link
+    /// to the project. The build number is the version, so it is not shown twice.
+    @objc private func showAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        let centered = NSMutableParagraphStyle()
+        centered.alignment = .center
+        let credits = NSAttributedString(string: "github.com/shreeve/shotts", attributes: [
+            .link: URL(string: "https://github.com/shreeve/shotts")!,
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .paragraphStyle: centered,
+        ])
+        NSApp.orderFrontStandardAboutPanel(options: [.version: "", .credits: credits])
+    }
+
     private func checkForUpdatesItem() -> NSMenuItem {
         let item = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         item.target = self
@@ -127,6 +149,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
+        appMenu.addItem(aboutItem())
+        appMenu.addItem(.separator())
         appMenu.addItem(checkForUpdatesItem())
         appMenu.addItem(.separator())
         appMenu.addItem(NSMenuItem(title: "Quit Shotts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))

@@ -56,8 +56,9 @@ Whatever is on screen can be captured, Shotts' own editors included; only the cr
 magnifier, dimming, and hints never are. While picking, macOS may show its screen-recording
 indicator in the menu bar.
 
-The menu bar menu holds Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into
-the editor), Check for Updates…, Quit, and the picker's options, remembered across launches:
+The menu bar menu holds About Shotts (the icon, version, copyright, and a link to the project),
+Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into the editor), Check for
+Updates…, Quit, and the picker's options, remembered across launches:
 
 | Option | Default | Effect |
 | --- | --- | --- |
