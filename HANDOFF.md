@@ -5,24 +5,25 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.2.6 is released: tag `v0.2.6` on `main` (commit "Shotts 0.2.6"), the GitHub release with its
-notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#19);
-installed copies are offered it through Sparkle. 0.2.6 (shreeve/shotts#57): the arrow keys nudge
+0.2.7 is released: tag `v0.2.7` on `main` (commit "Shotts 0.2.7"), the GitHub release with its
+notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#20);
+installed copies are offered it through Sparkle. 0.2.7 (shreeve/shotts#58): Return starts a new
+line and only Command-Return finishes typing. 0.2.6 (shreeve/shotts#57): the arrow keys nudge
 the selection, Option-Return breaks a line, and a new capture replaces the editor in front.
 0.2.5 (shreeve/shotts#56): F10 no longer brings Shotts to the front (the picker is a
 non-activating panel), a wide picture prints turned onto a portrait page, and the menu bar
-options follow a capture's order. 0.2.4 (shreeve/shotts#55): Return finishes typing and
-Shift-Return breaks a line, Escape cancels typing, and Trebuchet and the Show Hints option are
-gone. 0.2.3 (shreeve/shotts#54) made the screen live while capturing, kept the editor open with
-Option-F10 to bring the last capture back, and added New Window per Capture; 0.2.2 printed
-through the standard Print window; 0.2.1 fixed 0.2.0's hidden bar. 0.2.0 is the revamp
-(shreeve/shotts#51, merge commit c24b093): a correctness, security, and performance pass over
-the whole app, plus Open Sans; `CHANGELOG.md` says what changed for users. The build has no
-warnings (warnings are errors) and `swift test` passes: 41 Core tests and 56 AppKit tests.
+options follow a capture's order. 0.2.4 (shreeve/shotts#55): Escape cancels typing, and
+Trebuchet and the Show Hints option are gone. 0.2.3 (shreeve/shotts#54) made the screen live
+while capturing, kept the editor open with Option-F10 to bring the last capture back, and added
+New Window per Capture; 0.2.2 printed through the standard Print window; 0.2.1 fixed 0.2.0's
+hidden bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit c24b093): a correctness,
+security, and performance pass over the whole app, plus Open Sans; `CHANGELOG.md` says what
+changed for users. The build has no warnings (warnings are errors) and `swift test` passes: 41
+Core tests and 56 AppKit tests.
 
 Next, in order:
 
-1. Use 0.2.6 by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
+1. Use 0.2.7 by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
    and headless renders check a lot, but they missed 0.2.0's hidden bar, which only a real window
    showed: look at the bar first, then a capture, every tool, copy into Mail or Notes (it should
    paste at on-screen size), save, drag out, F10 from inside an editor, two displays.
