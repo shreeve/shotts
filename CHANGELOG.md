@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.2.8 — 2026-09-28
 
 - A Line tool (L), after the arrows: a straight line in the chosen color and width, round at both
   ends. Shift snaps it to horizontal, vertical, or 45°, and a selected line can be reshaped by
