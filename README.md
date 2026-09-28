@@ -39,7 +39,7 @@ Apple. Installed copies update themselves: choose **Check for Updates…** in th
 The first capture asks for Screen Recording permission, once.
 
 Or download `Shotts-<version>.zip` from the [latest release](https://github.com/shreeve/shotts/releases/latest)
-and drop `Shotts.app` into Applications.
+and open Shotts: it offers to move itself into Applications, where it can keep itself up to date.
 
 ## How it works
 

@@ -22,6 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if !DEBUG
+        // A download run from anywhere but Applications offers to move itself there first.
+        if MoveToApplications.offerIfNeeded() { return }
+        #endif
         NSApp.mainMenu = makeMainMenu()
         let capture = HotKey.registerF10 { [weak self] in self?.flow.begin() }
         let showLast = HotKey.registerF10(modifiers: optionKey) { [weak self] in self?.flow.showLast() }

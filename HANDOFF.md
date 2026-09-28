@@ -19,7 +19,7 @@ to bring the last capture back, and added New Window per Capture; 0.2.2 printed 
 standard Print window; 0.2.1 fixed 0.2.0's hidden bar. 0.2.0 is the revamp (shreeve/shotts#51,
 merge commit c24b093): a correctness, security, and performance pass over the whole app, plus
 Open Sans; `CHANGELOG.md` says what changed for users. The build has no warnings (warnings are
-errors) and `swift test` passes: 43 Core tests and 58 AppKit tests.
+errors) and `swift test` passes: 46 Core tests and 58 AppKit tests.
 
 Next, in order:
 
@@ -62,6 +62,7 @@ Deferred, with the reason each waits:
 | | `HitTest.swift` | Which annotation a point lands on, and which part of an arrow or callout. |
 | | `History.swift` | Undo and redo over any `Equatable` state, with `record(since:)` for changes made in place. |
 | | `Selection.swift` | `SelectionRule`: the drag rectangle rules the picker and the shape tools share. |
+| | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | ShottsUI | `AreaSelection.swift` | The picker: `DisplayImage` (a display's latest picture, its windows, and `cut`), one overlay window per display, the crosshair, magnifier, hints, window outlines, `PixelSampler`. |
 | | `EditorWindow.swift` | `EditorWindowController`: the bar, copy, save, print, closing, resizing, the drag grip, remembered tool and style. |
@@ -74,6 +75,7 @@ Deferred, with the reason each waits:
 | | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list. |
 | | `LiveDisplay.swift` | A display streamed while the picker is up: its latest frame and windows. |
 | | `HotKey.swift` | The Carbon hot keys: F10 captures, Option-F10 brings the last capture back. |
+| | `MoveToApplications.swift` | A release launched outside Applications offers to move itself there. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
 
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
@@ -296,6 +298,13 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   not activate at all. Its overlays are non-activating panels (`.nonactivatingPanel`), which
   become key and take keys and clicks while the app in front stays in front, and show a blank
   cursor, since an app that is not active may not hide the pointer.
+- A downloaded app still carrying its quarantine runs from a hidden read-only copy ("App
+  Translocation"), where Sparkle cannot update it. `MoveToApplications` copies the bundle into
+  Applications, removes `com.apple.quarantine` from the copy, and finds the real download to
+  trash through `SecTranslocateCreateOriginalPathForURL`, which has no public header; it is
+  looked up with `dlsym`, and when it is missing the download simply stays. The move runs only
+  in release builds (`#if !DEBUG`), and it replaces whatever `/Applications/Shotts.app` there is:
+  test it with a downloaded release, not over a copy you want to keep.
 - `CGImage.cropping(to:)` shares its parent's pixels: a cut-out made that way keeps the whole
   frame alive, and with it a buffer the stream needs back. `DisplayImage.cut` draws into a bitmap
   of its own.

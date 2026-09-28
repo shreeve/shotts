@@ -310,6 +310,29 @@ import Testing
     }
 }
 
+@Suite struct AppLocationTests {
+    let home = "/Users/brother"
+
+    @Test func applicationsFoldersAreHome() {
+        #expect(!AppLocation.offersMove(bundlePath: "/Applications/Shotts.app", home: home))
+        #expect(!AppLocation.offersMove(bundlePath: "/Users/brother/Applications/Shotts.app", home: home))
+        #expect(!AppLocation.offersMove(bundlePath: "/Applications/Utilities/Shotts.app", home: home))
+    }
+
+    @Test func downloadsAndTranslocationOfferAMove() {
+        #expect(AppLocation.offersMove(bundlePath: "/Users/brother/Downloads/Shotts.app", home: home))
+        #expect(AppLocation.offersMove(bundlePath: "/Users/brother/Desktop/Shotts.app", home: home))
+        #expect(AppLocation.offersMove(bundlePath: "/private/var/folders/xy/T/AppTranslocation/1234/d/Shotts.app", home: home))
+        // A folder that merely starts the same way is not Applications.
+        #expect(AppLocation.offersMove(bundlePath: "/Applications Old/Shotts.app", home: home))
+    }
+
+    @Test func movesIntoTheSharedFolderWhenItCan() {
+        #expect(AppLocation.destinationFolder(canWriteShared: true, home: home) == "/Applications")
+        #expect(AppLocation.destinationFolder(canWriteShared: false, home: home) == "/Users/brother/Applications")
+    }
+}
+
 @Suite struct EditorLayoutTests {
     let layout = EditorLayout(picture: CGSize(width: 1600, height: 1000), scale: 2, barHeight: 44, minimumWidth: 880, inset: 28, minimumPicture: 160)
 

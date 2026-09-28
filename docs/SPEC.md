@@ -11,6 +11,14 @@ It captures only what the user selects, only when the user asks, and keeps nothi
 that the user did not save or drag out. With Copy to Clipboard on, a capture is on the
 clipboard as soon as it is taken.
 
+## Installing
+
+Shotts comes through Homebrew or as a download. Opened from anywhere but an Applications folder
+(Downloads, the Desktop), a release asks once: "Move Shotts to your Applications folder?"
+Move to Applications copies it there, replacing an older copy, puts the downloaded copy in the
+Trash, and reopens it from there; without permission to write to the shared Applications folder
+it uses the user's own. Not Now leaves it where it is, and "Don't ask again" stops the question.
+
 ## Capturing
 
 F10 is the hot key, and Option-F10 brings the last capture back (see The editor). On a Mac
