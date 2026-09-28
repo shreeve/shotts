@@ -5,6 +5,11 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.3.0 — 2026-09-28
+
+- About Shotts, at the top of the menu bar menu and in the app menu: the icon, version,
+  copyright, and a link to the project.
+
 ## 0.2.9 — 2026-09-28
 
 - Opened from Downloads or anywhere but Applications, Shotts offers to move itself into
