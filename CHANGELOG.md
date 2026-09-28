@@ -5,6 +5,12 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Opened from Downloads or anywhere but Applications, Shotts offers to move itself into
+  Applications, puts the download in the Trash, and reopens from there, so installing without
+  Homebrew is download, open, and one click. Not Now leaves it, and "Don't ask again" stops it.
+
 ## 0.2.8 — 2026-09-28
 
 - A Line tool (L), after the arrows: a straight line in the chosen color and width, round at both
