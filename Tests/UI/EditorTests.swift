@@ -14,8 +14,8 @@ import Testing
         #expect(string == "Hello there" && size.width > 0 && size.height > 0)
     }
 
-    /// Return finishes the words; Shift-Return and Option-Return start a new line.
-    @Test func returnFinishesAndShiftReturnBreaksALine() throws {
+    /// Return, Shift-Return, and Option-Return start a new line; only Command-Return finishes.
+    @Test func onlyCommandReturnFinishes() throws {
         let canvas = canvasInWindow()
         canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
         let entry = try #require(canvas.textField)
@@ -23,16 +23,16 @@ import Testing
             NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: canvas.window!.windowNumber,
                              context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!
         }
-        entry.insertText("one", replacementRange: NSRange(location: NSNotFound, length: 0))
-        entry.keyDown(with: key(.shift))
-        entry.insertText("two", replacementRange: NSRange(location: NSNotFound, length: 0))
-        entry.keyDown(with: key(.option))
-        entry.insertText("three", replacementRange: NSRange(location: NSNotFound, length: 0))
-        #expect(canvas.textField != nil)
-        entry.keyDown(with: key([]))
+        for (words, flags) in [("one", NSEvent.ModifierFlags()), ("two", .shift), ("three", .option)] {
+            entry.insertText(words, replacementRange: NSRange(location: NSNotFound, length: 0))
+            entry.keyDown(with: key(flags))
+            #expect(canvas.textField != nil)
+        }
+        entry.insertText("four", replacementRange: NSRange(location: NSNotFound, length: 0))
+        entry.keyDown(with: key(.command))
         #expect(canvas.textField == nil)
         guard case let .text(_, words, _, _)? = canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
-        #expect(words == "one\ntwo\nthree")
+        #expect(words == "one\ntwo\nthree\nfour")
     }
 
     /// Escape cancels typing whole: a new text is never added.
