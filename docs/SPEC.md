@@ -82,7 +82,7 @@ as the screen allows.
 | Select | V | Click an annotation to select it; drag to move it, or nudge it with the arrow keys, a point at a time or ten with Shift; Delete removes it. Double-click text or a callout's words to edit them. |
 | Arrow with text | N | An arrow with words at its tail, one object; see below. The tool a first capture starts with. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
-| Text | T | Click and type on the picture; the text appears in its final style as you go. Return finishes, as do a click elsewhere or another tool; Shift-Return or Option-Return starts a new line, and Escape cancels the text. Clicking an existing text edits it. |
+| Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line; Command-Return finishes, as do a click elsewhere or another tool, and Escape cancels the text. Clicking an existing text edits it. |
 | Rectangle | R | A stroked rectangle. Shift for a square; Option for a solid one. |
 | Ellipse | E | A stroked ellipse. Shift for a circle; Option for a solid one. |
 | Pen | P | A smooth freehand stroke. |
@@ -111,9 +111,8 @@ the tail:
   when to its right.
 - A mostly vertical arrow centers them on the tail horizontally, below it (arrow pointing up) or
   above it (pointing down), growing away from the arrow.
-- A line runs to within 8 points of the picture's edge before it wraps; Shift-Return (or
-  Option-Return) breaks a line sooner, and Return finishes. The words keep that margin from
-  every edge.
+- A line runs to within 8 points of the picture's edge before it wraps; Return breaks a line
+  sooner, and Command-Return finishes. The words keep that margin from every edge.
 
 An arrow and its words are one object. With the select tool, or with either arrow tool clicking
 an existing arrow, dragging the shaft moves the whole; dragging the dot at the tail's end, or

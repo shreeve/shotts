@@ -431,7 +431,7 @@ public final class CanvasView: NSView {
     // MARK: - Callouts
 
     /// The text may run to within a small margin of the picture's edge on its side;
-    /// Shift-Return breaks a line sooner. Only that margin wraps.
+    /// Return breaks a line sooner. Only that margin wraps.
     private func calloutLayout(tail: CGPoint, tip: CGPoint, style: Style) -> CalloutLayout {
         CalloutLayout(tail: tail, tip: tip, lineHeight: Renderer.lineHeight(style: style, scale: document.scale),
                       maxWidth: Double(document.width), in: document.pixelBounds, margin: Self.textMargin * document.scale)
@@ -603,8 +603,9 @@ public final class CanvasView: NSView {
 }
 
 /// The invisible text view words are typed into. It draws nothing but its caret; the canvas
-/// draws `preview`, the words in their final style. Return or Command-Return finishes, Escape
-/// cancels, and Shift-Return or Option-Return adds a line. Its undo covers keystrokes only, and goes when it does.
+/// draws `preview`, the words in their final style. Command-Return finishes, Escape cancels, and
+/// Return, with Shift or Option or without, adds a line. Its undo covers keystrokes only, and
+/// goes when it does.
 final class TextEntry: NSTextView {
     private(set) var style = Style.standard
     var origin = CGPoint.zero
@@ -717,10 +718,12 @@ final class TextEntry: NSTextView {
         // An input method composing gets every key, Return and Escape included.
         guard !hasMarkedText() else { return super.keyDown(with: event) }
         let isReturn = event.keyCode == 36 || event.keyCode == 76
-        if isReturn, !event.modifierFlags.isDisjoint(with: [.shift, .option]) {
-            insertNewlineIgnoringFieldEditor(nil)
-        } else if isReturn {
+        // Only Command-Return finishes: a Return pressed out of habit adds a line rather than
+        // ending the words early.
+        if isReturn, event.modifierFlags.contains(.command) {
             onFinish?()
+        } else if isReturn {
+            insertNewlineIgnoringFieldEditor(nil)
         } else if event.keyCode == 53 {
             onCancel?()
         } else {
