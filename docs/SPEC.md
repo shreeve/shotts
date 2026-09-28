@@ -82,6 +82,7 @@ as the screen allows.
 | Select | V | Click an annotation to select it; drag to move it, or nudge it with the arrow keys, a point at a time or ten with Shift; Delete removes it. Double-click text or a callout's words to edit them. |
 | Arrow with text | N | An arrow with words at its tail, one object; see below. The tool a first capture starts with. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
+| Line | L | A straight line, round at both ends. Shift snaps it to horizontal, vertical, or 45°. Drag either end to reshape it; clicking an existing line with this tool selects it. |
 | Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line; Command-Return finishes, as do a click elsewhere or another tool, and Escape cancels the text. Clicking an existing text edits it. |
 | Rectangle | R | A stroked rectangle. Shift for a square; Option for a solid one. |
 | Ellipse | E | A stroked ellipse. Shift for a circle; Option for a solid one. |

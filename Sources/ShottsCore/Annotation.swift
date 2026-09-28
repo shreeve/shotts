@@ -11,6 +11,8 @@ public enum TextAlignment: Equatable, Sendable {
 public struct Annotation: Identifiable, Equatable, Sendable {
     public enum Shape: Equatable, Sendable {
         case arrow(from: CGPoint, to: CGPoint)
+        /// A straight line, round at both ends.
+        case line(from: CGPoint, to: CGPoint)
         /// Stroked, or solid when `filled`.
         case rectangle(CGRect, filled: Bool = false)
         case ellipse(CGRect, filled: Bool = false)
@@ -57,7 +59,7 @@ public struct Annotation: Identifiable, Equatable, Sendable {
     /// The pixel rectangle the shape occupies, before stroke width and shadow.
     public var bounds: CGRect {
         switch shape {
-        case let .arrow(from, to):
+        case let .arrow(from, to), let .line(from, to):
             return Self.bounds(of: [from, to])
         case let .rectangle(rect, _), let .ellipse(rect, _), let .obscure(rect):
             return rect.standardized
@@ -76,6 +78,8 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         switch shape {
         case let .arrow(from, to):
             copy.shape = .arrow(from: from + delta, to: to + delta)
+        case let .line(from, to):
+            copy.shape = .line(from: from + delta, to: to + delta)
         case let .rectangle(rect, filled):
             copy.shape = .rectangle(rect.offsetBy(dx: delta.x, dy: delta.y), filled: filled)
         case let .ellipse(rect, filled):
@@ -101,7 +105,7 @@ public struct Annotation: Identifiable, Equatable, Sendable {
     public func isDegenerate(in picture: CGRect) -> Bool {
         guard bounds.insetBy(dx: -1, dy: -1).intersects(picture) else { return true }
         switch shape {
-        case let .arrow(from, to), let .callout(from, to, _):
+        case let .arrow(from, to), let .line(from, to), let .callout(from, to, _):
             return from.distance(to: to) < 3
         case let .rectangle(rect, _), let .ellipse(rect, _), let .obscure(rect):
             return abs(rect.width) < 3 || abs(rect.height) < 3
@@ -123,6 +127,10 @@ public struct Annotation: Identifiable, Equatable, Sendable {
             copy.shape = .arrow(from: from + delta, to: to)
         case let (.arrow(from, to), .head?):
             copy.shape = .arrow(from: from, to: to + delta)
+        case let (.line(from, to), .tail?):
+            copy.shape = .line(from: from + delta, to: to)
+        case let (.line(from, to), .head?):
+            copy.shape = .line(from: from, to: to + delta)
         case let (.callout(from, to, text), .tail?), let (.callout(from, to, text), .text?):
             copy.shape = .callout(from: from + delta, to: to, text: text)
         case let (.callout(from, to, text), .head?):

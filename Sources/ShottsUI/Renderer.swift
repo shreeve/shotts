@@ -98,6 +98,14 @@ public enum Renderer {
                 ctx.strokeEllipse(in: r.insetBy(dx: width / 2, dy: width / 2))
             }
 
+        case let .line(from, to):
+            setShadow(ctx, blur: shadow)
+            ctx.setStrokeColor(color)
+            ctx.setLineWidth(width)
+            ctx.move(to: from)
+            ctx.addLine(to: to)
+            ctx.strokePath()
+
         case let .pen(points):
             setShadow(ctx, blur: shadow)
             ctx.setStrokeColor(color)
@@ -196,7 +204,7 @@ public enum Renderer {
             ink = a.bounds.insetBy(dx: -a.style.highlighterWidth(scale: s) / 2, dy: -a.style.highlighterWidth(scale: s) / 2)
         case .text, .obscure:
             ink = a.bounds
-        case .rectangle, .ellipse, .pen:
+        case .rectangle, .ellipse, .pen, .line:
             ink = a.bounds.insetBy(dx: -a.style.stroke(scale: s), dy: -a.style.stroke(scale: s))
         }
         // The arrow's softening stroke, a text outline's top, and a shadow's blur reach past the

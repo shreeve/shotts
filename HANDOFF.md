@@ -18,8 +18,8 @@ while capturing, kept the editor open with Option-F10 to bring the last capture 
 New Window per Capture; 0.2.2 printed through the standard Print window; 0.2.1 fixed 0.2.0's
 hidden bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit c24b093): a correctness,
 security, and performance pass over the whole app, plus Open Sans; `CHANGELOG.md` says what
-changed for users. The build has no warnings (warnings are errors) and `swift test` passes: 41
-Core tests and 56 AppKit tests.
+changed for users. The build has no warnings (warnings are errors) and `swift test` passes: 43
+Core tests and 58 AppKit tests.
 
 Next, in order:
 
@@ -55,7 +55,7 @@ Deferred, with the reason each waits:
 | Target | File | Holds |
 | --- | --- | --- |
 | ShottsCore | `Document.swift` | The seam: pixel size, scale, annotations, crop; `visibleRect` is what exports. |
-| | `Annotation.swift` | `Annotation.Shape` (arrow, callout, rectangle, ellipse, text, pen, highlighter, obscure), bounds, translation, `dragged(_:by:)` (what a drag on each part moves), degeneracy. |
+| | `Annotation.swift` | `Annotation.Shape` (arrow, callout, line, rectangle, ellipse, text, pen, highlighter, obscure), bounds, translation, `dragged(_:by:)` (what a drag on each part moves), degeneracy. |
 | | `Style.swift` | `Style` (color, stroke width, font size, font, shadow, outline, tapered arrows), its pixel metrics, `applying(from:to:)`, and decoding that tolerates older and newer saved styles. `FontChoice`: Rounded, System, Open Sans. |
 | | `Arrow.swift` | `ArrowGeometry`: an arrow as one filled outline, and its head length. |
 | | `Callout.swift` | `CalloutLayout`: where a callout's words go, from the arrow alone. |
@@ -203,8 +203,8 @@ it accepts clicks only over the words.
 
 A callout is one annotation, `.callout(from:to:text:)`, whose `TextBox` is derived state: the
 canvas's `relaid(_:from:to:string:)` recomputes it whenever the arrow or the style changes.
-`HitTest.arrowPart` says which part of an arrow or callout a point is on (`.text`, `.tail`,
-`.head`, `.shaft`; the tail grip and head each at most a third of the arrow), and
+`HitTest.arrowPart` says which part of an arrow, callout, or line a point is on (`.text`,
+`.tail`, `.head`, `.shaft`; the tail grip and head each at most a third of the arrow), and
 `Annotation.dragged(_:by:)` says what a drag on it moves. Editing words (`editText`) keeps the
 text or callout in the document with empty words, so it keeps its place in the stack;
 `endTextEntry` puts the words back, removes a text left empty, and turns a wordless callout into

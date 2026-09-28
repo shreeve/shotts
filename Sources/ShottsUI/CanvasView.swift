@@ -1,14 +1,17 @@
 import AppKit
 import ShottsCore
 
+/// The editor's tools, in the bar's order. The raw values are what the defaults remember as the
+/// last tool, so they never change: a new tool takes the next unused number, wherever it sits.
 public enum Tool: Int, CaseIterable, Sendable {
-    case select, callout, arrow, text, rectangle, ellipse, pen, highlighter, obscure, crop
+    case select = 0, callout = 1, arrow = 2, line = 10, text = 3, rectangle = 4, ellipse = 5, pen = 6, highlighter = 7, obscure = 8, crop = 9
 
     public var title: String {
         switch self {
         case .select: "Select"
         case .callout: "Arrow with text"
         case .arrow: "Arrow"
+        case .line: "Line"
         case .text: "Text"
         case .rectangle: "Rectangle"
         case .ellipse: "Ellipse"
@@ -24,6 +27,7 @@ public enum Tool: Int, CaseIterable, Sendable {
         case .select: "v"
         case .callout: "n"
         case .arrow: "a"
+        case .line: "l"
         case .text: "t"
         case .rectangle: "r"
         case .ellipse: "e"
@@ -39,6 +43,7 @@ public enum Tool: Int, CaseIterable, Sendable {
         case .select: "cursorarrow"
         case .callout: "text.bubble"
         case .arrow: "arrow.up.right"
+        case .line: "line.diagonal"
         case .text: "textformat"
         case .rectangle: "rectangle"
         case .ellipse: "circle"
@@ -202,7 +207,8 @@ public final class CanvasView: NSView {
     }
 
     /// One unmodified key picks a tool, as in most annotation editors: V select, N arrow with
-    /// text, A arrow, T text, R rectangle, E ellipse, P pen, H highlighter, O obscure, C crop.
+    /// text, A arrow, L line, T text, R rectangle, E ellipse, P pen, H highlighter, O obscure,
+    /// C crop.
     public override func keyDown(with event: NSEvent) {
         let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
         if plain, let direction = Self.arrowKeys[event.keyCode], selectedID != nil, dragAnchor == nil {
@@ -262,9 +268,9 @@ public final class CanvasView: NSView {
         dragAnchor = p
         dragTool = tool
         switch (tool, hit?.shape) {
-        case (.callout, .arrow?), (.callout, .callout?), (.arrow, .arrow?), (.arrow, .callout?):
-            // The arrow tools select an arrow or callout as the select tool would, so what was
-            // just drawn can be moved or reshaped without changing tools.
+        case (.callout, .arrow?), (.callout, .callout?), (.arrow, .arrow?), (.arrow, .callout?), (.line, .line?):
+            // The arrow tools select an arrow or callout, and the line tool a line, as the select
+            // tool would, so what was just drawn can be moved or reshaped without changing tools.
             dragTool = .select
         case (.text, .text?):
             // The text tool edits the text it clicks rather than typing over it.
@@ -296,6 +302,8 @@ public final class CanvasView: NSView {
             dragAnchor = nil
         case .arrow, .callout:
             live = Annotation(shape: .arrow(from: p, to: p), style: style)
+        case .line:
+            live = Annotation(shape: .line(from: p, to: p), style: style)
         case .rectangle:
             live = Annotation(shape: .rectangle(CGRect(origin: p, size: .zero)), style: style)
         case .ellipse:
@@ -328,6 +336,8 @@ public final class CanvasView: NSView {
             }
         case .arrow, .callout:
             live?.shape = .arrow(from: anchor, to: p)
+        case .line:
+            live?.shape = .line(from: anchor, to: SelectionRule.lineEnd(anchor: anchor, pointer: p, snapped: shift))
         case .rectangle:
             live?.shape = .rectangle(SelectionRule.rect(anchor: anchor, pointer: p, square: shift), filled: filled)
         case .ellipse:
@@ -584,7 +594,7 @@ public final class CanvasView: NSView {
             ctx.setLineWidth(1)
             ctx.setLineDash(phase: 0, lengths: [4, 3])
             switch a.shape {
-            case let .arrow(from, to), let .callout(from, to, _):
+            case let .arrow(from, to), let .line(from, to), let .callout(from, to, _):
                 // An arrow shows its grips: a dot at each end, and a box around a callout's words.
                 if case let .callout(_, _, text) = a.shape, !text.string.isEmpty { ctx.stroke(viewRect(text.frame).insetBy(dx: -4, dy: -4)) }
                 ctx.setLineDash(phase: 0, lengths: [])

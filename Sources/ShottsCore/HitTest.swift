@@ -14,7 +14,7 @@ public enum HitTest {
         let width = a.style.stroke(scale: scale)
         let reach = tolerance + width / 2
         switch a.shape {
-        case .arrow, .callout:
+        case .arrow, .callout, .line:
             return arrowPart(at: p, of: a, scale: scale, tolerance: tolerance) != nil
         case let .rectangle(rect, filled):
             // The stroke is drawn inside the rectangle, centered half a width in.
@@ -52,14 +52,17 @@ public enum HitTest {
         case tail
     }
 
-    /// Which part of an arrow or callout a point lands on: a callout's words, the tail's end, the
-    /// head, else the shaft. The tail's grip and the head each take at most a third of the arrow,
-    /// so even a short one keeps a shaft to move it by.
+    /// Which part of an arrow, callout, or line a point lands on: a callout's words, the tail's
+    /// end, the head (a line's far end), else the shaft. The end grips each take at most a third
+    /// of the length, so even a short one keeps a shaft to move it by.
     public static func arrowPart(at p: CGPoint, of a: Annotation, scale: Double, tolerance: Double) -> ArrowPart? {
         let from: CGPoint, to: CGPoint
+        var isLine = false
         switch a.shape {
         case let .arrow(f, t):
             (from, to) = (f, t)
+        case let .line(f, t):
+            (from, to, isLine) = (f, t, true)
         case let .callout(f, t, text):
             if !text.string.isEmpty, text.frame.insetBy(dx: -tolerance, dy: -tolerance).contains(p) { return .text }
             (from, to) = (f, t)
@@ -67,12 +70,14 @@ public enum HitTest {
             return nil
         }
         let width = a.style.stroke(scale: scale)
-        let geometry = a.style.arrow(from: from, to: to, scale: scale)
+        let geometry = isLine ? nil : a.style.arrow(from: from, to: to, scale: scale)
         let third = from.distance(to: to) / 3
-        // The tail's end is a round grip, drawn as a dot when selected.
-        if p.distance(to: from) <= min(max(width * 2, tolerance * 3), max(third, tolerance)) { return .tail }
-        guard distance(from: p, toSegment: from, to) <= tolerance + width / 2 || geometry.contains(p) else { return nil }
-        if p.distance(to: to) <= min(geometry.headLength + tolerance, max(third, tolerance)) { return .head }
+        // An end without a head is a round grip, drawn as a dot when selected.
+        let grip = min(max(width * 2, tolerance * 3), max(third, tolerance))
+        if p.distance(to: from) <= grip { return .tail }
+        if isLine, p.distance(to: to) <= grip { return .head }
+        guard distance(from: p, toSegment: from, to) <= tolerance + width / 2 || geometry?.contains(p) == true else { return nil }
+        if let geometry, p.distance(to: to) <= min(geometry.headLength + tolerance, max(third, tolerance)) { return .head }
         return .shaft
     }
 

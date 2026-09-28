@@ -5,6 +5,12 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.2.8 — 2026-09-28
+
+- A Line tool (L), after the arrows: a straight line in the chosen color and width, round at both
+  ends. Shift snaps it to horizontal, vertical, or 45°, and a selected line can be reshaped by
+  either end or moved by its middle, as arrows can.
+
 ## 0.2.7 — 2026-09-28
 
 - Return starts a new line while typing, as Shift-Return and Option-Return do, and only

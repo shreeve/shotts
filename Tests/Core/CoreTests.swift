@@ -19,6 +19,17 @@ import Testing
         #expect(SelectionRule.moved(r, by: CGPoint(x: 50, y: -50), within: bounds) == CGRect(x: 70, y: 0, width: 30, height: 30))
     }
 
+    @Test func shiftSnapsALineTo45Degrees() {
+        let a = CGPoint(x: 100, y: 100)
+        #expect(SelectionRule.lineEnd(anchor: a, pointer: CGPoint(x: 200, y: 110), snapped: false) == CGPoint(x: 200, y: 110))
+        let flat = SelectionRule.lineEnd(anchor: a, pointer: CGPoint(x: 200, y: 110), snapped: true)
+        #expect(abs(flat.y - 100) < 1e-9 && abs(flat.x - 200) < 1e-9)
+        let diagonal = SelectionRule.lineEnd(anchor: a, pointer: CGPoint(x: 190, y: 210), snapped: true)
+        #expect(abs((diagonal.x - 100) - (diagonal.y - 100)) < 1e-9)
+        let up = SelectionRule.lineEnd(anchor: a, pointer: CGPoint(x: 105, y: 20), snapped: true)
+        #expect(abs(up.x - 100) < 1e-9 && abs(up.y - 20) < 1e-9)
+    }
+
     @Test func pixelRectSnapsAndClips() {
         let r = SelectionRule.pixelRect(CGRect(x: 10.3, y: 5.6, width: 20.2, height: 4), scale: 2, within: CGRect(x: 0, y: 0, width: 50, height: 50))
         #expect(r == CGRect(x: 20, y: 11, width: 30, height: 9)) // 20.6…61 by 11.2…19.2, snapped outward, clipped at 50
@@ -212,6 +223,20 @@ import Testing
         let doc = Document(width: 300, height: 300, scale: 2, annotations: [sliver])
         #expect(HitTest.annotation(at: CGPoint(x: 103, y: 115), in: doc, tolerance: 2) == sliver.id)
         #expect(HitTest.annotation(at: CGPoint(x: 140, y: 115), in: doc, tolerance: 2) == nil)
+    }
+
+    @Test func aLineIsHitOnItselfAndGrabbedByItsEnds() {
+        let line = Annotation(shape: .line(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 400, y: 100)), style: style)
+        let doc = Document(width: 500, height: 300, scale: 1, annotations: [line])
+        #expect(HitTest.annotation(at: CGPoint(x: 250, y: 103), in: doc, tolerance: 4) == line.id)
+        #expect(HitTest.annotation(at: CGPoint(x: 250, y: 130), in: doc, tolerance: 4) == nil)
+        #expect(HitTest.arrowPart(at: CGPoint(x: 101, y: 100), of: line, scale: 1, tolerance: 4) == .tail)
+        #expect(HitTest.arrowPart(at: CGPoint(x: 399, y: 100), of: line, scale: 1, tolerance: 4) == .head)
+        #expect(HitTest.arrowPart(at: CGPoint(x: 250, y: 100), of: line, scale: 1, tolerance: 4) == .shaft)
+        let d = CGPoint(x: 0, y: 50)
+        #expect(line.dragged(.head, by: d).shape == .line(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 400, y: 150)))
+        #expect(line.dragged(.shaft, by: d).shape == .line(from: CGPoint(x: 100, y: 150), to: CGPoint(x: 400, y: 150)))
+        #expect(Annotation(shape: .line(from: .zero, to: CGPoint(x: 2, y: 1)), style: style).isDegenerate(in: doc.pixelBounds))
     }
 
     @Test func emptyStrokesHitNothing() {
