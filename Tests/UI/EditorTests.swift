@@ -317,6 +317,31 @@ import Testing
         #expect(canvas.document.crop == nil)
     }
 
+    /// The line tool draws a straight line, Shift snaps it to 45°, and the tool clicked on a line
+    /// selects it rather than drawing over it.
+    @Test func theLineToolDrawsAndSnaps() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .line
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 200, y: 60))
+        #expect(try #require(canvas.document.annotations.first).shape == .line(from: CGPoint(x: 40, y: 40), to: CGPoint(x: 200, y: 60)))
+        mouse.down(CGPoint(x: 40, y: 200))
+        canvas.mouseDragged(with: mouse.event(.leftMouseDragged, CGPoint(x: 200, y: 212), flags: .shift))
+        mouse.up(CGPoint(x: 200, y: 212))
+        guard case let .line(from, to)? = canvas.document.annotations.last?.shape else { Issue.record("no line"); return }
+        #expect(from == CGPoint(x: 40, y: 200) && abs(to.y - 200) < 1e-9)
+        mouse.down(CGPoint(x: 120, y: 50)); mouse.up(CGPoint(x: 120, y: 50))
+        #expect(canvas.document.annotations.count == 2 && canvas.selectedID == canvas.document.annotations.first?.id)
+    }
+
+    /// The defaults remember the last tool by raw value: a new tool must not renumber the others.
+    @Test func toolNumbersNeverChange() {
+        let remembered: [Tool: Int] = [.select: 0, .callout: 1, .arrow: 2, .text: 3, .rectangle: 4, .ellipse: 5, .pen: 6,
+                                       .highlighter: 7, .obscure: 8, .crop: 9, .line: 10]
+        for (tool, number) in remembered { #expect(tool.rawValue == number) }
+        #expect(Tool.allCases.firstIndex(of: .line) == Tool.allCases.firstIndex(of: .arrow)! + 1)
+    }
+
     @Test func thePlainArrowHasGripsToo() throws {
         let canvas = canvasInWindow()
         let mouse = Mouse(canvas: canvas)

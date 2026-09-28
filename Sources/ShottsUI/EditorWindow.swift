@@ -61,7 +61,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         showStyle(canvas.style)
         canvas.onChange = { [weak self] in self?.refresh() }
         canvas.onToolChange = { [weak self] tool in
-            self?.tools.selectedSegment = tool.rawValue
+            self?.tools.selectedSegment = Tool.allCases.firstIndex(of: tool) ?? 0
             // Only a drawing tool is worth coming back to; select and crop are passing states.
             if tool != .select, tool != .crop { Self.rememberedTool = tool }
         }
@@ -94,7 +94,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
             tools.setToolTip("\(tool.title) (\(tool.key.uppercased()))", forSegment: i)
             tools.setWidth(30, forSegment: i)
         }
-        tools.selectedSegment = Self.rememberedTool.rawValue
+        tools.selectedSegment = Tool.allCases.firstIndex(of: Self.rememberedTool) ?? 0
         canvas.tool = Self.rememberedTool
         tools.target = self
         tools.action = #selector(toolChanged)
@@ -188,7 +188,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     // MARK: - Actions
 
     @objc private func toolChanged() {
-        canvas.tool = Tool(rawValue: tools.selectedSegment) ?? .callout
+        canvas.tool = Tool.allCases.indices.contains(tools.selectedSegment) ? Tool.allCases[tools.selectedSegment] : .callout
     }
 
     /// The drawing tool last used; a new capture starts with it.

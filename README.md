@@ -47,7 +47,7 @@ and drop `Shotts.app` into Applications.
 | --- | --- |
 | **Press F10** (fn-F10 on most Mac keyboards) | A crosshair follows the pointer over the live screen, with a magnifier that shows the pixels under it, their color in hex, and the selection's size. Command-C copies the color. |
 | **Select** | Drag an area (Shift for a square, Space to move it), or click a window, outlined as the crosshair passes over it, to capture only that window, with the shadow macOS draws around it if you turn that on. Escape cancels. |
-| **Annotate** | Arrow with text, arrow, text, rectangle, ellipse, pen, highlighter, obscure, and crop, each on a single key. Undo and redo. A color and style popover remembers your choices. |
+| **Annotate** | Arrow with text, arrow, line, text, rectangle, ellipse, pen, highlighter, obscure, and crop, each on a single key. Undo and redo. A color and style popover remembers your choices. |
 | **Copy, save, print, drag** | Command-C puts the picture on the clipboard, Command-S saves a PNG, Command-P prints it to fit one page, and the hand icon drags a file into any app. Pictures keep the capture's resolution, so a Retina capture pastes at its on-screen size. |
 
 The arrow with text is one object: draw the arrow, type beside its tail, and the words lay

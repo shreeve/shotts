@@ -26,6 +26,16 @@ public enum SelectionRule {
         return r
     }
 
+    /// Where a line from `anchor` toward `pointer` ends: at the pointer, or with `snapped`
+    /// (Shift) on the nearest multiple of 45°, as far along it as the pointer reaches.
+    public static func lineEnd(anchor: CGPoint, pointer: CGPoint, snapped: Bool) -> CGPoint {
+        guard snapped else { return pointer }
+        let dx = pointer.x - anchor.x, dy = pointer.y - anchor.y
+        let angle = (atan2(dy, dx) / (.pi / 4)).rounded() * (.pi / 4)
+        let length = dx * cos(angle) + dy * sin(angle)
+        return CGPoint(x: anchor.x + length * cos(angle), y: anchor.y + length * sin(angle))
+    }
+
     /// Snaps a rectangle to whole pixels and clips it to the image.
     public static func pixelRect(_ rect: CGRect, scale: Double, within pixelBounds: CGRect) -> CGRect {
         let scaled = CGRect(x: rect.minX * scale, y: rect.minY * scale, width: rect.width * scale, height: rect.height * scale)

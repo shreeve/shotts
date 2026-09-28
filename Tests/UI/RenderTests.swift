@@ -12,6 +12,7 @@ func everyKind() -> [Annotation] {
     return [
         Annotation(shape: .arrow(from: CGPoint(x: 60, y: 300), to: CGPoint(x: 240, y: 120)), style: thick),
         Annotation(shape: .rectangle(CGRect(x: 300, y: 40, width: 120, height: 80)), style: .standard),
+        Annotation(shape: .line(from: CGPoint(x: 40, y: 380), to: CGPoint(x: 160, y: 340)), style: thick),
         Annotation(shape: .ellipse(CGRect(x: 440, y: 40, width: 120, height: 80), filled: true), style: .standard),
         Annotation(shape: .pen([CGPoint(x: 300, y: 200), CGPoint(x: 360, y: 240), CGPoint(x: 420, y: 210)]), style: .standard),
         Annotation(shape: .highlighter([CGPoint(x: 300, y: 300), CGPoint(x: 520, y: 300)]), style: .standard),
