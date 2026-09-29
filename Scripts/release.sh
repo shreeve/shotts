@@ -184,8 +184,10 @@ assessment=$(spctl --assess --type execute -vv "$app" 2>&1) && grep -qx "source=
     || fail "Gatekeeper does not accept the stapled app"
 
 # ditto --keepParent preserves the bundle exactly; Homebrew and Sparkle unpack it the same way.
+# Extended attributes stay behind: the signature and the stapled ticket live in files, and what
+# macOS attaches on the build machine (provenance, quarantine) would be unpacked as the user's.
 archive="Shotts-$version.zip"
-ditto -c -k --keepParent "$app" "$out/feed/$archive"
+ditto -c -k --norsrc --noextattr --noqtn --noacl --keepParent "$app" "$out/feed/$archive"
 # Notes named like the archive are the update's notes; embedded, the feed carries them itself.
 [ -z "$section" ] || printf '%s\n' "$section" > "$out/feed/Shotts-$version.md"
 printf '%s\n' "$notes" > "$out/notes.md"
