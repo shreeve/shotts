@@ -5,6 +5,11 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.3.1 — 2026-09-28
+
+- The download holds only Shotts itself: the zip no longer carries hidden file attributes from
+  the Mac it was built on, which Finder would unpack onto the downloaded copy.
+
 ## 0.3.0 — 2026-09-28
 
 - About Shotts, at the top of the menu bar menu and in the app menu: the icon, version,

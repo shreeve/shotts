@@ -9,8 +9,9 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#25);
 installed copies are offered it through Sparkle. 0.3.0 (shreeve/shotts#61) adds About Shotts at
 the top of the menu bar menu and the app menu. 0.2.9 (shreeve/shotts#60) offers to move itself
-into Applications when opened elsewhere; the move itself still wants a check by hand with a
-downloaded zip. 0.2.8 (shreeve/shotts#59) adds the Line tool. 0.2.7 (shreeve/shotts#58): Return
+into Applications when opened elsewhere, checked by hand with a zip downloaded in Chrome. Test
+a download through a browser: a zip fetched by clicking a link inside the Claude app gets a
+quarantine Gatekeeper calls "damaged", though the app is fine. 0.2.8 (shreeve/shotts#59) adds the Line tool. 0.2.7 (shreeve/shotts#58): Return
 starts a new line and only Command-Return finishes typing. 0.2.6 (shreeve/shotts#57): the arrow
 keys nudge the selection, Option-Return breaks a line, and a new capture replaces the editor in
 front. 0.2.5 (shreeve/shotts#56): F10 no longer brings Shotts to the front (the picker is a
