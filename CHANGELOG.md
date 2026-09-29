@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.4.0 — 2026-09-28
 
 - Runs on macOS 14 Sonoma and later, where it needed macOS 27 before.
 
