@@ -6,7 +6,7 @@ the code disagree, find out which is wrong and fix that one.
 ## The product
 
 Shotts is a Mac screenshot tool that lives in the menu bar and takes one motion from key press
-to paste: F10, drag out an area, mark it up, Command-C. It runs on macOS 27 on Apple silicon.
+to paste: F10, drag out an area, mark it up, Command-C. It runs on macOS 14 and later on Apple silicon.
 It captures only what the user selects, only when the user asks, and keeps nothing on disk
 that the user did not save or drag out. With Copy to Clipboard on, a capture is on the
 clipboard as soon as it is taken.

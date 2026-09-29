@@ -32,7 +32,13 @@ Next, in order:
    and headless renders check a lot, but they missed 0.2.0's hidden bar, which only a real window
    showed: look at the bar first, then a capture, every tool, copy into Mail or Notes (it should
    paste at on-screen size), save, drag out, F10 from inside an editor, two displays.
-2. Deferred work, below. New changes collect under a `## Unreleased` heading in `CHANGELOG.md`.
+2. Check the next release on macOS 14, 15, and 26, in virtual machines (UTM runs them on Apple
+   silicon). The target is macOS 14, where ScreenCaptureKit gained what Shotts uses (the one-shot
+   window capture, `captureResolution`, and the shadow switches), and it builds and tests there,
+   but it has only ever run on macOS 27. Watch what could differ: the editor and Option-F10
+   coming to the front (the first Trap), the picker taking keys and clicks while another app
+   stays in front, the live screen under the picker, and the Screen Recording prompts.
+3. Deferred work, below. New changes collect under a `## Unreleased` heading in `CHANGELOG.md`.
 
 Decided against, so they are not rebuilt:
 
@@ -297,8 +303,8 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
 - Screen Recording permission is keyed to the code signature. An ad-hoc-signed build has a new
   signature every time, so each rebuild would ask again and leave another row in System
   Settings. `Scripts/package-app.sh` signs every build with the Developer ID for that reason.
-- A menu bar app (`LSUIElement`) is not active when its windows appear, and on macOS 27 the
-  plain `NSApp.activate()` is refused for it. `activate(ignoringOtherApps: true)` works, and every
+- A menu bar app (`LSUIElement`) is not active when its windows appear, and on macOS 27 (the one
+  version this was seen on) the plain `NSApp.activate()` is refused for it. `activate(ignoringOtherApps: true)` works, and every
   activation uses it; but activating brings all of an app's windows forward, so the picker does
   not activate at all. Its overlays are non-activating panels (`.nonactivatingPanel`), which
   become key and take keys and clicks while the app in front stays in front, and show a blank

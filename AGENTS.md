@@ -1,8 +1,8 @@
 # Agent rules
 
 Shotts is a native Mac screenshot tool that feels like a small utility Apple shipped next to the
-Screenshot app: F10, select an area, annotate, copy. It lives in the menu bar, targets macOS 27
-on Apple silicon only, and stays small in code and in memory. It never loses a capture the user
+Screenshot app: F10, select an area, annotate, copy. It lives in the menu bar, targets macOS 14
+and later on Apple silicon only, and stays small in code and in memory. It never loses a capture the user
 is editing, and it never captures anything the user did not ask for; every rule below serves
 that, the native feel, or the memory budget.
 

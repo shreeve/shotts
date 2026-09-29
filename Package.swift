@@ -9,7 +9,7 @@ let app: [SwiftSetting] = strict + [.defaultIsolation(MainActor.self)]
 let package = Package(
     name: "Shotts",
     platforms: [
-        .macOS(.v27)
+        .macOS(.v14)
     ],
     products: [
         .executable(name: "Shotts", targets: ["Shotts"])
