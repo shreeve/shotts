@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/shreeve/shotts/releases/latest"><img src="https://img.shields.io/github/v/release/shreeve/shotts?label=release&color=2470EB" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/macOS-27-2470EB" alt="macOS 27">
+  <img src="https://img.shields.io/badge/macOS-14%2B-2470EB" alt="macOS 14+">
   <img src="https://img.shields.io/badge/Apple%20silicon-arm64-2470EB" alt="Apple silicon">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2470EB" alt="MIT license"></a>
 </p>
@@ -34,7 +34,7 @@ pixels), and never captures anything you did not ask for.
 brew install --cask shreeve/tap/shotts
 ```
 
-Requires macOS 27 on Apple silicon. Releases are signed with a Developer ID and notarized by
+Requires macOS 14 Sonoma or later on Apple silicon. Releases are signed with a Developer ID and notarized by
 Apple. Installed copies update themselves: choose **Check for Updates…** in the menu bar menu.
 The first capture asks for Screen Recording permission, once.
 
