@@ -5,9 +5,10 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.3.1 is released: tag `v0.3.1` on `main` (commit "Shotts 0.3.1"), the GitHub release with its
-notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#26);
-installed copies are offered it through Sparkle. 0.3.1 (shreeve/shotts#62) zips the app without
+0.4.0 is released: tag `v0.4.0` on `main` (commit "Shotts 0.4.0"), the GitHub release with its
+notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#27);
+installed copies are offered it through Sparkle. 0.4.0 (shreeve/shotts#63) runs on macOS 14
+Sonoma and later, not yet tried on anything but 27. 0.3.1 (shreeve/shotts#62) zips the app without
 the build machine's extended attributes. 0.3.0 (shreeve/shotts#61) adds About Shotts at
 the top of the menu bar menu and the app menu. 0.2.9 (shreeve/shotts#60) offers to move itself
 into Applications when opened elsewhere, checked by hand with a zip downloaded in Chrome. Test
@@ -28,11 +29,11 @@ Core tests and 58 AppKit tests.
 
 Next, in order:
 
-1. Use 0.3.1 by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
+1. Use 0.4.0 by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
    and headless renders check a lot, but they missed 0.2.0's hidden bar, which only a real window
    showed: look at the bar first, then a capture, every tool, copy into Mail or Notes (it should
    paste at on-screen size), save, drag out, F10 from inside an editor, two displays.
-2. Check the next release on macOS 14, 15, and 26, in virtual machines (UTM runs them on Apple
+2. Check 0.4.0 on macOS 14, 15, and 26, in virtual machines (UTM runs them on Apple
    silicon). The target is macOS 14, where ScreenCaptureKit gained what Shotts uses (the one-shot
    window capture, `captureResolution`, and the shadow switches), and it builds and tests there,
    but it has only ever run on macOS 27. Watch what could differ: the editor and Option-F10
