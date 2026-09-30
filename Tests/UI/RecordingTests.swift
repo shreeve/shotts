@@ -202,6 +202,23 @@ private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, 
         #expect(gif.delays == [10, 20, 70])
     }
 
+    /// A trimmed file starts with the frame showing at the trim's start and lasts as long as
+    /// the trim; a frame that changed before the start still shows at it.
+    @Test func aTrimmedFileKeepsOnlyItsPart() async throws {
+        let recording = try await makeRecording()
+        defer { try? FileManager.default.removeItem(at: recording.folder) }
+        let trim = Trim(start: 0.15, end: 0.9)
+        let gifURL = recording.folder.appendingPathComponent("out.gif")
+        try await RecordingExport.write(recording, settings: RecordingSettings(format: .gif, width: 160, frameRate: 10, sound: .none, trim: trim), to: gifURL)
+        #expect(gifSummary(try Data(contentsOf: gifURL)).delays == [10, 65])
+        let mp4URL = recording.folder.appendingPathComponent("out.mp4")
+        try await RecordingExport.write(recording, settings: RecordingSettings(format: .mp4, width: 160, frameRate: 30, sound: .both, trim: trim), to: mp4URL)
+        let asset = AVURLAsset(url: mp4URL)
+        #expect(abs(try await asset.load(.duration).seconds - 0.75) < 0.05)
+        #expect(try await videoFrames(asset) == 2)
+        #expect(try await asset.loadTracks(withMediaType: .audio).count == 1)
+    }
+
     @Test func aCancelledFileIsLeftOut() async throws {
         let recording = try await makeRecording(width: 1280, height: 720, times: (0..<60).map { Double($0) / 30 }, end: 2)
         defer { try? FileManager.default.removeItem(at: recording.folder) }

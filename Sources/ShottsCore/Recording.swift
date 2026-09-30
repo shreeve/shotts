@@ -27,14 +27,130 @@ public struct RecordingSettings: Equatable, Sendable {
     public var frameRate: Int
     /// MP4 only: GIFs are silent.
     public var sound: Sound
+    /// The part of the recording kept; nil keeps all of it.
+    public var trim: Trim?
 
-    public init(format: Format, width: Int, frameRate: Int, sound: Sound) {
+    public init(format: Format, width: Int, frameRate: Int, sound: Sound, trim: Trim? = nil) {
         self.format = format
         self.width = width
         self.frameRate = frameRate
         self.sound = sound
+        self.trim = trim
     }
 }
+
+/// The part of a recording a file keeps, in seconds from its start: at least a tenth of a
+/// second, and never past either end.
+public struct Trim: Equatable, Sendable {
+    public private(set) var start: Double
+    public private(set) var end: Double
+    public static let shortest = 0.1
+
+    public init(start: Double, end: Double) {
+        self.start = start
+        self.end = end
+    }
+
+    public static func whole(_ duration: Double) -> Trim { Trim(start: 0, end: duration) }
+
+    public var length: Double { end - start }
+
+    /// The start dragged to `time`, stopping short of the end.
+    public func movingStart(to time: Double) -> Trim {
+        Trim(start: min(max(time, 0), end - Self.shortest), end: end)
+    }
+
+    /// The end dragged to `time`, stopping short of the start and at the recording's end.
+    public func movingEnd(to time: Double, duration: Double) -> Trim {
+        Trim(start: start, end: max(min(time, duration), start + Self.shortest))
+    }
+
+    /// Whether it keeps all of a recording `duration` long, near enough that no one could see.
+    public func isWhole(_ duration: Double) -> Bool { start < 0.001 && end > duration - 0.001 }
+}
+
+/// A timeline's drawing: times across a track `width` points wide, and which of a trim's
+/// handles a point is on.
+public struct TimelineLayout: Equatable, Sendable {
+    public var width: Double
+    public var duration: Double
+    /// How near a handle a press takes it, in points.
+    public static let reach = 8.0
+
+    public init(width: Double, duration: Double) {
+        self.width = width
+        self.duration = duration
+    }
+
+    public func x(for time: Double) -> Double {
+        duration > 0 ? min(max(time / duration, 0), 1) * width : 0
+    }
+
+    public func time(at x: Double) -> Double {
+        width > 0 ? min(max(x / width, 0), 1) * duration : 0
+    }
+
+    public enum Part: Equatable, Sendable { case start, end, track }
+
+    /// The handle a press at `x` takes, the nearer when both are in reach; else the track,
+    /// which moves the playhead.
+    public func part(at x: Double, of trim: Trim) -> Part {
+        let toStart = abs(x - self.x(for: trim.start)), toEnd = abs(x - self.x(for: trim.end))
+        guard min(toStart, toEnd) <= Self.reach else { return .track }
+        // Handles at the same place: the one that can move toward the press.
+        if toStart == toEnd { return x < self.x(for: trim.start) ? .start : .end }
+        return toStart < toEnd ? .start : .end
+    }
+}
+
+/// A recording's time with its pauses taken out: what was recorded while paused is dropped,
+/// and what comes after a pause follows straight on from what came before it. Times are
+/// seconds on any clock that only goes forward.
+public struct PauseClock: Equatable, Sendable {
+    /// When the current pause began, while paused.
+    public private(set) var pausedAt: Double?
+    /// All the time spent paused before now.
+    public private(set) var paused: Double = 0
+    /// Pauses so far, as clock times, for samples that arrive late.
+    private var pauses: [(start: Double, end: Double)] = []
+
+    public init() {}
+
+    public static func == (a: PauseClock, b: PauseClock) -> Bool {
+        a.pausedAt == b.pausedAt && a.paused == b.paused && a.pauses.elementsEqual(b.pauses) { $0 == $1 }
+    }
+
+    public var isPaused: Bool { pausedAt != nil }
+
+    public mutating func pause(at time: Double) {
+        guard pausedAt == nil else { return }
+        pausedAt = time
+    }
+
+    public mutating func resume(at time: Double) {
+        guard let start = pausedAt else { return }
+        pausedAt = nil
+        pauses.append((start, max(time, start)))
+        paused += max(time - start, 0)
+    }
+
+    /// Where a sample at clock `time` goes in the recording, counted from the clock's zero; nil
+    /// for one from within a pause, which is dropped.
+    public func recorded(_ time: Double) -> Double? {
+        if let pausedAt, time >= pausedAt { return nil }
+        var before = 0.0
+        for pause in pauses {
+            if time >= pause.end { before += pause.end - pause.start } else if time >= pause.start { return nil }
+        }
+        return time - before
+    }
+
+    /// How much has been recorded by clock `now`: held still while paused.
+    public func elapsed(at now: Double) -> Double {
+        (pausedAt ?? now) - paused
+    }
+}
+
 
 /// The rules a recording's files follow: their sizes, frame rates, and timing.
 public enum RecordingRule {

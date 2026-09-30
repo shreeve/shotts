@@ -150,7 +150,48 @@ import Testing
             let content = try #require(window.contentView).bounds
             let player = controller.player.convert(controller.player.bounds, to: nil)
             #expect(player.minX == 0 && player.width == content.width, "player \(player) in \(content)")
-            #expect(player.minY == 0 && player.height > content.height - 60)
+            let timeline = controller.timeline.convert(controller.timeline.bounds, to: nil)
+            #expect(timeline.minY == 0 && timeline.width == content.width)
+            #expect(player.minY == timeline.maxY && player.height > content.height - 100)
         }
+    }
+}
+
+@MainActor @Suite struct TrimmingTests {
+    /// Dragging a bracket trims what every format's file keeps once the drag ends, and makes
+    /// the file again; dragging it back to the end keeps all of it.
+    @Test func dragsTrimEveryFormat() async throws {
+        let recording = try await testRecording()
+        let controller = RecordingWindowController(recording: recording, contents: try await RecordingExport.contents(of: recording))
+        defer { controller.close() }
+        let track = controller.timeline.track
+        track.frame = CGRect(x: 0, y: 0, width: 212, height: 28) // 200 points of track for 1 s
+        track.pressed(at: 6)
+        track.dragged(to: 56)
+        #expect(controller.current.trim == nil) // not while dragging
+        track.released()
+        let trim = try #require(controller.current.trim)
+        #expect(abs(trim.start - 0.25) < 0.001 && trim.end > 0.99)
+        controller.formats.selectItem(at: 1)
+        controller.formatChanged()
+        #expect(controller.current.trim == trim)
+        track.pressed(at: 56)
+        track.dragged(to: 0)
+        track.released()
+        #expect(controller.current.trim == nil)
+    }
+
+    /// A press on the track away from the brackets moves the playhead there.
+    @Test func aPressOnTheTrackMovesThePlayhead() async throws {
+        let recording = try await testRecording()
+        let controller = RecordingWindowController(recording: recording, contents: try await RecordingExport.contents(of: recording))
+        defer { controller.close() }
+        let track = controller.timeline.track
+        track.frame = CGRect(x: 0, y: 0, width: 212, height: 28)
+        track.pressed(at: 106)
+        track.released()
+        #expect(abs(controller.timeline.playhead - 0.5) < 0.001)
+        #expect(controller.current.trim == nil)
+        #expect(controller.timeline.time.stringValue == "0:00 / 0:01")
     }
 }

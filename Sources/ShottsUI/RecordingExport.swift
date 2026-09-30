@@ -88,7 +88,11 @@ public nonisolated enum RecordingExport {
                              progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
         let movie = AVURLAsset(url: recording.movie)
         guard let video = try await movie.loadTracks(withMediaType: .video).first else { throw Failure.noVideo }
-        let duration = try await movie.load(.duration)
+        let whole = try await movie.load(.duration)
+        // The part kept, which the file starts at the beginning of.
+        let kept = settings.trim.map {
+            CMTimeRange(start: CMTime(seconds: $0.start, preferredTimescale: 600), end: min(CMTime(seconds: $0.end, preferredTimescale: 600), whole))
+        } ?? CMTimeRange(start: .zero, duration: whole)
         // A track does not keep its asset: the job holds them while it reads.
         var assets: [AVAsset] = [movie]
         var sounds: [(track: AVAssetTrack, range: CMTimeRange)] = []
@@ -106,7 +110,7 @@ public nonisolated enum RecordingExport {
         }
         let videoRange = try await video.load(.timeRange)
         let size = RecordingRule.size(width: settings.width, format: settings.format, recorded: (recording.width, recording.height))
-        let job = Job(assets: assets, video: (video, videoRange), sounds: sounds, duration: duration, size: size, rate: settings.frameRate, to: url, progress: progress)
+        let job = Job(assets: assets, video: (video, videoRange), sounds: sounds, kept: kept, size: size, rate: settings.frameRate, to: url, progress: progress)
         try? FileManager.default.removeItem(at: url)
         do {
             try await withTaskCancellationHandler {
@@ -135,7 +139,9 @@ public nonisolated enum RecordingExport {
         let assets: [AVAsset]
         let video: (track: AVAssetTrack, range: CMTimeRange)
         let sounds: [(track: AVAssetTrack, range: CMTimeRange)]
-        let duration: CMTime
+        /// The part of the recording kept, and so the file's length.
+        let kept: CMTimeRange
+        var duration: CMTime { kept.duration }
         let size: (width: Int, height: Int)
         let rate: Int
         let url: URL
@@ -143,12 +149,12 @@ public nonisolated enum RecordingExport {
         private let lock = NSLock()
         private var cancelled = false
 
-        init(assets: [AVAsset], video: (track: AVAssetTrack, range: CMTimeRange), sounds: [(track: AVAssetTrack, range: CMTimeRange)], duration: CMTime, size: (width: Int, height: Int), rate: Int, to url: URL,
+        init(assets: [AVAsset], video: (track: AVAssetTrack, range: CMTimeRange), sounds: [(track: AVAssetTrack, range: CMTimeRange)], kept: CMTimeRange, size: (width: Int, height: Int), rate: Int, to url: URL,
              progress: @escaping @Sendable (Double) -> Void) {
             self.assets = assets
             self.video = video
             self.sounds = sounds
-            self.duration = duration
+            self.kept = kept
             self.size = size
             self.rate = rate
             self.url = url
@@ -163,6 +169,12 @@ public nonisolated enum RecordingExport {
 
         private var seconds: Double { max(duration.seconds, 0.001) }
 
+        /// The kept part of a track that covers `range`.
+        private func part(of range: CMTimeRange) -> CMTimeRange {
+            let start = max(kept.start, range.start), end = min(kept.end, range.end)
+            return end > start ? CMTimeRange(start: start, end: end) : CMTimeRange(start: kept.start, duration: .zero)
+        }
+
         /// The recording's frames at this job's rate, each scaled to this job's size into
         /// `format`, with the time it shows from. A frame is handed on once the next has come,
         /// when it is known whether it lasts until a tick.
@@ -171,7 +183,7 @@ public nonisolated enum RecordingExport {
             guard let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
                 throw Failure.failed("The recording could not be read.")
             }
-            try track.insertTimeRange(CMTimeRange(start: .zero, end: min(duration, video.range.end)), of: video.track, at: .zero)
+            try track.insertTimeRange(part(of: video.range), of: video.track, at: .zero)
             let reader = try AVAssetReader(asset: composition)
             let output = AVAssetReaderTrackOutput(track: track, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: format])
             output.alwaysCopiesSampleData = false
@@ -227,12 +239,12 @@ public nonisolated enum RecordingExport {
 
             // The sound, one track mixed from those chosen: many players play only a file's first.
             var sound: (reader: AVAssetReader, output: AVAssetReaderAudioMixOutput, input: AVAssetWriterInput)?
-            if sounds.contains(where: { $0.range.duration > .zero }) {
+            if sounds.contains(where: { part(of: $0.range).duration > .zero }) {
                 let composition = AVMutableComposition()
                 var tracks: [AVAssetTrack] = []
-                for source in sounds where source.range.duration > .zero {
+                for source in sounds where part(of: source.range).duration > .zero {
                     guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
-                    try track.insertTimeRange(CMTimeRange(start: .zero, end: min(duration, source.range.end)), of: source.track, at: .zero)
+                    try track.insertTimeRange(part(of: source.range), of: source.track, at: .zero)
                     tracks.append(track)
                 }
                 let reader = try AVAssetReader(asset: composition)

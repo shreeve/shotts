@@ -3,7 +3,8 @@ import AVKit
 import ShottsCore
 import UniformTypeIdentifiers
 
-/// The window a recording opens in once it stops: a bar of export settings above a player.
+/// The window a recording opens in once it stops: a bar of export settings above a player,
+/// and a timeline below it that plays, and trims what the files keep.
 /// The window always holds the file its settings make, made again in the background whenever
 /// they change, so its size shows exactly and Copy, Save, and a drag use it at once. Closing
 /// the window deletes the recording and every file made from it.
@@ -25,6 +26,9 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     private var waiting: [(URL) -> Void] = []
 
     let player = AVPlayerView()
+    let timeline: Timeline
+    private var timeObserver: Any?
+    private var endObserver: NSObjectProtocol?
     let formats = NSPopUpButton()
     let widthField = NSTextField()
     let heightLabel = NSTextField(labelWithString: "")
@@ -43,6 +47,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
             .mp4: RecordingRule.defaults(for: .mp4, recorded: recorded, scale: recording.scale, hasMicrophone: contents.hasMicrophone),
             .gif: RecordingRule.defaults(for: .gif, recorded: recorded, scale: recording.scale, hasMicrophone: contents.hasMicrophone),
         ]
+        timeline = Timeline(duration: contents.duration)
         let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = Export.suggestedName(date: recording.started, prefix: "Shotts Recording", fileExtension: "mp4")
             .replacingOccurrences(of: ".mp4", with: "")
@@ -57,11 +62,13 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         // bar is cut off.
         let visible = (screen ?? NSScreen.main)?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
         let bar = self.bar.fittingSize
+        let chrome = bar.height + Self.timelineHeight
         let points = CGSize(width: Double(recording.width) / recording.scale, height: Double(recording.height) / recording.scale)
-        let fit = min(1, visible.width * 0.9 / points.width, (visible.height * 0.9 - bar.height) / points.height)
+        let fit = min(1, visible.width * 0.9 / points.width, (visible.height * 0.9 - chrome) / points.height)
         let video = CGSize(width: (points.width * fit).rounded(), height: (points.height * fit).rounded())
-        window.setContentSize(CGSize(width: max(video.width, bar.width), height: video.height + bar.height))
-        window.contentMinSize = CGSize(width: bar.width, height: bar.height + 120)
+        window.setContentSize(CGSize(width: max(video.width, bar.width), height: video.height + chrome))
+        window.contentMinSize = CGSize(width: bar.width, height: chrome + 120)
+        window.initialFirstResponder = timeline.track
         window.center()
 
         loadPlayer()
@@ -131,8 +138,8 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         bar.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         bar.setCustomSpacing(4, after: widthField)
 
-        player.controlsStyle = .inline
-        player.showsFullScreenToggleButton = false
+        // The timeline below is the player's only control.
+        player.controlsStyle = .none
         // The bar across the top and the player filling the rest, pinned edge to edge: the
         // player's own idea of its size, which it takes from the video once loaded, never wins.
         for view in [player as NSView] {
@@ -142,7 +149,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
             view.setContentCompressionResistancePriority(.init(1), for: .vertical)
         }
         let content = NSView()
-        for view in [bar, player] as [NSView] {
+        for view in [bar, player, timeline] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(view)
         }
@@ -153,11 +160,22 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
             player.topAnchor.constraint(equalTo: bar.bottomAnchor),
             player.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             player.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            player.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            player.bottomAnchor.constraint(equalTo: timeline.topAnchor),
+            timeline.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            timeline.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            timeline.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            timeline.heightAnchor.constraint(equalToConstant: Self.timelineHeight),
         ])
+        timeline.play.target = self
+        timeline.play.action = #selector(togglePlaying)
+        timeline.track.onToggle = { [weak self] in self?.togglePlaying() }
+        timeline.track.onSeek = { [weak self] time in self?.seek(to: time) }
+        timeline.track.onTrim = { [weak self] trim, done in self?.trimmed(trim, done: done) }
         self.bar = bar
         return content
     }
+
+    private static let timelineHeight: CGFloat = 40
 
     /// Plays the video with every sound it has, the microphone's file alongside.
     private func loadPlayer() {
@@ -174,8 +192,51 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
                 else { continue }
                 try? added.insertTimeRange(range, of: track, at: .zero)
             }
-            player.player = AVPlayer(playerItem: AVPlayerItem(asset: composition))
+            let item = AVPlayerItem(asset: composition)
+            let playing = AVPlayer(playerItem: item)
+            player.player = playing
+            let timeline = timeline
+            timeObserver = playing.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { time in
+                MainActor.assumeIsolated { timeline.playhead = time.seconds }
+            }
+            endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { _ in
+                MainActor.assumeIsolated { timeline.showPlaying(false) }
+            }
         }
+    }
+
+    // MARK: - Playing and trimming
+
+    /// Plays the part kept, from its start again once it has played to its end.
+    @objc func togglePlaying() {
+        guard let playing = player.player else { return }
+        if playing.rate != 0 {
+            playing.pause()
+            timeline.showPlaying(false)
+            return
+        }
+        let trim = timeline.track.trim
+        if timeline.playhead >= trim.end - 0.05 || timeline.playhead < trim.start { seek(to: trim.start) }
+        playing.play()
+        timeline.showPlaying(true)
+    }
+
+    private func seek(to time: Double) {
+        timeline.playhead = time
+        player.player?.seek(to: CMTime(seconds: time, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    /// Playing stops at the trim's end as it is dragged; the files follow once the drag ends,
+    /// for every format, since what to keep is the same whatever it is saved as.
+    func trimmed(_ trim: Trim, done: Bool) {
+        player.player?.pause()
+        timeline.showPlaying(false)
+        player.player?.currentItem?.forwardPlaybackEndTime = CMTime(seconds: trim.end, preferredTimescale: 600)
+        guard done else { return }
+        let kept = trim.isWhole(contents.duration) ? nil : trim
+        guard kept != current.trim else { return }
+        for format in settings.keys { settings[format]?.trim = kept }
+        remake()
     }
 
     // MARK: - Settings
@@ -324,6 +385,8 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     public func windowWillClose(_ notification: Notification) {
         making?.cancel()
         player.player?.pause()
+        if let timeObserver { player.player?.removeTimeObserver(timeObserver) }
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         player.player = nil
         try? FileManager.default.removeItem(at: recording.folder)
         let done = onClose

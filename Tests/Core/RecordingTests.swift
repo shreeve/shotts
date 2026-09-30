@@ -362,3 +362,75 @@ private func lzwDecode(_ data: [UInt8], minimumCodeSize: Int, count: Int) throws
         #expect(column == [0, 1])
     }
 }
+
+@Suite struct TrimTests {
+    @Test func handlesStopShortOfEachOtherAndTheEnds() {
+        let whole = Trim.whole(10)
+        #expect(whole.isWhole(10))
+        #expect(whole.movingStart(to: -3).start == 0)
+        #expect(whole.movingStart(to: 12).start == 10 - Trim.shortest)
+        let cut = whole.movingStart(to: 2).movingEnd(to: 7, duration: 10)
+        #expect(cut == Trim(start: 2, end: 7) && cut.length == 5 && !cut.isWhole(10))
+        #expect(cut.movingEnd(to: 1, duration: 10).end == 2 + Trim.shortest)
+        #expect(cut.movingEnd(to: 99, duration: 10).end == 10)
+    }
+
+    @Test func settingsCarryTheTrim() {
+        var s = RecordingSettings(format: .mp4, width: 100, frameRate: 30, sound: .none)
+        #expect(s.trim == nil)
+        s.trim = Trim(start: 1, end: 2)
+        #expect(s != RecordingSettings(format: .mp4, width: 100, frameRate: 30, sound: .none))
+    }
+}
+
+@Suite struct TimelineLayoutTests {
+    @Test func timesAndPlacesMapBothWays() {
+        let t = TimelineLayout(width: 400, duration: 20)
+        #expect(t.x(for: 5) == 100 && t.time(at: 100) == 5)
+        #expect(t.x(for: -1) == 0 && t.x(for: 99) == 400)
+        #expect(t.time(at: -10) == 0 && t.time(at: 1000) == 20)
+    }
+
+    @Test func aPressTakesTheNearerHandleInReach() {
+        let t = TimelineLayout(width: 400, duration: 20)
+        let trim = Trim(start: 5, end: 15) // x 100 and 300
+        #expect(t.part(at: 104, of: trim) == .start)
+        #expect(t.part(at: 295, of: trim) == .end)
+        #expect(t.part(at: 200, of: trim) == .track)
+        // Together, the press's side decides which moves.
+        let together = Trim(start: 10, end: 10.1)
+        #expect(t.part(at: 195, of: together) == .start)
+        #expect(t.part(at: 206, of: together) == .end)
+    }
+}
+
+@Suite struct PauseClockTests {
+    /// What is recorded during a pause is dropped, and what follows picks up where it left off.
+    @Test func pausesAreTakenOut() {
+        var clock = PauseClock()
+        #expect(clock.recorded(3) == 3)
+        clock.pause(at: 4)
+        #expect(clock.isPaused && clock.recorded(5) == nil)
+        #expect(clock.elapsed(at: 9) == 4)
+        clock.resume(at: 10)
+        #expect(!clock.isPaused)
+        #expect(clock.recorded(10) == 4 && clock.recorded(12) == 6)
+        #expect(clock.elapsed(at: 12) == 6)
+        // A sample from before the pause that arrives late keeps its time; one from within it
+        // is still dropped.
+        #expect(clock.recorded(3.5) == 3.5 && clock.recorded(7) == nil)
+        clock.pause(at: 13)
+        clock.resume(at: 15)
+        #expect(clock.recorded(16) == 8)
+    }
+
+    @Test func pausingTwiceOrResumingUnpausedChangesNothing() {
+        var clock = PauseClock()
+        clock.resume(at: 2)
+        #expect(clock.recorded(2) == 2)
+        clock.pause(at: 3)
+        clock.pause(at: 5)
+        clock.resume(at: 6)
+        #expect(clock.recorded(6) == 3)
+    }
+}
