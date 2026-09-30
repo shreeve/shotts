@@ -7,7 +7,7 @@ import Testing
 /// grays at `times`, the last lasting until `end`, a tone as the Mac's sound, and another in a
 /// microphone file of its own.
 /// The recording the window tests open.
-func testRecording() async throws -> Recording { try await makeRecording() }
+func testRecording(width: Int = 320, height: Int = 200) async throws -> Recording { try await makeRecording(width: width, height: height) }
 
 private func makeRecording(width: Int = 320, height: Int = 200, times: [Double] = [0, 0.1, 0.25], end: Double = 1,
                            systemSound: Bool = true, microphone: Bool = true) async throws -> Recording {

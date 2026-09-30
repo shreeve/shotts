@@ -131,3 +131,26 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: recording.folder.path))
     }
 }
+
+@MainActor @Suite struct RecordingWindowLayoutTests {
+    /// The player fills the window below the bar, edge to edge, however the window is sized.
+    @Test(arguments: [(320, 200), (1898, 948)]) func thePlayerFillsTheWindowBelowTheBar(_ size: (Int, Int)) async throws {
+        let recording = try await testRecording(width: size.0, height: size.1)
+        let controller = RecordingWindowController(recording: recording, contents: try await RecordingExport.contents(of: recording))
+        defer { controller.close() }
+        let window = try #require(controller.window)
+        // With the video loaded, as it is by the time anyone looks.
+        for _ in 0..<200 where controller.player.player?.currentItem?.status != .readyToPlay {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(controller.player.player?.currentItem?.status == .readyToPlay)
+        for size in [nil, CGSize(width: 900, height: 600), CGSize(width: 1400, height: 700)] {
+            if let size { window.setContentSize(size) } // first, as it opens
+            window.contentView?.layoutSubtreeIfNeeded()
+            let content = try #require(window.contentView).bounds
+            let player = controller.player.convert(controller.player.bounds, to: nil)
+            #expect(player.minX == 0 && player.width == content.width, "player \(player) in \(content)")
+            #expect(player.minY == 0 && player.height > content.height - 60)
+        }
+    }
+}

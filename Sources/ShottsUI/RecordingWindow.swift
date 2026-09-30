@@ -33,6 +33,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     let status = NSTextField(labelWithString: "")
     let progress = NSProgressIndicator()
     private var grip: RecordingGrip!
+    private var bar: NSStackView!
 
     public init(recording: Recording, contents: RecordingExport.Contents, on screen: NSScreen? = NSScreen.main) {
         self.recording = recording
@@ -55,7 +56,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         // The video at the size it had on screen, or smaller to fit, and never so narrow the
         // bar is cut off.
         let visible = (screen ?? NSScreen.main)?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-        let bar = window.contentView!.fittingSize
+        let bar = self.bar.fittingSize
         let points = CGSize(width: Double(recording.width) / recording.scale, height: Double(recording.height) / recording.scale)
         let fit = min(1, visible.width * 0.9 / points.width, (visible.height * 0.9 - bar.height) / points.height)
         let video = CGSize(width: (points.width * fit).rounded(), height: (points.height * fit).rounded())
@@ -132,13 +133,30 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
 
         player.controlsStyle = .inline
         player.showsFullScreenToggleButton = false
-        player.setContentHuggingPriority(.init(1), for: .vertical)
-        player.setContentHuggingPriority(.init(1), for: .horizontal)
-        let column = NSStackView(views: [bar, player])
-        column.orientation = .vertical
-        column.spacing = 0
-        column.alignment = .width
-        return column
+        // The bar across the top and the player filling the rest, pinned edge to edge: the
+        // player's own idea of its size, which it takes from the video once loaded, never wins.
+        for view in [player as NSView] {
+            view.setContentHuggingPriority(.init(1), for: .horizontal)
+            view.setContentHuggingPriority(.init(1), for: .vertical)
+            view.setContentCompressionResistancePriority(.init(1), for: .horizontal)
+            view.setContentCompressionResistancePriority(.init(1), for: .vertical)
+        }
+        let content = NSView()
+        for view in [bar, player] as [NSView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            content.addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            bar.topAnchor.constraint(equalTo: content.topAnchor),
+            bar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            bar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            player.topAnchor.constraint(equalTo: bar.bottomAnchor),
+            player.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            player.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            player.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+        ])
+        self.bar = bar
+        return content
     }
 
     /// Plays the video with every sound it has, the microphone's file alongside.
