@@ -242,3 +242,46 @@ extension OverlayView {
         }
     }
 }
+
+@MainActor @Suite struct RecordPickerTests {
+    /// Command held as the drag ends records the area; without it, the area is captured.
+    @Test func commandAtReleaseRecords() throws {
+        for command in [false, true] {
+            let view = try overlay()
+            var outcome: AreaSelection.Outcome?
+            view.onFinish = { outcome = $0 }
+            view.pressed(at: CGPoint(x: 20, y: 20))
+            view.dragged(to: CGPoint(x: 120, y: 80), square: false)
+            view.released(at: CGPoint(x: 120, y: 80), recording: command)
+            switch outcome {
+            case let .record(_, rect)?: #expect(command && rect == CGRect(x: 20, y: 20, width: 100, height: 60))
+            case let .selected(_, rect)?: #expect(!command && rect == CGRect(x: 20, y: 20, width: 100, height: 60))
+            default: Issue.record("no area came back")
+            }
+        }
+    }
+
+    /// While Command is down the selection reads "Record" and its size, not the color.
+    @Test func commandShowsTheRecordingToBe() throws {
+        let view = try overlay()
+        view.pressed(at: CGPoint(x: 20, y: 20))
+        view.dragged(to: CGPoint(x: 120, y: 80), square: false)
+        #expect(!view.magnifier(at: CGPoint(x: 120, y: 80)).text.hasPrefix("Record"))
+        view.commandChanged(true)
+        #expect(view.records)
+        #expect(view.magnifier(at: CGPoint(x: 120, y: 80)).text == "Record  200 × 120")
+        view.commandChanged(false)
+        #expect(!view.records)
+    }
+
+    /// A click, Command or not, still captures the window under it.
+    @Test func aClickStillCapturesAWindow() throws {
+        let view = try overlay(windows: [WindowInfo(id: 7, frame: CGRect(x: 0, y: 0, width: 100, height: 100))])
+        var outcome: AreaSelection.Outcome?
+        view.onFinish = { outcome = $0 }
+        view.pressed(at: CGPoint(x: 50, y: 50))
+        view.released(at: CGPoint(x: 50, y: 50), recording: true)
+        guard case let .window(_, window)? = outcome else { Issue.record("no window came back"); return }
+        #expect(window.id == 7)
+    }
+}

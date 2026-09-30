@@ -8,6 +8,11 @@ import Sparkle
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemValidation {
     private var statusItem: NSStatusItem?
+    /// The menu bar item's menu, set aside while it shows a recording's time.
+    private var statusMenu: NSMenu?
+    /// The recording the menu bar item shows the time of, and what ticks it.
+    private var recorder: Recorder?
+    private var ticker: Timer?
     private let flow = CaptureFlow()
     /// Reads SUFeedURL and SUPublicEDKey from Info.plist and checks daily, silently
     /// (SUEnableAutomaticChecks), so it never asks a question of its own. The plist always has
@@ -27,13 +32,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         if MoveToApplications.offerIfNeeded() { return }
         #endif
         NSApp.mainMenu = makeMainMenu()
+        // Recordings live only while their windows are open; none is open at launch, so
+        // anything left is from a crash.
+        try? FileManager.default.removeItem(at: Recording.parentFolder)
+        flow.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
         let capture = HotKey.registerF10 { [weak self] in self?.flow.begin() }
         let showLast = HotKey.registerF10(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
         makeStatusItem(hasHotKey: capture, hasShowLastKey: showLast)
-        updater.startUpdater()
         #if DEBUG
-        DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
+        // A developer check runs without the updater, whose alerts would hold it up.
+        if CommandLine.arguments.contains(where: { $0.hasPrefix("--") }) {
+            DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
+            return
+        }
         #endif
+        updater.startUpdater()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
@@ -102,7 +115,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menu.addItem(checkForUpdatesItem())
         menu.addItem(NSMenuItem(title: "Quit Shotts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
+        statusMenu = menu
         statusItem = item
+    }
+
+    /// While recording, the item is a red dot and the time so far, and clicking it stops the
+    /// recording; its menu comes back when the recording ends.
+    private func showRecording(_ recorder: Recorder?) {
+        guard let item = statusItem, let button = item.button else { return }
+        ticker?.invalidate()
+        ticker = nil
+        self.recorder = recorder
+        guard recorder != nil else {
+            button.attributedTitle = NSAttributedString()
+            button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Shotts")
+            button.target = nil
+            button.action = nil
+            button.toolTip = nil
+            item.length = NSStatusItem.squareLength
+            item.menu = statusMenu
+            return
+        }
+        item.menu = nil
+        item.length = NSStatusItem.variableLength
+        button.image = nil
+        button.target = self
+        button.action = #selector(stopRecording)
+        button.toolTip = "Stop recording (F10)"
+        tick()
+        let timer = Timer(timeInterval: 0.25, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
+        RunLoop.main.add(timer, forMode: .common)
+        ticker = timer
+    }
+
+    @objc private func tick() {
+        guard let recorder else { return }
+        let seconds = Int(recorder.elapsed)
+        let time = seconds >= 3600
+            ? String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
+            : String(format: "%d:%02d", seconds / 60, seconds % 60)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        let title = NSMutableAttributedString(string: "● ", attributes: [.foregroundColor: NSColor.systemRed, .font: font])
+        title.append(NSAttributedString(string: time, attributes: [.font: font]))
+        statusItem?.button?.attributedTitle = title
+        statusItem?.button?.setAccessibilityLabel("Recording, \(time). Stop recording")
+    }
+
+    @objc private func stopRecording() {
+        flow.stopRecording()
     }
 
     private func aboutItem() -> NSMenuItem {

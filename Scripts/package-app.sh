@@ -50,7 +50,9 @@ resign --preserve-metadata=entitlements "$framework/Versions/B/XPCServices/Downl
 resign "$framework/Versions/B/Autoupdate"
 resign "$framework/Versions/B/Updater.app"
 resign "$framework"
-resign "$app"
+# The hardened runtime keeps the microphone from an app that does not claim it; the
+# entitlement is the claim, and macOS still asks the user the first time.
+resign --entitlements "$root/Support/Shotts.entitlements" "$app"
 codesign --verify --deep --strict "$app"
 identifier=$( (codesign -dv "$app" 2>&1 || true) | sed -n 's/^Identifier=//p')
 expected=$(plutil -extract CFBundleIdentifier raw "$app/Contents/Info.plist")

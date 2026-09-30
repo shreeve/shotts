@@ -23,6 +23,11 @@ highlighter, and pixelation for things that should not leave your Mac. Copy it, 
 it, or drag it into another app; the editor stays open like any window, and Option-F10 brings
 back the last one if you closed it.
 
+Hold Command as you let go of the drag and Shotts records the area instead, with the Mac's sound
+and, if you like, your microphone. The menu bar shows the time; F10 stops it. The recording
+opens in a window that saves it as an MP4 that plays nearly everywhere, or as an animated GIF
+from Shotts' own encoder, at whatever size and frame rate you choose.
+
 The annotations are made to look good on a busy screenshot: rounded strokes, tapered arrows,
 bold text with a contrasting outline, restrained shadows. The app is small, keeps its memory in
 check (one source image, a list of editable annotations, an undo history of edits rather than
@@ -36,7 +41,8 @@ brew install --cask shreeve/tap/shotts
 
 Requires macOS 14 Sonoma or later on Apple silicon. Releases are signed with a Developer ID and notarized by
 Apple. Installed copies update themselves: choose **Check for Updates…** in the menu bar menu.
-The first capture asks for Screen Recording permission, once.
+The first capture asks for Screen Recording permission, once; the first recording with the
+microphone on asks for the microphone.
 
 Or download `Shotts-<version>.zip` from the [latest release](https://github.com/shreeve/shotts/releases/latest)
 and open Shotts: it offers to move itself into Applications, where it can keep itself up to date.
@@ -48,6 +54,7 @@ and open Shotts: it offers to move itself into Applications, where it can keep i
 | **Press F10** (fn-F10 on most Mac keyboards) | A crosshair follows the pointer over the live screen, with a magnifier that shows the pixels under it, their color in hex, and the selection's size. Command-C copies the color. |
 | **Select** | Drag an area (Shift for a square, Space to move it), or click a window, outlined as the crosshair passes over it, to capture only that window, with the shadow macOS draws around it if you turn that on. Escape cancels. |
 | **Annotate** | Arrow with text, arrow, line, text, rectangle, ellipse, pen, highlighter, obscure, and crop, each on a single key. Undo and redo. A color and style popover remembers your choices. |
+| **Or record** | Hold Command as the drag ends, press Return, and it records. F10 stops. Save, copy, or drag it out as H.264 MP4 or a blue-noise-dithered GIF, as many ways as you like. |
 | **Copy, save, print, drag** | Command-C puts the picture on the clipboard, Command-S saves a PNG, Command-P prints it to fit one page, and the hand icon drags a file into any app. Pictures keep the capture's resolution, so a Retina capture pastes at its on-screen size. |
 
 The arrow with text is one object: draw the arrow, type beside its tail, and the words lay

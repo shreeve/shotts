@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import AVFoundation
 import ShottsCore
 import ShottsUI
 
@@ -30,6 +31,7 @@ enum DevSwitches {
                 case .cancelled: line = "cancelled"
                 case let .selected(display, rect): line = "selected \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(display.screen.localizedName)"
                 case let .window(display, window): line = "window \(window.id) at \(Int(window.frame.minX)),\(Int(window.frame.minY)) on \(display.screen.localizedName)"
+                case let .record(display, rect): line = "record \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(display.screen.localizedName)"
                 }
                 try? line.write(to: out, atomically: true, encoding: .utf8)
                 exit(0)
@@ -50,6 +52,20 @@ enum DevSwitches {
         if let v = value(after: "--preview-style") {
             // The style popover's layout, drawn off screen.
             exit(StylePopoverPreview.write(to: URL(fileURLWithPath: v[0])) ? 0 : 1)
+        }
+        if let v = value(after: "--export-recording", 2) {
+            // A recording's export, from any movie standing in for one (its sound as the Mac's,
+            // and `--microphone file` as the microphone), as the recording window makes it:
+            // `--width`, `--fps`, and `--sound none|system|microphone|both`; the format by the
+            // output's extension.
+            let out = URL(fileURLWithPath: v[1])
+            let microphone = value(after: "--microphone").map { URL(fileURLWithPath: $0[0]) }
+            let width = value(after: "--width").flatMap { Int($0[0]) }
+            let rate = value(after: "--fps").flatMap { Int($0[0]) }
+            let sound = value(after: "--sound").flatMap { RecordingSettings.Sound(rawValue: $0[0]) }
+            Task {
+                exit(await exportRecording(URL(fileURLWithPath: v[0]), microphone: microphone, to: out, width: width, rate: rate, sound: sound) ? 0 : 1)
+            }
         }
         if let v = value(after: "--capture-window", 2), let id = CGWindowID(v[0]) {
             // Window capture: the window with that id, with its shadow unless --no-shadow,
@@ -94,6 +110,30 @@ enum DevSwitches {
         // One "window" for the picker to outline, at 700,700 points, 600 by 400.
         return DisplayImage(screen: screen, image: ctx.makeImage()!, scale: scale,
                             windows: [WindowInfo(id: 0, frame: CGRect(x: 700, y: 700, width: 600, height: 400))])
+    }
+
+    static func exportRecording(_ movie: URL, microphone: URL?, to out: URL, width: Int?, rate: Int?, sound: RecordingSettings.Sound?) async -> Bool {
+        do {
+            let asset = AVURLAsset(url: movie)
+            guard let track = try await asset.loadTracks(withMediaType: .video).first else { return false }
+            let size = try await track.load(.naturalSize)
+            let recording = Recording(folder: out.deletingLastPathComponent(), movie: movie, microphone: microphone,
+                                      width: Int(size.width), height: Int(size.height), scale: 2, started: .now)
+            let format: RecordingSettings.Format = out.pathExtension.lowercased() == "gif" ? .gif : .mp4
+            let contents = try await RecordingExport.contents(of: recording)
+            var settings = RecordingRule.defaults(for: format, recorded: (recording.width, recording.height), scale: 2,
+                                                  hasMicrophone: contents.hasMicrophone)
+            if let width { settings.width = width }
+            if let rate { settings.frameRate = rate }
+            if let sound { settings.sound = sound }
+            let started = Date.now
+            try await RecordingExport.write(recording, settings: settings, to: out)
+            print("\(settings) in \(String(format: "%.2f", Date.now.timeIntervalSince(started))) s")
+            return true
+        } catch {
+            print(error.localizedDescription)
+            return false
+        }
     }
 
     static func previewOverlay(to output: URL, selected: Bool, dimmed: Bool, corner: Bool) -> Bool {

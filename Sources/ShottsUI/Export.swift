@@ -32,8 +32,10 @@ public enum Export {
     /// `Shotts 2026-09-26 at 10.12.34 PM.png`, named the way the Screenshot app names its files:
     /// the date year first, then the time as the user's locale writes it, 12 or 24 hour. Colons,
     /// which Finder shows as slashes, become dots, and the narrow space some locales put before
-    /// AM or PM becomes a plain one, which is easier to type in a shell.
-    public static func suggestedName(date: Date = .now, locale: Locale = .current) -> String {
+    /// AM or PM becomes a plain one, which is easier to type in a shell. A recording's files
+    /// are `Shotts Recording 2026-09-26 at 10.12.34 PM.mp4`.
+    public static func suggestedName(date: Date = .now, locale: Locale = .current, prefix: String = "Shotts",
+                                     fileExtension: String = "png") -> String {
         let f = DateFormatter()
         f.locale = locale
         f.calendar = Calendar(identifier: .gregorian)
@@ -42,7 +44,7 @@ public enum Export {
         f.timeStyle = .medium
         f.dateFormat = "yyyy-MM-dd 'at' " + f.dateFormat
         let stamp = f.string(from: date).replacing(":", with: ".").replacing("/", with: "-").replacing(/\s/, with: " ")
-        return "Shotts \(stamp).png"
+        return "\(prefix) \(stamp).\(fileExtension)"
     }
 
     /// Writes the PNG.

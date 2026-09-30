@@ -24,8 +24,9 @@ while capturing, kept the editor open with Option-F10 to bring the last capture 
 New Window per Capture; 0.2.2 printed through the standard Print window; 0.2.1 fixed 0.2.0's
 hidden bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit c24b093): a correctness,
 security, and performance pass over the whole app, plus Open Sans; `CHANGELOG.md` says what
-changed for users. The build has no warnings (warnings are errors) and `swift test` passes: 46
-Core tests and 58 AppKit tests.
+changed for users. Screen recording (Command as the drag ends; MP4 and Shotts' own GIF encoder)
+is built, under Unreleased in `CHANGELOG.md`, and not yet released. The build has no warnings
+(warnings are errors) and `swift test` passes: 67 Core tests and 74 AppKit tests.
 
 Next, in order:
 
@@ -39,7 +40,14 @@ Next, in order:
    but it has only ever run on macOS 27. Watch what could differ: the editor and Option-F10
    coming to the front (the first Trap), the picker taking keys and clicks while another app
    stays in front, the live screen under the picker, and the Screen Recording prompts.
-3. Deferred work, below. New changes collect under a `## Unreleased` heading in `CHANGELOG.md`.
+3. Record by hand before releasing recording: nothing launched without a person at the Mac can
+   record, so no test has. Command-drag an area and let go; Record with and without the
+   microphone (the first asks for it); play sound; move windows and the pointer in the area;
+   stop with F10 and with the menu bar item; in the window, save an MP4 and a GIF at a few sizes
+   and rates, copy each into Messages and Mail, drag one to the Finder, close, and check the
+   folder under `Recording.parentFolder` is gone. Record an area that includes the menu bar and
+   check the timer is not in it.
+4. Deferred work, below. New changes collect under a `## Unreleased` heading in `CHANGELOG.md`.
 
 Decided against, so they are not rebuilt:
 
@@ -76,23 +84,30 @@ Deferred, with the reason each waits:
 | | `Selection.swift` | `SelectionRule`: the drag rectangle rules the picker and the shape tools share. |
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
+| | `Recording.swift` | `RecordingSettings` (format, width, frame rate, sound), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), `GIFTiming`. |
+| | `GIF.swift` | The GIF encoder: `BlueNoise` (void-and-cluster), `PaletteBuilder` (exact prominent colors, median cut for the rest), `Quantizer` (blue-noise dithering), `GIFWriter` (GIF89a, changed rectangles only), `LZW`. |
 | ShottsUI | `AreaSelection.swift` | The picker: `DisplayImage` (a display's latest picture, its windows, and `cut`), one overlay window per display, the crosshair, magnifier, hints, window outlines, `PixelSampler`. |
 | | `EditorWindow.swift` | `EditorWindowController`: the bar, copy, save, print, closing, resizing, the drag grip, remembered tool and style. |
 | | `CanvasView.swift` | The picture with its annotations, every tool's mouse handling, text entry (`TextEntry`), selection drawing. |
 | | `Renderer.swift` | Draws a `Document` into any `CGContext`; measures text; an annotation's extent. |
 | | `StylePopover.swift` | The color and style popover. |
 | | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file. |
+| | `RecordingSetup.swift` | The red outline around an area being recorded, and the Record, Microphone, and Cancel panel beside it. |
+| | `RecordingWindow.swift` | `RecordingWindowController`: the player, the export settings, the file made in the background, Copy, Save, the drag grip, deleting it all on close. |
+| | `RecordingExport.swift` | `Recording` (the kept files) and `RecordingExport`: MP4 and GIF files from it, off the main thread. |
 | Shotts | `ShottsApp.swift` | `AppDelegate`: menu bar item and menu, main menu, Sparkle. |
 | | `CaptureFlow.swift` | One capture from hot key to editor, which app gets focus back, and the capture closed last. |
 | | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list. |
 | | `LiveDisplay.swift` | A display streamed while the picker is up: its latest frame and windows. |
-| | `HotKey.swift` | The Carbon hot keys: F10 captures, Option-F10 brings the last capture back. |
+| | `Recorder.swift` | Records an area through ScreenCaptureKit, the Mac's sound with it, and the microphone through AVFoundation. |
+| | `HotKey.swift` | The Carbon hot keys: F10 captures (or stops a recording), Option-F10 brings the last capture back. |
 | | `MoveToApplications.swift` | A release launched outside Applications offers to move itself there. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
 
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
-`capture.askedPermission` once the system's permission prompt has been shown, `editor.newWindows`; the editor's last
+`capture.askedPermission` once the system's permission prompt has been shown, `editor.newWindows`,
+`recording.microphone`; the editor's last
 style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 
 ## The seam
@@ -154,6 +169,50 @@ Permission is checked with `CGPreflightScreenCaptureAccess`. The first F10 witho
 `CGRequestScreenCaptureAccess`, which shows the system's prompt; later presses show Shotts' own
 explanation. macOS records the grant against the app's code signature, which is why every build
 is signed with the Developer ID rather than ad hoc.
+
+## Recording
+
+Command held as a drag ends makes the picker report `.record` rather than `.selected`
+(`OverlayView.released(at:recording:)`; the outline turns red and the label reads "Record" while
+Command is down). `CaptureFlow` stops the picker's streams and shows a `RecordingSetup`: a red
+outline window just outside the area and a non-activating panel beside it, like the picker's,
+so nothing on screen moves. Record (Return) asks for the microphone if it is on and not yet
+allowed, then starts a `Recorder`; the panel goes and the outline stays. F10 while recording, or
+the menu bar item, which shows a red dot and the time (`AppDelegate.showRecording`), stops it.
+
+`Recorder` streams the area with `SCStreamConfiguration.sourceRect` at full pixels, 4:2:0
+(`420v`, BT.709), up to 60 frames a second, with the pointer and `capturesAudio` (the Mac's own
+sound, Shotts' excluded). Only `.complete` frames are written: an idle stream sends frames with
+no picture, and the frame before goes on showing. The filter leaves out the setup's windows and
+every Shotts window above layer 0, which is the menu bar item. Everything is retimed to the first
+frame, which starts both writers' sessions; the stop time ends them, so the last frame lasts
+until then. The movie is HEVC at quality 0.9 with the Mac's sound as AAC; the microphone
+(`AVCaptureSession`, resampled to 48 kHz mono) goes to its own `Microphone.m4a`, so the window
+can offer either sound, both, or none. All of it is in one folder under `Recording.parentFolder`,
+removed when the window closes and at launch.
+
+`RecordingWindowController` keeps settings per format and, 250 ms after any change, makes the
+file for them in a folder of its own (`RecordingExport.write`), so a file still being made for
+earlier settings never meets it; files made earlier stay until the window closes, so one already
+copied still pastes. Copy writes the file's URL to the pasteboard; Save copies it; the grip drags
+it. `RecordingExport` reads the movie back with `AVAssetReader` through an `AVMutableComposition`,
+keeps the frames `FrameSampler` picks (the latest frame at each tick of the rate, so the last
+change before a pause is never lost), and scales them with `VTPixelTransferSession`, averaging
+as it shrinks. MP4: H.264 High, BT.709 tags, one AAC track mixed by
+`AVAssetReaderAudioMixOutput` from the sounds chosen, `shouldOptimizeForNetworkUse` for the index
+first; video and sound are pumped in turn, since the writer wants them interleaved. GIF: two
+passes, the first gathering the clip's colors into one `PaletteBuilder`, the second writing
+frames with `GIFWriter`, streamed to the file.
+
+The GIF encoder is Shotts' own, in Core. Prominent colors (1 in 500 samples or more, up to half
+the palette) are kept exactly and never dithered; median cut over 5-bit bins picks the rest, 255
+at most, leaving one index for "unchanged". A color not in the palette is drawn as a blue-noise
+mix of the palette color nearest it and the one nearest its reflection past that color, in
+proportion; the 64 by 64 threshold map is made once by void-and-cluster. Being fixed per pixel,
+the dithering leaves still areas identical from frame to frame, so each frame after the first
+stores only the rectangle whose indices changed, with the unchanged inside it transparent, and a
+frame that changes nothing only lengthens the one before. Delays are whole hundredths measured
+between rounded times, so they never drift.
 
 ## The editor
 
@@ -266,17 +325,19 @@ the Dock shadow and packs `Support/AppIcon.icns`; rerun it after editing the SVG
 
 ## Releasing
 
-`docs/RELEASING.md`. Sparkle always starts, and `SUEnableAutomaticChecks` makes it check daily
+`docs/RELEASING.md`. Sparkle always starts, but for a developer switch in a debug build, and `SUEnableAutomaticChecks` makes it check daily
 without asking; Check for Updates… is in the menu bar menu and the app menu.
 
 ## Tests
 
 `swift test` runs two targets. `Tests/Core` covers Core: selection rules, history, the document,
-hit testing at scale 1 and 2, arrow parts and drags, styles, callout layout, and the editor's
-layout. `Tests/UI` drives AppKit in windows that are never shown: the editor's gestures, undo,
+hit testing at scale 1 and 2, arrow parts and drags, styles, callout layout, the editor's
+layout, the recording rules, and the GIF encoder, read back by a GIF decoder of the tests' own. `Tests/UI` drives AppKit in windows that are never shown: the editor's gestures, undo,
 typing, restyling, closing, and resizing; the renderer (extent, text box, canvas against export);
 export (resolution, color space, obscure, the background copy, file names, the drag file); and
-the picker (the cut, the pointer per display, clipping, cancelling). `Tests/UI/Support.swift`
+the picker (the cut, the pointer per display, clipping, cancelling, Command-release); and
+recording (the setup panel, the window's settings and files, and MP4 and GIF export from a
+recording the tests write themselves, with no screen). `Tests/UI/Support.swift`
 has the helpers, and `EditorTests.swift`'s `Mouse` posts events to a view, never to the screen.
 
 ## Checking by hand
@@ -293,6 +354,7 @@ build ignores its arguments.
 | `--select out.txt` | Runs the picker alone over a drawn stand-in for each display and writes `selected x,y,w,h on <display>`, `window <id> at x,y on <display>`, or `cancelled`. |
 | `--preview-overlay out.png [--dragged] [--dim] [--corner]` | Draws the picker off screen with the pointer three pixels inside the corner of the stand-in's square at 1600,1600, so the magnifier's mapping can be checked (`--dim` shows only with `--dragged`). |
 | `--capture-window <id> out.png [--no-shadow]` | Captures one window through ScreenCaptureKit (needs Screen Recording). |
+| `--export-recording in.mov out.(mp4\|gif) [--width N] [--fps N] [--sound none\|system\|microphone\|both] [--microphone file]` | Makes the file a recording window would from any movie standing in for a recording, and prints its settings and time. |
 
 From a shell that macOS trusts for Accessibility, `CGEvent` posts reach a real editor: launch
 `Shotts.app --args --edit sample.png`, find the window with `CGWindowListCopyWindowInfo` (owner
@@ -366,6 +428,18 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   backgrounds screenshots are full of. It is a translucent stroke.
 - A bitmap context's first row in memory is its top row, even though its drawing coordinates
   run upward. `PixelSampler.colors` reads row `j` at offset `j * width`.
+- An `AVAssetTrack` does not keep its `AVAsset`: a track from an asset made inline and let go
+  fails later, as `-12780` from `insertTimeRange`. `RecordingExport` holds its assets while it
+  reads.
+- An `AVAssetWriter` whose inputs are not real-time wants their samples interleaved: waiting on
+  one input's readiness while never feeding the other waits forever. `RecordingExport` pumps the
+  sound whenever the video waits; a writer fed all its video first needs
+  `expectsMediaDataInRealTime`, as the tests' recording helper sets.
+- The hardened runtime keeps the microphone from an app that does not claim
+  `com.apple.security.device.audio-input`; `package-app.sh` signs with `Support/Shotts.entitlements`
+  for it. macOS still asks the user the first time.
+- A debug binary run from a shell has no feed to check, and Sparkle's modal alert about it would
+  hold up the main thread, so a developer switch runs without the updater.
 - An arrow is one filled outline (`ArrowGeometry.outline`), not a stroked line plus a head:
   that is what lets it taper, and one shape means one shadow with no seam.
 - `Tool.select` is raw value 0, which is also what an unset default reads as; the remembered
