@@ -179,15 +179,21 @@ the area outlined in red, with a small panel beside it; nothing records yet.
 
 | Control | Effect |
 | --- | --- |
-| Record, or Return | Starts recording. The panel goes; the outline stays. |
+| Record, or Return | Starts recording. The panel becomes the recording bar; the outline stays. |
 | Microphone | Records your voice as well. Off until turned on, and remembered. The first recording with it on asks macOS for the microphone. |
 | Cancel, or Escape | Ends without recording. |
 
 Everything in the area is recorded as it happens, at the display's full resolution, up to 60
 frames a second, with the pointer, and with the Mac's own sound, kept apart from the
-microphone. The outline sits just outside the area; neither it, the panel, nor Shotts' menu bar
-item is ever recorded. While recording, the menu bar item shows a red dot and the time so far.
-F10, or a click on the menu bar item, stops the recording.
+microphone. The outline sits just outside the area; neither it, the bar, nor Shotts' menu bar
+item is ever recorded. While recording, the menu bar item shows a red dot and the time so far,
+and the bar beside the area has:
+
+| Control | Effect |
+| --- | --- |
+| Arrow, Rectangle | Draws on the area as it records, in the editor's last style: tapered or even arrows, the color, the width, the shadow. Each shape stays four seconds, then fades over one, and is recorded. While a tool is on, clicks in the area draw rather than reaching what is underneath; its button again, or Escape, turns it off. Shift keeps a rectangle square. |
+| Pause | Stops taking the screen and sound until pressed again; the recording goes straight from before the pause to after it. The menu bar item shows ❚❚ and holds the time. |
+| Stop | Ends the recording, as F10 and a click on the menu bar item do. |
 
 The recording then opens in a window of its own, which plays it and makes files from it:
 
@@ -197,6 +203,10 @@ The recording then opens in a window of its own, which plays it and makes files 
 | Width | Up to the recording's own, and for MP4 within 4096 by 2304; the height follows. |
 | Frame rate | 60, 30, 20, 15, 12, or 10 frames a second; a GIF up to 30. |
 | Sound | MP4 only: none, the Mac's sound, the microphone, or both mixed, of what was recorded. |
+
+Below the video, a timeline plays it (Space plays and pauses; the playhead can be clicked or
+dragged) and trims it: the bracket at either end drags in, the part left out is dimmed, and
+every file made keeps only the part between, whatever its format.
 
 An MP4 starts at the recording's full size, 30 frames a second, with the microphone if it was
 on; a GIF at the size the area had on screen, 15 frames a second. Each format keeps its own
@@ -217,5 +227,5 @@ first, so a preview in Messages or Mail plays at once.
 
 ## Not built
 
-Full-screen capture, repeating the previous area, delayed capture, trimming a recording,
-recording a single window, uploads, cloud storage, and OCR.
+Full-screen capture, repeating the previous area, delayed capture, recording a single window,
+clicks shown in a recording, uploads, cloud storage, and OCR.

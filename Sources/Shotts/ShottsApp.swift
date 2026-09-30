@@ -155,10 +155,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             ? String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
             : String(format: "%d:%02d", seconds / 60, seconds % 60)
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        let title = NSMutableAttributedString(string: "● ", attributes: [.foregroundColor: NSColor.systemRed, .font: font])
+        // A red dot while recording; paused, the pause sign, and the time held.
+        let title = recorder.isPaused
+            ? NSMutableAttributedString(string: "❚❚ ", attributes: [.font: font])
+            : NSMutableAttributedString(string: "● ", attributes: [.foregroundColor: NSColor.systemRed, .font: font])
         title.append(NSAttributedString(string: time, attributes: [.font: font]))
         statusItem?.button?.attributedTitle = title
-        statusItem?.button?.setAccessibilityLabel("Recording, \(time). Stop recording")
+        statusItem?.button?.setAccessibilityLabel("\(recorder.isPaused ? "Paused" : "Recording"), \(time). Stop recording")
     }
 
     @objc private func stopRecording() {

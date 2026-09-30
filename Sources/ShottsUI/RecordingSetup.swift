@@ -1,20 +1,30 @@
 import AppKit
 
 /// The area about to be recorded, and then being recorded: a red outline just outside it, and
-/// until recording starts, a small panel beside it with Record, the Microphone switch, and
-/// Cancel. Return records, Escape cancels. Neither the outline nor the panel is ever in the
-/// recording: the recorder leaves out `windowNumbers`, and both sit outside the area.
+/// a small panel beside it. Until recording starts the panel has Record, the Microphone switch,
+/// and Cancel; Return records, Escape cancels. Then it has the drawing tools, Pause, and Stop,
+/// and a clear layer over the area takes what is drawn. Neither the outline nor the panel is
+/// ever in the recording: the recorder leaves out `windowNumbers`, and both sit outside the
+/// area. The drawing layer is recorded: it is `keptNumbers`.
 public final class RecordingSetup {
     public enum Outcome {
         case record(microphone: Bool)
         case cancelled
     }
 
+    /// The recording bar's buttons, once recording.
+    public enum Control {
+        case pause, resume, stop
+    }
+
+    public var onControl: ((Control) -> Void)?
+
     /// The area in screen coordinates.
     public let area: CGRect
     public let screen: NSScreen
     private let outline: NSWindow
     private var panel: SetupPanel?
+    let drawing: DrawingLayer
     private var completion: ((Outcome) -> Void)?
     private var observer: NSObjectProtocol?
 
@@ -24,9 +34,13 @@ public final class RecordingSetup {
         area = CGRect(x: screen.frame.minX + rect.minX, y: screen.frame.maxY - rect.maxY, width: rect.width, height: rect.height)
         self.completion = completion
         outline = Self.makeOutline(around: area)
+        drawing = DrawingLayer(area: area, scale: screen.backingScaleFactor)
         let panel = SetupPanel(microphone: microphone)
         self.panel = panel
         panel.onFinish = { [weak self] outcome in self?.finish(outcome) }
+        panel.onControl = { [weak self] control in self?.onControl?(control) }
+        panel.onTool = { [weak self] tool in self?.drawing.tool = tool }
+        drawing.onToolChange = { [weak panel] tool in panel?.showTool(tool) }
         panel.setFrameOrigin(Self.panelOrigin(size: panel.frame.size, beside: area, on: screen.visibleFrame))
         // The area's display going, or the displays rearranging, leaves the outline over nothing.
         observer = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil,
@@ -34,6 +48,9 @@ public final class RecordingSetup {
             MainActor.assumeIsolated { self?.finish(.cancelled) }
         }
     }
+
+    /// The drawing layer's window, for the recorder to keep though it floats as the others do.
+    public var keptNumbers: Set<Int> { [drawing.windowNumber] }
 
     /// The outline's and the panel's windows, for the recorder to leave out.
     public var windowNumbers: Set<Int> {
@@ -50,11 +67,17 @@ public final class RecordingSetup {
         panel?.makeKey()
     }
 
-    /// Recording has started: the panel goes, the outline stays.
+    /// Recording has started: the panel becomes the recording bar, and the drawing layer goes
+    /// over the area, letting clicks through until a tool is on.
     public func recording() {
-        panel?.orderOut(nil)
-        panel = nil
+        drawing.orderFrontRegardless()
+        guard let panel else { return }
+        panel.showControls()
+        panel.setFrameOrigin(Self.panelOrigin(size: panel.frame.size, beside: area, on: screen.visibleFrame))
     }
+
+    /// The recording bar shows it paused, or not.
+    public func showPaused(_ paused: Bool) { panel?.showPaused(paused) }
 
     /// Takes everything down, without an outcome.
     public func close() {
@@ -63,6 +86,8 @@ public final class RecordingSetup {
         observer = nil
         panel?.orderOut(nil)
         panel = nil
+        drawing.tool = nil
+        drawing.orderOut(nil)
         outline.orderOut(nil)
     }
 
@@ -115,11 +140,20 @@ private final class OutlineView: NSView {
 }
 
 /// The panel: a non-activating panel, like the picker's windows, so Shotts stays in the
-/// background and nothing on screen moves before the recording starts.
+/// background and nothing on screen moves. It starts as the setup (Record, Microphone, Cancel)
+/// and becomes the recording bar (Arrow, Rectangle, Pause, Stop).
 final class SetupPanel: NSPanel {
     var onFinish: ((RecordingSetup.Outcome) -> Void)?
+    var onControl: ((RecordingSetup.Control) -> Void)?
+    var onTool: ((DrawingTool?) -> Void)?
     let microphone: NSButton
     let record: NSButton
+    let arrow = NSButton()
+    let rectangle = NSButton()
+    let pause = NSButton()
+    let stop = NSButton()
+    private let row = NSStackView()
+    private(set) var recording = false
 
     init(microphone on: Bool) {
         record = NSButton(title: "Record", target: nil, action: nil)
@@ -150,7 +184,30 @@ final class SetupPanel: NSPanel {
         cancel.keyEquivalent = "\u{1b}"
         cancel.toolTip = "Put it away (Escape)"
 
-        let row = NSStackView(views: [record, microphone, cancel])
+        for (button, symbol, tip) in [(arrow, "arrow.up.right", "Draw arrows on the recording"),
+                                      (rectangle, "rectangle", "Draw rectangles on the recording")] {
+            button.setButtonType(.pushOnPushOff)
+            button.bezelStyle = .texturedRounded
+            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
+            button.toolTip = tip + "; each fades after a few seconds"
+            button.target = self
+            button.action = #selector(toolPressed(_:))
+        }
+        pause.setButtonType(.pushOnPushOff)
+        pause.bezelStyle = .texturedRounded
+        pause.target = self
+        pause.action = #selector(pausePressed)
+        stop.title = "Stop"
+        stop.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(paletteColors: [.systemRed]))
+        stop.imagePosition = .imageLeading
+        stop.bezelStyle = .rounded
+        stop.toolTip = "Stop recording (F10)"
+        stop.target = self
+        stop.action = #selector(stopPressed)
+        showPaused(false)
+
+        row.setViews([record, microphone, cancel], in: .leading)
         row.orientation = .horizontal
         row.spacing = 12
         row.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
@@ -179,5 +236,39 @@ final class SetupPanel: NSPanel {
     @objc func recordPressed() { onFinish?(.record(microphone: microphone.state == .on)) }
     @objc func cancelPressed() { onFinish?(.cancelled) }
 
-    override func cancelOperation(_ sender: Any?) { cancelPressed() }
+    /// Escape: before recording, Cancel; while recording, the tool off.
+    override func cancelOperation(_ sender: Any?) {
+        if recording { onTool?(nil) } else { cancelPressed() }
+    }
+
+    /// The recording bar, in the setup's place.
+    func showControls() {
+        recording = true
+        let divider = NSBox()
+        divider.boxType = .separator
+        row.setViews([arrow, rectangle, divider, pause, stop], in: .leading)
+        row.spacing = 8
+        setContentSize(row.fittingSize)
+    }
+
+    /// One tool at a time; pressing the one on turns it off.
+    @objc func toolPressed(_ sender: NSButton) {
+        let tool: DrawingTool? = sender.state == .on ? (sender === arrow ? .arrow : .rectangle) : nil
+        onTool?(tool)
+    }
+
+    /// The buttons as the drawing layer's tool is, whichever turned it on or off.
+    func showTool(_ tool: DrawingTool?) {
+        arrow.state = tool == .arrow ? .on : .off
+        rectangle.state = tool == .rectangle ? .on : .off
+    }
+
+    @objc func pausePressed() { onControl?(pause.state == .on ? .pause : .resume) }
+    @objc func stopPressed() { onControl?(.stop) }
+
+    func showPaused(_ paused: Bool) {
+        pause.state = paused ? .on : .off
+        pause.image = NSImage(systemSymbolName: paused ? "play.fill" : "pause.fill", accessibilityDescription: paused ? "Resume" : "Pause")
+        pause.toolTip = paused ? "Resume recording" : "Pause recording"
+    }
 }

@@ -26,7 +26,7 @@ hidden bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit c24b093): a cor
 security, and performance pass over the whole app, plus Open Sans; `CHANGELOG.md` says what
 changed for users. Screen recording (Command as the drag ends; MP4 and Shotts' own GIF encoder)
 is built, under Unreleased in `CHANGELOG.md`, and not yet released. The build has no warnings
-(warnings are errors) and `swift test` passes: 67 Core tests and 74 AppKit tests.
+(warnings are errors) and `swift test` passes: 73 Core tests and 81 AppKit tests.
 
 Next, in order:
 
@@ -43,7 +43,9 @@ Next, in order:
 3. Record by hand before releasing recording: nothing launched without a person at the Mac can
    record, so no test has. Command-drag an area and let go; Record with and without the
    microphone (the first asks for it); play sound; move windows and the pointer in the area;
-   stop with F10 and with the menu bar item; in the window, save an MP4 and a GIF at a few sizes
+   draw arrows and rectangles while recording and check they fade and are in the file; pause
+   and resume, changing the screen while paused; stop with F10, the bar, and the menu bar item;
+   trim with both brackets; in the window, save an MP4 and a GIF at a few sizes
    and rates, copy each into Messages and Mail, drag one to the Finder, close, and check the
    folder under `Recording.parentFolder` is gone. Record an area that includes the menu bar and
    check the timer is not in it.
@@ -84,7 +86,7 @@ Deferred, with the reason each waits:
 | | `Selection.swift` | `SelectionRule`: the drag rectangle rules the picker and the shape tools share. |
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
-| | `Recording.swift` | `RecordingSettings` (format, width, frame rate, sound), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), `GIFTiming`. |
+| | `Recording.swift` | `RecordingSettings` (format, width, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), `GIFTiming`. |
 | | `GIF.swift` | The GIF encoder: `BlueNoise` (void-and-cluster), `PaletteBuilder` (exact prominent colors, median cut for the rest), `Quantizer` (blue-noise dithering), `GIFWriter` (GIF89a, changed rectangles only), `LZW`. |
 | ShottsUI | `AreaSelection.swift` | The picker: `DisplayImage` (a display's latest picture, its windows, and `cut`), one overlay window per display, the crosshair, magnifier, hints, window outlines, `PixelSampler`. |
 | | `EditorWindow.swift` | `EditorWindowController`: the bar, copy, save, print, closing, resizing, the drag grip, remembered tool and style. |
@@ -92,7 +94,9 @@ Deferred, with the reason each waits:
 | | `Renderer.swift` | Draws a `Document` into any `CGContext`; measures text; an annotation's extent. |
 | | `StylePopover.swift` | The color and style popover. |
 | | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file. |
-| | `RecordingSetup.swift` | The red outline around an area being recorded, and the Record, Microphone, and Cancel panel beside it. |
+| | `RecordingSetup.swift` | The red outline around an area being recorded, and the panel beside it: Record, Microphone, and Cancel, then the recording bar (Arrow, Rectangle, Pause, Stop). |
+| | `DrawingLayer.swift` | The clear, recorded window over the area that takes arrows and rectangles while recording and fades each out. |
+| | `Timeline.swift` | The recording window's timeline: play, the playhead, and the trim brackets. |
 | | `RecordingWindow.swift` | `RecordingWindowController`: the player, the export settings, the file made in the background, Copy, Save, the drag grip, deleting it all on close. |
 | | `RecordingExport.swift` | `Recording` (the kept files) and `RecordingExport`: MP4 and GIF files from it, off the main thread. |
 | Shotts | `ShottsApp.swift` | `AppDelegate`: menu bar item and menu, main menu, Sparkle. |
@@ -177,8 +181,19 @@ Command held as a drag ends makes the picker report `.record` rather than `.sele
 Command is down). `CaptureFlow` stops the picker's streams and shows a `RecordingSetup`: a red
 outline window just outside the area and a non-activating panel beside it, like the picker's,
 so nothing on screen moves. Record (Return) asks for the microphone if it is on and not yet
-allowed, then starts a `Recorder`; the panel goes and the outline stays. F10 while recording, or
-the menu bar item, which shows a red dot and the time (`AppDelegate.showRecording`), stops it.
+allowed, then starts a `Recorder`; the panel becomes the recording bar and the outline stays. F10
+while recording, the bar's Stop, or the menu bar item, which shows a red dot and the time
+(`AppDelegate.showRecording`), stops it.
+
+The bar's Arrow and Rectangle turn on a tool in the `DrawingLayer`, a clear non-activating panel
+exactly over the area that lets every click through until a tool is on. Shapes are ordinary
+`Annotation`s in the area's pixels, in the editor's remembered style, drawn by `Renderer` at a
+zoom of one over the display's scale; each is opaque for four seconds and fades over one, a
+timer redrawing only while any are showing. The recorder leaves out Shotts' windows above layer
+0 but keeps the layer (`keptNumbers`), so what is drawn is recorded. Pause and resume go to
+`Recorder`, whose `PauseClock` (Core) takes the paused time out: samples from within a pause
+are dropped, later ones move back by the time paused, and the last frame that came while paused
+is written at the resume, since an unchanging screen sends no new one.
 
 `Recorder` streams the area with `SCStreamConfiguration.sourceRect` at full pixels, 4:2:0
 (`420v`, BT.709), up to 60 frames a second, with the pointer and `capturesAudio` (the Mac's own
@@ -190,6 +205,11 @@ until then. The movie is HEVC at quality 0.9 with the Mac's sound as AAC; the mi
 (`AVCaptureSession`, resampled to 48 kHz mono) goes to its own `Microphone.m4a`, so the window
 can offer either sound, both, or none. All of it is in one folder under `Recording.parentFolder`,
 removed when the window closes and at launch.
+
+The window's `Timeline` replaces the player's own controls: play (Space), a playhead, and trim
+brackets whose `TimelineLayout` (Core) maps points to times and picks the handle a press takes.
+A trim is part of every format's settings once the drag ends, and `RecordingExport` builds its
+composition from just that part, so the first frame is the one showing at the trim's start.
 
 `RecordingWindowController` keeps settings per format and, 250 ms after any change, makes the
 file for them in a folder of its own (`RecordingExport.write`), so a file still being made for

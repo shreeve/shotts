@@ -12,6 +12,10 @@ Unreleased, whose heading becomes the version's when it ships.
   stops it. The recording opens in a window that saves, copies, or drags it out as an MP4
   (H.264, plays nearly everywhere) or an animated GIF, at the size, frame rate, and sound you
   choose, as many times as you like.
+- While recording, a bar beside the area draws arrows and rectangles on it, in your editor
+  style, each fading after four seconds, and pauses the recording, which then cuts straight on.
+- The recording's window has a timeline that plays it and trims what the files keep: drag the
+  bracket at either end.
 - GIFs are made by Shotts' own encoder: one palette for the clip, flat colors kept exact, and
   blue-noise dithering, so gradients stay smooth and still areas stay still.
 

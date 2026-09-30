@@ -7,7 +7,8 @@ import ShottsUI
 /// full resolution, up to 60 frames a second and only when it changes, with the pointer and
 /// the Mac's sound; the microphone, when on, comes through AVFoundation into a file of its own.
 /// Frames are written as they come, HEVC at high quality, so nothing piles up in memory. Every
-/// timestamp is measured from the first frame, which is the recording's start.
+/// timestamp is measured from the first frame, which is the recording's start, with pauses
+/// taken out.
 nonisolated final class Recorder: NSObject, @unchecked Sendable {
     /// Where sample buffers arrive and are written, one at a time.
     private let queue = DispatchQueue(label: "Shotts recording")
@@ -21,19 +22,29 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
     private var voiceClock: CMClock?
     /// The first frame's time, once it comes: everything is measured from it.
     private var start: CMTime?
+    /// The pauses, in seconds from the first frame.
+    private var pauses = PauseClock()
+    /// The latest frame that came while paused, shown once recording resumes: the screen may
+    /// not change again for a while, and the frame before the pause is no longer what it shows.
+    private var frameWhilePaused: CMSampleBuffer?
+    /// Where the last frame written went, so a frame is never written before it.
+    private var lastFrame = -1.0
     private var recording: Recording?
     /// Called on the main thread when the stream stops by itself, as when its display goes.
     var onInterrupted: (@MainActor () -> Void)?
 
     /// Starts recording `rect` (points from the top-left of the display `id`, which has `scale`
     /// pixels a point), leaving out Shotts' windows above ordinary ones (the outline, the panel,
-    /// the menu bar item) and those numbered `excluded`.
-    func start(display id: CGDirectDisplayID, scale: CGFloat, rect: CGRect, excluding excluded: Set<Int>, microphone: Bool) async throws {
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    /// the menu bar item) and those numbered `excluded`, but for those numbered `kept` (what is
+    /// drawn on the area).
+    func start(display id: CGDirectDisplayID, scale: CGFloat, rect: CGRect, excluding excluded: Set<Int>, keeping kept: Set<Int>,
+               microphone: Bool) async throws {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         guard let display = content.displays.first(where: { $0.displayID == id }) else { throw ScreenCapture.Failure.noDisplay }
         let me = ProcessInfo.processInfo.processIdentifier
         let left = content.windows.filter {
-            excluded.contains(Int($0.windowID)) || ($0.owningApplication?.processID == me && $0.windowLayer != 0)
+            let number = Int($0.windowID)
+            return !kept.contains(number) && (excluded.contains(number) || ($0.owningApplication?.processID == me && $0.windowLayer != 0))
         }
         let size = RecordingRule.recordedSize(points: rect.size, scale: scale)
 
@@ -142,9 +153,35 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         }
     }
 
-    /// How long it has been recording, from its first frame.
+    /// How long it has been recording, from its first frame, not counting pauses.
     var elapsed: TimeInterval {
-        queue.sync { start.map { (CMClockGetTime(CMClockGetHostTimeClock()) - $0).seconds } ?? 0 }
+        queue.sync { now().map { pauses.elapsed(at: $0) } ?? 0 }
+    }
+
+    var isPaused: Bool { queue.sync { pauses.isPaused } }
+
+    /// Seconds since the first frame, once it has come.
+    private func now() -> Double? {
+        start.map { (CMClockGetTime(CMClockGetHostTimeClock()) - $0).seconds }
+    }
+
+    /// Stops taking frames and sound until `resume`; the recording goes straight on from here.
+    func pause() {
+        queue.sync {
+            guard let now = now() else { return }
+            pauses.pause(at: now)
+        }
+    }
+
+    func resume() {
+        queue.sync {
+            guard let now = now(), pauses.isPaused else { return }
+            pauses.resume(at: now)
+            if let frame = frameWhilePaused {
+                frameWhilePaused = nil
+                append(frame, to: video, at: pauses.elapsed(at: now))
+            }
+        }
     }
 
     /// Stops, and finishes the files: the last frame lasts until now.
@@ -154,7 +191,7 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         capture?.stopRunning()
         capture = nil
         let (writers, end) = queue.sync { () -> ([AVAssetWriter], CMTime?) in
-            let end = start.map { CMClockGetTime(CMClockGetHostTimeClock()) - $0 }
+            let end = now().map { CMTime(seconds: pauses.elapsed(at: $0), preferredTimescale: 1_000_000_000) }
             video?.markAsFinished()
             sound?.markAsFinished()
             voice?.input.markAsFinished()
@@ -197,12 +234,24 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
     }
 
     /// Appends a buffer whose times are on `clock` (the host's, as the screen's are, unless
-    /// given), measured from the first frame; anything from before it is dropped.
-    private func append(_ buffer: CMSampleBuffer, to input: AVAssetWriterInput?, clock: CMClock? = nil) {
-        guard let start, let input, input.isReadyForMoreMediaData else { return }
+    /// given), at its place in the recording: measured from the first frame with the pauses
+    /// taken out, or `at` seconds when given. Anything from before the first frame, or from
+    /// within a pause, is dropped; a frame from within a pause is kept aside for the resume.
+    private func append(_ buffer: CMSampleBuffer, to input: AVAssetWriterInput?, clock: CMClock? = nil, at forced: Double? = nil) {
+        guard let start, let input else { return }
         let time = buffer.presentationTimeStamp
         let host = clock.map { CMSyncConvertTime(time, from: $0, to: CMClockGetHostTimeClock()) } ?? time
-        guard host >= start, let moved = retimed(buffer, by: start + (time - host)) else { return }
+        guard host >= start else { return }
+        guard let place = forced ?? pauses.recorded((host - start).seconds) else {
+            if input === video { frameWhilePaused = buffer }
+            return
+        }
+        if input === video {
+            guard place > lastFrame else { return }
+            lastFrame = place
+        }
+        guard input.isReadyForMoreMediaData,
+              let moved = retimed(buffer, by: time - CMTime(seconds: place, preferredTimescale: 1_000_000_000)) else { return }
         input.append(moved)
     }
 }

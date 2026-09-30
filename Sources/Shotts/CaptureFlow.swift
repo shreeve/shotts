@@ -199,7 +199,7 @@ final class CaptureFlow {
         do {
             guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { throw ScreenCapture.Failure.noDisplay }
             try await recorder.start(display: number.uint32Value, scale: screen.backingScaleFactor, rect: rect,
-                                     excluding: setup.windowNumbers, microphone: microphone)
+                                     excluding: setup.windowNumbers, keeping: setup.keptNumbers, microphone: microphone)
         } catch {
             _ = try? await recorder.stop()
             cancelRecording()
@@ -208,6 +208,15 @@ final class CaptureFlow {
         }
         guard recording != nil else { _ = try? await recorder.stop(); return }
         recording?.recorder = recorder
+        setup.onControl = { [weak self, weak setup, weak recorder] control in
+            guard let self, let setup, let recorder else { return }
+            switch control {
+            case .pause: recorder.pause()
+            case .resume: recorder.resume()
+            case .stop: stopRecording()
+            }
+            setup.showPaused(recorder.isPaused)
+        }
         setup.recording()
         onRecording?(recorder)
     }

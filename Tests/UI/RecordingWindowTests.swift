@@ -195,3 +195,66 @@ import Testing
         #expect(controller.timeline.time.stringValue == "0:00 / 0:01")
     }
 }
+
+@MainActor @Suite struct RecordingBarTests {
+    private func setup() throws -> RecordingSetup {
+        let screen = try #require(NSScreen.screens.first)
+        return RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), microphone: false) { _ in }
+    }
+
+    /// Once recording, the panel is the recording bar: one drawing tool at a time, which the
+    /// drawing layer takes; Escape turns it off; Pause and Stop reach the recording.
+    @Test func theBarDrawsPausesAndStops() throws {
+        let setup = try setup()
+        defer { setup.close() }
+        let panel = try #require(setup.setupPanel)
+        #expect(!setup.windowNumbers.contains(setup.drawing.windowNumber))
+        #expect(setup.keptNumbers == [setup.drawing.windowNumber])
+        setup.recording()
+        #expect(panel.recording)
+        panel.arrow.performClick(nil)
+        #expect(setup.drawing.tool == .arrow && !setup.drawing.ignoresMouseEvents)
+        panel.rectangle.performClick(nil)
+        #expect(setup.drawing.tool == .rectangle && panel.arrow.state == .off && panel.rectangle.state == .on)
+        panel.cancelOperation(nil)
+        #expect(setup.drawing.tool == nil && setup.drawing.ignoresMouseEvents && panel.rectangle.state == .off)
+
+        var controls: [RecordingSetup.Control] = []
+        setup.onControl = { controls.append($0) }
+        panel.pause.performClick(nil)
+        panel.pause.performClick(nil)
+        panel.stop.performClick(nil)
+        #expect(controls == [.pause, .resume, .stop])
+    }
+}
+
+@MainActor @Suite struct DrawingCanvasTests {
+    /// A drag with a tool on leaves the shape; one too small to see, or with no tool, leaves
+    /// nothing.
+    @Test func dragsDrawShapes() {
+        let canvas = DrawingCanvas(size: CGSize(width: 300, height: 200), scale: 2)
+        canvas.pressed(at: CGPoint(x: 10, y: 10))
+        canvas.dragged(to: CGPoint(x: 100, y: 100))
+        canvas.released()
+        #expect(canvas.shapes.isEmpty)
+        canvas.tool = .arrow
+        canvas.pressed(at: CGPoint(x: 10, y: 10))
+        canvas.dragged(to: CGPoint(x: 100, y: 100))
+        canvas.released()
+        guard case let .arrow(from, to)? = canvas.shapes.first?.annotation.shape else { Issue.record("no arrow"); return }
+        #expect(from == CGPoint(x: 20, y: 20) && to == CGPoint(x: 200, y: 200)) // in the area's pixels
+        canvas.tool = .rectangle
+        canvas.pressed(at: CGPoint(x: 50, y: 50))
+        canvas.dragged(to: CGPoint(x: 50.5, y: 50.5))
+        canvas.released()
+        #expect(canvas.shapes.count == 1)
+    }
+
+    /// A shape shows fully for four seconds, then fades out over one.
+    @Test func shapesFadeAfterFourSeconds() {
+        let drawn = Date(timeIntervalSinceReferenceDate: 0)
+        #expect(DrawingCanvas.opacity(drawn: drawn, now: drawn.addingTimeInterval(3.9)) == 1)
+        #expect(abs(DrawingCanvas.opacity(drawn: drawn, now: drawn.addingTimeInterval(4.5)) - 0.5) < 1e-9)
+        #expect(DrawingCanvas.opacity(drawn: drawn, now: drawn.addingTimeInterval(5)) == 0)
+    }
+}
