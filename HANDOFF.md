@@ -5,11 +5,13 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.4.0 is the latest release (tag `v0.4.0`, Homebrew cask shreeve/homebrew-tap#27, offered through
-Sparkle); `CHANGELOG.md` has every release. Since then: screen recording (shreeve/shotts#64) and
-a second revamp, both under Unreleased in `CHANGELOG.md`, for 0.5.0. The build has no warnings
-(warnings are errors) and `swift test` passes: 86 Core tests and 84 AppKit tests. Shotts has
-only ever run on macOS 27, and recording has been tried by hand only briefly.
+0.5.0 is the latest release: tag `v0.5.0` on `main` (commit "Shotts 0.5.0"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#28);
+installed copies are offered it through Sparkle. It brings screen recording (shreeve/shotts#64)
+and a second revamp (shreeve/shotts#65): recording made robust against busy encoders, quits and
+failed files, GIF fixes, editor fixes, and a smaller app. `CHANGELOG.md` has every release. The
+build has no warnings (warnings are errors) and `swift test` passes: 86 Core tests and 84 AppKit
+tests. Shotts has only ever run on macOS 27, and recording has been tried by hand only briefly.
 
 Next, in order:
 
@@ -34,8 +36,9 @@ Next, in order:
    area that includes the menu bar and check the timer is not in it. Quit while recording: it
    stops and opens instead. Compare a recording's colors in QuickTime with the screen (it is
    captured in BT.709 to match its tags).
-4. Before shipping 0.5.0, update an installed 0.4.0 to it through Sparkle (`docs/RELEASING.md`,
-   "Testing an update"): the app now ships Sparkle thinned to arm64 without its headers.
+4. Before shipping 0.5.1, test updating 0.5.0 to it through Sparkle (`docs/RELEASING.md`,
+   "Testing an update"): 0.5.0 is the first to ship Sparkle thinned to arm64 without its headers,
+   and its updater has not yet installed anything.
 5. Deferred work, below.
 
 Decided against, so they are not rebuilt:
