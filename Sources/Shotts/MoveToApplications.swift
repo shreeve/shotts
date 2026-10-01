@@ -43,16 +43,17 @@ enum MoveToApplications {
         let destination = folder.appendingPathComponent(running.lastPathComponent)
         // Copied beside it first: a copy that fails leaves the Shotts already there as it was.
         let staged = folder.appendingPathComponent(".\(UUID().uuidString)-\(running.lastPathComponent)")
-        try files.copyItem(at: running, to: staged)
-        if files.fileExists(atPath: destination.path) {
-            do {
-                try files.trashItem(at: destination, resultingItemURL: nil)
-            } catch {
-                try? files.removeItem(at: staged)
-                throw error
-            }
+        var trashed: NSURL?
+        do {
+            try files.copyItem(at: running, to: staged)
+            if files.fileExists(atPath: destination.path) { try files.trashItem(at: destination, resultingItemURL: &trashed) }
+            try files.moveItem(at: staged, to: destination)
+        } catch {
+            // Back as it was: no half copy left, and the Shotts that was there out of the Trash.
+            try? files.removeItem(at: staged)
+            if let trashed = trashed as URL?, !files.fileExists(atPath: destination.path) { try? files.moveItem(at: trashed, to: destination) }
+            throw error
         }
-        try files.moveItem(at: staged, to: destination)
         // Downloaded is not installed: with the quarantine left on, macOS would run the copy from
         // a read-only stand-in where Sparkle cannot update it.
         removexattr(destination.path, "com.apple.quarantine", XATTR_NOFOLLOW)

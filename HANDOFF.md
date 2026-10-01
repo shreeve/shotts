@@ -8,7 +8,7 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 0.4.0 is the latest release (tag `v0.4.0`, Homebrew cask shreeve/homebrew-tap#27, offered through
 Sparkle); `CHANGELOG.md` has every release. Since then: screen recording (shreeve/shotts#64) and
 a second revamp, both under Unreleased in `CHANGELOG.md`, for 0.5.0. The build has no warnings
-(warnings are errors) and `swift test` passes: 84 Core tests and 84 AppKit tests. Shotts has
+(warnings are errors) and `swift test` passes: 86 Core tests and 84 AppKit tests. Shotts has
 only ever run on macOS 27, and recording has been tried by hand only briefly.
 
 Next, in order:
@@ -190,7 +190,9 @@ timer redrawing only while any are showing. The recorder leaves out Shotts' wind
 pause are dropped, later ones move back by the time paused, the last frame that came while
 paused is written at the resume (an unchanging screen sends no new one), and a frame the
 encoder was not ready for is offered again with the next sample and at the stop rather than
-lost. Quitting while recording (`applicationShouldTerminate`) stops it and opens its window.
+lost; a frame from a pause already over is dropped. Quitting while recording
+(`applicationShouldTerminate`) stops it and opens its window, unless macOS has announced a
+logout or shutdown (`willPowerOffNotification`), which is never held up.
 
 `Recorder` streams the area with `SCStreamConfiguration.sourceRect` at full pixels, 4:2:0
 (`420v`, captured in BT.709 to match the files' tags), up to 60 frames a second, with the pointer and `capturesAudio` (the Mac's own
@@ -202,8 +204,8 @@ frame, which starts both writers' sessions; the stop time ends them, so the last
 until then. The movie is HEVC at quality 0.9, a key frame at least every 2 s, with the Mac's
 sound as AAC; the microphone (`AVCaptureSession`, resampled to 48 kHz mono, its clock converted
 to the host's) goes to its own `Microphone.m4a`, so the window can offer either sound, both, or
-none. Both are written in 10 s fragments, so a crash leaves what came before playable; a
-microphone file that fails at the stop is dropped and the recording kept. All of it is in one folder under `Recording.parentFolder`,
+none. Both are written in 10 s fragments: a movie whose writer fails at the stop (a full disk)
+is kept with what it holds, and a microphone file that fails is dropped and the recording kept. All of it is in one folder under `Recording.parentFolder`,
 removed when the window closes. Each folder holds a lock on a file in it (`.in-use`) while it
 is in use; at launch `Recording.removeLeftovers` removes only the folders no running Shotts
 holds, which a crash leaves.

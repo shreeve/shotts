@@ -36,6 +36,7 @@ final class LiveDisplay {
     /// Every display, with the windows on each from one reading of the window server.
     static func all() -> [LiveDisplay] {
         let list = ScreenCapture.windowList()
+        windowList = (.now, list)
         return NSScreen.screens.compactMap { LiveDisplay(screen: $0, windows: list) }
     }
 
@@ -77,10 +78,15 @@ final class LiveDisplay {
     /// The window list, read for every display at once a few times a second.
     private static var windowList: (read: Date, list: [(id: CGWindowID, frame: CGRect)]) = (.distantPast, [])
 
+    /// When this display last took its windows from the shared reading.
+    private var windowsFrom = Date.distantPast
+
     private func received(_ image: CGImage) {
         display.image = image
         // Windows move, open, and close while the user aims; a few readings a second follow them.
         if Date.now.timeIntervalSince(Self.windowList.read) > 0.1 { Self.windowList = (.now, ScreenCapture.windowList()) }
+        guard windowsFrom != Self.windowList.read else { return }
+        windowsFrom = Self.windowList.read
         display.windows = ScreenCapture.windows(in: Self.windowList.list, on: id)
     }
 }

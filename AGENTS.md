@@ -39,8 +39,9 @@ read it before changing capture, the selection overlay, the editor, or export.
   a capture with no annotations in place of one with them.
 - A recording is written as it is made, into one temporary folder, and never held in memory;
   every file made from it is made from it, at its full quality, never from another file. The
-  folder, and every file made from it, goes when its window closes; at launch, only what no
-  running Shotts holds (a crash's) goes. A recording leaves out its outline, its bar, and
+  folder, and every file made from it, goes when its window closes (after a save still
+  copying), but for the last file copied, kept outside it until the next Copy so it still
+  pastes; at launch, only what no running Shotts holds (a crash's) goes. A recording leaves out its outline, its bar, and
   Shotts' menu bar item, and nothing else; what is drawn on the area while it records is
   recorded with it. Quitting while recording stops it rather than losing it.
 - Coordinates: `Document` and every annotation live in image pixels. Screen points, backing

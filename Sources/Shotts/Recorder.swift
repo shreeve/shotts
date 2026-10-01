@@ -58,7 +58,8 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
                               scale: scale, started: .now)
 
         let movie = try AVAssetWriter(outputURL: movieURL, fileType: .mov)
-        // Written in fragments, so what was recorded before a crash or a full disk still plays.
+        // Written in fragments, so what was recorded before a full disk still plays and is kept.
+        // (After a crash the next launch removes it as a leftover; offering it back is not built.)
         movie.movieFragmentInterval = CMTime(seconds: 10, preferredTimescale: 600)
         let video = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.hevc,
@@ -187,11 +188,10 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
 
     func resume() {
         queue.sync {
-            guard let now = now(), let place = timeline.resume(at: now) else { return }
-            if let frame = heldFrame {
-                heldFrame = nil
-                writeFrame(frame, at: place)
-            }
+            let frame = heldFrame
+            heldFrame = nil
+            guard let now = now(), let place = timeline.resume(at: now), let frame else { return }
+            writeFrame(frame, at: place)
         }
     }
 
@@ -228,6 +228,11 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         await movie.finishWriting()
         guard movie.status == .completed else {
             voice?.cancelWriting()
+            // A disk that filled up leaves the fragments written before it, which still play.
+            if let video = try? await AVURLAsset(url: recording.movie).loadTracks(withMediaType: .video).first,
+               let range = try? await video.load(.timeRange), range.duration > .zero {
+                return recording.withoutMicrophone()
+            }
             Recording.removeFolder(recording.folder)
             throw movie.error ?? Failure.notWritten
         }

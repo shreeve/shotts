@@ -428,11 +428,16 @@ public struct GIFWriter {
         // A delay is at most 65,535 hundredths; a frame shown longer goes on through frames of
         // one unchanged pixel, which change nothing on screen.
         var delay = GIFTiming.delay(from: start, to: time)
-        writeControl(delay: min(delay, 65535), transparency: transparency)
+        // Each piece is at most 65,535, and never leaves a last piece under two, which browsers
+        // would slow to ten.
+        func piece() -> Int { delay <= 65535 ? delay : delay - 65535 < 2 ? 65533 : 65535 }
+        var first = piece()
+        writeControl(delay: first, transparency: transparency)
         write(Data(image))
-        while delay > 65535 {
-            delay -= 65535
-            writeControl(delay: min(delay, 65535), transparency: true)
+        while delay > first {
+            delay -= first
+            first = piece()
+            writeControl(delay: first, transparency: true)
             write(Data(self.image([transparent], rect: (0, 0, 1, 1))))
         }
     }

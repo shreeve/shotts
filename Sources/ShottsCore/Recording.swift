@@ -169,7 +169,10 @@ public struct RecordingTimeline: Sendable {
     }
 
     public func frame(at time: Double) -> Frame {
-        guard let place = pauses.recorded(time) else { return .hold }
+        guard let place = pauses.recorded(time) else {
+            // From the pause going on now, held for its resume; from one already over, too late.
+            return pauses.isPaused && time >= (pauses.pausedAt ?? .infinity) ? .hold : .drop
+        }
         return place > lastFrame ? .write(at: place) : .drop
     }
 

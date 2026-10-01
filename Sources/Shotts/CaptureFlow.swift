@@ -26,8 +26,9 @@ final class CaptureFlow {
     /// A stopped recording's files are being finished; its window opens next.
     private var finishing = false
 
-    /// Whether a recording is being made or finished, which quitting would lose.
-    var isRecording: Bool { recording?.recorder != nil || finishing }
+    /// Whether a recording is being made, which quitting would lose. One being finished is not:
+    /// stopping again would do nothing, and refusing to quit then could leave Shotts unquittable.
+    var isRecording: Bool { recording?.recorder != nil }
 
     private struct RecordingSession {
         var setup: RecordingSetup

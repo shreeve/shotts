@@ -33,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         #endif
         NSApp.mainMenu = makeMainMenu()
         flow.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
+        powerOffObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil,
+                                                                             queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.poweringOff = true }
+        }
         let capture = HotKey.registerF10 { [weak self] in self?.flow.begin() }
         let showLast = HotKey.registerF10(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
         makeStatusItem(hasHotKey: capture, hasShowLastKey: showLast)
@@ -51,13 +55,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
-    /// Quitting while recording, as logging out does, would lose the recording: it stops
-    /// instead and opens in its window, and quitting again quits.
+    /// Quitting while recording would lose the recording: it stops instead and opens in its
+    /// window, and quitting again quits. Logging out or shutting down is not held up: macOS
+    /// says so first (`willPowerOffNotification`), and then Shotts quits as asked.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard flow.isRecording else { return .terminateNow }
+        guard flow.isRecording, !poweringOff else { return .terminateNow }
         flow.stopRecording()
         return .terminateCancel
     }
+
+    private var poweringOff = false
+    private var powerOffObserver: NSObjectProtocol?
 
     @objc private func showLastCapture() {
         flow.showLast()

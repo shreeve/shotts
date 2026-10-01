@@ -30,6 +30,10 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     private var timeObserver: Any?
     /// Setting up the player, which closing stops.
     private var loading: Task<Void, Never>?
+    /// Saves still copying, which the recording's folder outlives; and whether the window closed
+    /// meanwhile, so the last of them removes it.
+    private var saving = 0
+    private var closed = false
     private var endObserver: NSObjectProtocol?
     let formats = NSPopUpButton()
     let sizes = NSPopUpButton()
@@ -387,12 +391,15 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let destination = panel.url, let self else { return }
             withFile { url in
+                self.saving += 1
                 Task {
                     do {
                         try await Task.detached(priority: .userInitiated) { try Self.copy(url, to: destination) }.value
                     } catch {
-                        NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil)
+                        if window.isVisible { NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil) } else { NSAlert(error: error).runModal() }
                     }
+                    self.saving -= 1
+                    if self.saving == 0, self.closed { Recording.removeFolder(self.recording.folder) }
                 }
             }
         }
@@ -422,7 +429,8 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         if let timeObserver { player.player?.removeTimeObserver(timeObserver) }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         player.player = nil
-        Recording.removeFolder(recording.folder)
+        closed = true
+        if saving == 0 { Recording.removeFolder(recording.folder) }
         let done = onClose
         onClose = nil
         done?()

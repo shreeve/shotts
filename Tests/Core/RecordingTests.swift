@@ -528,3 +528,28 @@ private func lzwDecode(_ data: [UInt8], minimumCodeSize: Int, count: Int) throws
         #expect(whole.movingEnd(to: 0.01, duration: 0.05) == whole)
     }
 }
+
+@Suite struct ReviewFixTests {
+    /// A frame that arrives late, stamped inside a pause already over, is dropped rather than
+    /// held for a later resume.
+    @Test func aLateFrameFromAnEndedPauseIsDropped() {
+        var timeline = RecordingTimeline()
+        timeline.wrote(frameAt: 0)
+        timeline.pause(at: 2)
+        _ = timeline.resume(at: 4)
+        #expect(timeline.frame(at: 3) == .drop)
+        timeline.pause(at: 6)
+        #expect(timeline.frame(at: 7) == .hold)
+        #expect(timeline.frame(at: 3) == .drop)
+    }
+
+    /// The last piece of a very long still is never under two hundredths.
+    @Test func theLastPieceOfALongStillIsNeverTooShort() throws {
+        var bytes: [UInt8] = []
+        var writer = GIFWriter(width: 2, height: 2, palette: GIFPalette(colors: [0, 0xFFFFFF])) { bytes += $0 }
+        Picture(2, 2) { _, _ in 0 }.frame { writer.add($0, at: 0) }
+        writer.finish(at: 655.36) // 65,536 hundredths: 65,535 and 1 would leave 1
+        let delays = try decode(bytes).frames.map(\.delay)
+        #expect(delays.reduce(0, +) == 65_536 && delays.allSatisfy { $0 >= 2 })
+    }
+}

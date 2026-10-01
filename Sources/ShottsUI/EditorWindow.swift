@@ -10,12 +10,16 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     private let tools = NSSegmentedControl()
     private let colorButton = NSButton()
     private let popover = NSPopover()
-    /// One per window, so the color panel it targets lives as long as the window.
-    private lazy var stylePopover: StylePopover = {
+    /// One per window, made when first shown, so the color panel it targets lives as long as the
+    /// window.
+    private var madeStylePopover: StylePopover?
+    private var stylePopover: StylePopover {
+        if let made = madeStylePopover { return made }
         let content = StylePopover(style: canvas.style)
         content.onStyle = { [weak self] style in self?.apply(style) }
+        madeStylePopover = content
         return content
-    }()
+    }
     private let widths = NSPopUpButton()
     private let sizes = NSPopUpButton()
     private let fonts = NSPopUpButton()
@@ -230,7 +234,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
         if let i = Style.strokeWidths.firstIndex(of: style.strokeWidth) { widths.selectItem(at: i) }
         if let i = Style.fontSizes.firstIndex(of: style.fontSize) { sizes.selectItem(at: i) }
         if let i = FontChoice.allCases.firstIndex(of: style.font) { fonts.selectItem(at: i) }
-        if popover.isShown { stylePopover.show(style) }
+        if popover.isShown { madeStylePopover?.show(style) }
     }
 
     /// The style the last edit used, so the next capture starts with the same color and sizes.
@@ -351,7 +355,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     public func windowWillClose(_ notification: Notification) {
         canvas.endTextEntry()
         _ = canvas.cancelCurrent()
-        stylePopover.releaseColorPanel()
+        madeStylePopover?.releaseColorPanel()
         let done = onClose
         onClose = nil
         done?()

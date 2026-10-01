@@ -197,8 +197,8 @@ and the bar beside the area has:
 | Pause | Stops taking the screen and sound until pressed again; the recording goes straight from before the pause to after it. The menu bar item shows ❚❚ and holds the time. |
 | Stop | Ends the recording, as F10 and a click on the menu bar item do. |
 
-Quitting Shotts while it records, or logging out, stops the recording and opens it instead;
-quitting again quits. If the display being recorded goes, the recording stops there and opens.
+Quitting Shotts while it records stops the recording and opens it instead; quitting again
+quits. Logging out or shutting down is not held up, and the recording goes with it. If the display being recorded goes, the recording stops there and opens.
 With the microphone on but turned off for Shotts in System Settings, Record asks: record
 without the microphone, open System Settings, or cancel.
 
