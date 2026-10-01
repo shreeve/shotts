@@ -67,6 +67,7 @@ final class CaptureFlow {
         let displays = LiveDisplay.all()
         capture?.displays = displays
         let selection = select(from: displays)
+        for display in displays { display.onInterrupted = { [weak selection] in selection?.cancel() } }
         Task {
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -100,7 +101,8 @@ final class CaptureFlow {
                     _ = await live.first { $0.display === display }?.firstFrame()
                     let image = display.cut(rect)
                     live.forEach { $0.stop() }
-                    guard let image else { self.end(); return }
+                    // Nothing to cut (no frame came in time): say so rather than nothing.
+                    guard let image else { NSSound.beep(); self.end(); return }
                     self.deliver(image, scale: display.scale, on: display.screen)
                 }
             case let .record(display, rect):
@@ -113,7 +115,7 @@ final class CaptureFlow {
                     let captured = (try? await ScreenCapture.captureWindow(window.id, shadow: SelectionOptions.current.dropShadow))
                         ?? display.cut(window.frame).map { ($0, display.scale) }
                     live.forEach { $0.stop() }
-                    guard let (image, scale) = captured else { end(); return }
+                    guard let (image, scale) = captured else { NSSound.beep(); end(); return }
                     deliver(image, scale: scale, on: display.screen)
                 }
             }
@@ -146,16 +148,16 @@ final class CaptureFlow {
         let editor = EditorWindowController(document: document, source: source, on: screen)
         editor.onClose = { [weak self, weak editor] in
             let working = editor?.window?.isKeyWindow ?? false
-            if let editor { self?.lastClosed = (editor.canvas.document, editor.canvas.source) }
+            if let editor { self?.keepAsLast(editor) }
             self?.editors.removeAll { $0.editor === editor }
-            if working { returnTo?.activate() }
+            if working { Front.giveBack(to: returnTo) }
         }
         // The editor in front is the one replaced, else the newest.
         let front = NSApp.orderedWindows.lazy.compactMap { window in self.editors.firstIndex { $0.editor.window === window } }.first
         if !SelectionOptions.current.newWindows, let index = front ?? editors.indices.last, let window = editor.window {
             let (replaced, _) = editors.remove(at: index)
             // Replaced, not closed by the user: it goes quietly, with no focus handed back.
-            replaced.onClose = { [weak self] in self?.lastClosed = (replaced.canvas.document, replaced.canvas.source) }
+            replaced.onClose = { [weak self] in self?.keepAsLast(replaced) }
             if let old = replaced.window {
                 // Where the old one was, its top-left corner kept, and still on screen if the
                 // new picture is bigger.
@@ -231,7 +233,7 @@ final class CaptureFlow {
         let app = recording?.frontmost
         recording?.setup.close()
         recording = nil
-        if let app, app.processIdentifier != NSRunningApplication.current.processIdentifier { app.activate() }
+        Front.giveBack(to: app)
     }
 
     /// F10, or the menu bar timer: the recording ends and opens in its window.
@@ -263,7 +265,7 @@ final class CaptureFlow {
         window.onClose = { [weak self, weak window] in
             let working = window?.window?.isKeyWindow ?? false
             self?.recordings.removeAll { $0 === window }
-            if working { returnTo?.activate() }
+            if working { Front.giveBack(to: returnTo) }
         }
         recordings.append(window)
         window.present()
@@ -281,7 +283,7 @@ final class CaptureFlow {
 
     /// The microphone is turned off for Shotts: record without it, or go and turn it on.
     private func askAboutMicrophone() -> MicrophoneAnswer {
-        NSApp.activate(ignoringOtherApps: true)
+        Front.bringShotts()
         let alert = NSAlert()
         alert.messageText = "Shotts can't use the microphone"
         alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › Microphone, then record again."
@@ -297,6 +299,13 @@ final class CaptureFlow {
         default:
             return .cancel
         }
+    }
+
+    /// A closed editor becomes the capture Option-F10 brings back, as `Document.keepsAsLast` says.
+    private func keepAsLast(_ editor: EditorWindowController) {
+        let document = editor.canvas.document
+        guard Document.keepsAsLast(document, over: lastClosed?.document) else { return }
+        lastClosed = (document, editor.canvas.source)
     }
 
     /// Whether Option-F10 has anything to show.
@@ -319,11 +328,11 @@ final class CaptureFlow {
     private func end() {
         let app = capture?.frontmost
         capture = nil
-        if let app, app.processIdentifier != NSRunningApplication.current.processIdentifier { app.activate() }
+        Front.giveBack(to: app)
     }
 
     private func fail(_ message: String, _ error: Error) {
-        NSApp.activate(ignoringOtherApps: true)
+        Front.bringShotts()
         let alert = NSAlert()
         alert.messageText = message
         alert.informativeText = error.localizedDescription
@@ -341,7 +350,7 @@ final class CaptureFlow {
             capture = nil
             return
         }
-        NSApp.activate(ignoringOtherApps: true)
+        Front.bringShotts()
         let alert = NSAlert()
         alert.messageText = "Allow Shotts to record the screen"
         alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › Screen & System Audio Recording, then press F10 again. macOS may ask you to quit and reopen Shotts first."

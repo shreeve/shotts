@@ -72,7 +72,7 @@ public final class CanvasView: NSView {
             window?.invalidateCursorRects(for: self)
         }
     }
-    public var tool: Tool = .callout { didSet { endTextEntry(commit: true); selectedID = nil; needsDisplay = true; onToolChange?(tool) } }
+    public var tool: Tool = .callout { didSet { endTextEntry(); selectedID = nil; needsDisplay = true; onToolChange?(tool) } }
     public var onToolChange: ((Tool) -> Void)?
     /// The style new annotations get. Changing it restyles the text being typed, or else the
     /// selected annotation, in whatever changed and nothing else.
@@ -156,14 +156,14 @@ public final class CanvasView: NSView {
     @objc public func undo(_ sender: Any?) {
         guard dragAnchor == nil else { return }
         if let words = textField?.undoManager, words.canUndo { words.undo(); return }
-        endTextEntry(commit: true)
+        endTextEntry()
         if history.undo() != nil { selectedID = nil; needsDisplay = true; onChange?() }
     }
 
     @objc public func redo(_ sender: Any?) {
         guard dragAnchor == nil else { return }
         if let words = textField?.undoManager, words.canRedo { words.redo(); return }
-        endTextEntry(commit: true)
+        endTextEntry()
         if history.redo() != nil { selectedID = nil; needsDisplay = true; onChange?() }
     }
 
@@ -259,7 +259,7 @@ public final class CanvasView: NSView {
 
     public override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
-        endTextEntry(commit: true)
+        endTextEntry()
         // A drag whose mouse-up never came (a close asked mid-drag, say) is put back, not
         // carried into this one.
         if dragAnchor != nil { _ = cancelCurrent() }
@@ -501,7 +501,7 @@ public final class CanvasView: NSView {
         }
         entry.string = initial
         entry.onChange = { [weak self] string in self?.updateLiveText(string) }
-        entry.onFinish = { [weak self] in self?.endTextEntry(commit: true) }
+        entry.onFinish = { [weak self] in self?.endTextEntry() }
         entry.onCancel = { [weak self] in _ = self?.cancelCurrent() }
         addSubview(entry)
         textField = entry
@@ -525,13 +525,13 @@ public final class CanvasView: NSView {
     /// Ends typing: the words land in the text or callout they belong to, or as a new text, and
     /// the whole entry is one undo step. A text left without words goes; a callout left without
     /// words becomes a plain arrow.
-    func endTextEntry(commit: Bool) {
+    func endTextEntry() {
         guard let entry = textField else { return }
         textField = nil
         entry.removeFromSuperview()
         window?.makeFirstResponder(self)
         let typed = entry.string.trimmingCharacters(in: .newlines)
-        let words = commit && !typed.allSatisfy(\.isWhitespace) ? typed : ""
+        let words = typed.allSatisfy(\.isWhitespace) ? "" : typed
         var d = document
         if let id = entry.editingID, let a = d.annotation(id) {
             switch a.shape {

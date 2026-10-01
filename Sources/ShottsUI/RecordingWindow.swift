@@ -79,7 +79,8 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     required init?(coder: NSCoder) { nil }
 
     public func present() {
-        NSApp.activate(ignoringOtherApps: true) // see AreaSelection.show()
+        Front.bringShotts()
+        if window?.isMiniaturized == true { window?.deminiaturize(nil) }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }

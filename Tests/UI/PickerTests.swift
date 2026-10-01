@@ -85,7 +85,8 @@ extension OverlayView {
     }
 }
 
-@MainActor @Suite struct PickerTests {
+// One test at a time: notifications one test posts reach the next one's picker on the main queue.
+@MainActor @Suite(.serialized) struct PickerTests {
     /// A display the pointer is not on shows no crosshair line, no magnifier pinned to its
     /// edge, no hints, and no window outline, whichever side the pointer is on.
     @Test func displayWithoutThePointerShowsOnlyItsPicture() throws {
@@ -240,6 +241,21 @@ extension OverlayView {
             guard case .cancelled? = outcome else { Issue.record("\(name.rawValue) left the picker up"); continue }
             _ = selection
         }
+    }
+
+    /// Shotts itself coming to the front, as when one of its editors opens, leaves the picker up:
+    /// only another app does not.
+    @Test func shottsComingForwardLeavesThePickerUp() async throws {
+        let screen = try #require(NSScreen.screens.first)
+        var outcome: AreaSelection.Outcome?
+        let selection = AreaSelection(displays: [DisplayImage(screen: screen, image: blankImage(40, 30), scale: 2)], options: SelectionOptions()) {
+            outcome = $0
+        }
+        defer { selection.cancel() }
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didActivateApplicationNotification, object: NSWorkspace.shared,
+                                                   userInfo: [NSWorkspace.applicationUserInfoKey: NSRunningApplication.current])
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(outcome == nil)
     }
 }
 

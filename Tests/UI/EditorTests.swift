@@ -8,7 +8,7 @@ import Testing
         let canvas = canvasInWindow()
         canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "Hello", style: canvas.style)
         canvas.typeText("Hello there")
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         #expect(canvas.document.annotations.count == 1)
         guard case let .text(_, string, size, _)? = canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
         #expect(string == "Hello there" && size.width > 0 && size.height > 0)
@@ -59,7 +59,7 @@ import Testing
         let canvas = canvasInWindow()
         canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
         canvas.typeText("first")
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         let before = canvas.document
         let text = try #require(before.annotations.first)
         canvas.tool = .select
@@ -79,7 +79,7 @@ import Testing
         canvas.commit(d)
         canvas.editText(callout.id)
         canvas.typeText("wrapped words beside the tail of the arrow")
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         guard case let .callout(from, _, text)? = canvas.document.annotations.last?.shape else { Issue.record("no callout"); return }
         #expect(from == tail)
         #expect(text.string.hasPrefix("wrapped") && text.alignment == .right && text.size.width > 0)
@@ -115,7 +115,7 @@ import Testing
         canvas.tool = .callout
         Mouse(canvas: canvas).stroke(CGPoint(x: 100, y: 150), CGPoint(x: 300, y: 100))
         canvas.typeText("look here")
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         guard case let .callout(_, _, text)? = canvas.document.annotations.first?.shape else { Issue.record("no callout"); return }
         #expect(text.string == "look here")
         canvas.undo(nil)
@@ -127,7 +127,7 @@ import Testing
         let canvas = canvasInWindow()
         canvas.tool = .callout
         Mouse(canvas: canvas).stroke(CGPoint(x: 100, y: 150), CGPoint(x: 300, y: 100))
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         guard case .arrow? = canvas.document.annotations.first?.shape else { Issue.record("not an arrow"); return }
         canvas.undo(nil)
         #expect(canvas.document.annotations.isEmpty)
@@ -138,7 +138,7 @@ import Testing
         let mouse = Mouse(canvas: canvas)
         canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
         canvas.typeText("first")
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         canvas.tool = .rectangle
         mouse.stroke(CGPoint(x: 200, y: 200), CGPoint(x: 300, y: 280))
         let text = try #require(canvas.document.annotations.first)
@@ -148,7 +148,7 @@ import Testing
         // The words stay visible while the entry is open.
         #expect(canvas.textField?.preview != nil)
         canvas.typeText("second")
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         #expect(canvas.document.annotations.count == 2)
         #expect(canvas.document.annotations.first?.id == text.id)
         guard case let .text(_, string, _, _)? = canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
@@ -196,7 +196,7 @@ import Testing
         let mouse = Mouse(canvas: canvas)
         canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
         canvas.typeText("Hi")
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         let text = try #require(canvas.document.annotations.first)
         canvas.tool = .select
         mouse.doubleClick(CGPoint(x: text.bounds.midX, y: text.bounds.midY))
@@ -243,7 +243,7 @@ import Testing
         let mouse = Mouse(canvas: canvas)
         canvas.beginTextEntry(at: CGPoint(x: 20, y: 20), initial: "", style: canvas.style)
         canvas.typeText("grow")
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         let small = try #require(canvas.document.annotations.first).bounds
         canvas.tool = .select
         mouse.down(CGPoint(x: small.midX, y: small.midY)); mouse.up(CGPoint(x: small.midX, y: small.midY))
@@ -281,7 +281,7 @@ import Testing
         var blue = canvas.style
         blue.color = .blue
         canvas.style = blue
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         #expect(try #require(canvas.document.annotations.first).style.color == .blue)
     }
 
@@ -394,18 +394,24 @@ import Testing
         canvas.tool = .select
         mouse.down(CGPoint(x: 10, y: 35))
         mouse.drag(CGPoint(x: 80, y: 35))
-        #expect(controller.windowShouldClose(controller.window!))
+        // As a new capture replacing the editor closes it: without asking windowShouldClose.
+        controller.close()
         #expect(canvas.document == before)
     }
 
-    /// Words still being typed are part of what closes, and so of what Option-F10 brings back.
+    /// Words still being typed are part of what closes, and so of what Option-F10 brings back,
+    /// however the editor closes: a new capture replacing it closes it without asking.
     @Test func wordsBeingTypedAreKeptWhenClosing() {
-        let controller = editor(annotated: false)
-        controller.canvas.beginTextEntry(at: CGPoint(x: 20, y: 20), initial: "", style: .standard)
-        controller.canvas.typeText("kept")
-        #expect(controller.windowShouldClose(controller.window!))
-        guard case let .text(_, words, _, _)? = controller.canvas.document.annotations.first?.shape else { Issue.record("no text"); return }
-        #expect(words == "kept")
+        for replaced in [false, true] {
+            let controller = editor(annotated: false)
+            var kept: Document?
+            controller.onClose = { kept = controller.canvas.document }
+            controller.canvas.beginTextEntry(at: CGPoint(x: 20, y: 20), initial: "", style: .standard)
+            controller.canvas.typeText("kept")
+            if replaced { controller.close() } else { controller.window?.performClose(nil) }
+            guard case let .text(_, words, _, _)? = kept?.annotations.first?.shape else { Issue.record("no text"); return }
+            #expect(words == "kept")
+        }
     }
 }
 

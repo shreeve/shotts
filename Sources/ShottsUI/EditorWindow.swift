@@ -72,7 +72,8 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     required init?(coder: NSCoder) { nil }
 
     public func present() {
-        NSApp.activate(ignoringOtherApps: true) // see AreaSelection.show()
+        Front.bringShotts()
+        if window?.isMiniaturized == true { window?.deminiaturize(nil) }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
         window?.makeFirstResponder(canvas)
@@ -248,12 +249,12 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     @objc private func redoPressed() { canvas.redo(nil) }
 
     @objc public func copyPressed() {
-        canvas.endTextEntry(commit: true)
-        _ = Export.copy(canvas.document, source: canvas.source, to: pasteboard)
+        canvas.endTextEntry()
+        if !Export.copy(canvas.document, source: canvas.source, to: pasteboard) { NSSound.beep() }
     }
 
     @objc public func savePressed() {
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         guard let window else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
@@ -272,7 +273,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     /// Command-P: the picture as it would export, scaled to fit one page, sideways when it is
     /// wider than tall. The editor comes back to the front afterwards.
     @objc public func printPressed() {
-        canvas.endTextEntry(commit: true)
+        canvas.endTextEntry()
         guard let (sheet, info) = Self.page(for: canvas.document, source: canvas.source) else { return }
         let operation = NSPrintOperation(view: sheet, printInfo: info)
         operation.jobTitle = Export.suggestedName().replacingOccurrences(of: ".png", with: "")
@@ -317,7 +318,7 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
 
     /// Draws the picture at this zoom, the canvas as tall as the picture and its field need.
     private func show(zoom: CGFloat) {
-        canvas.endTextEntry(commit: true) // an entry is placed for one zoom
+        canvas.endTextEntry() // an entry is placed for one zoom
         canvas.zoom = zoom
         canvasHeight?.constant = CGFloat(canvas.document.height) * zoom + CanvasView.inset * 2
     }
@@ -344,15 +345,13 @@ public final class EditorWindowController: NSWindowController, NSWindowDelegate 
     }
 
     /// Closing is a window's ordinary close, with no question: Option-F10 opens the editor
-    /// closed last again, as it was.
-    public func windowShouldClose(_ sender: NSWindow) -> Bool {
-        // Words being typed are kept, and a drag in progress is put back, before it goes.
-        canvas.endTextEntry(commit: true)
-        _ = canvas.cancelCurrent()
-        return true
-    }
-
+    /// closed last again, as it was. Words being typed are kept, and a drag in progress is put
+    /// back, before it goes, however it closes: a new capture replacing it closes it without
+    /// asking `windowShouldClose`.
     public func windowWillClose(_ notification: Notification) {
+        canvas.endTextEntry()
+        _ = canvas.cancelCurrent()
+        stylePopover.releaseColorPanel()
         let done = onClose
         onClose = nil
         done?()
@@ -417,11 +416,14 @@ final class DragGrip: NSImageView {
 
     override func mouseDragged(with event: NSEvent) {
         guard let controller else { return }
-        controller.canvas.endTextEntry(commit: true) // the words being typed go with the picture
-        guard let file = try? Export.temporaryFile(controller.canvas.document, source: controller.canvas.source) else { return }
+        controller.canvas.endTextEntry() // the words being typed go with the picture
+        guard let (file, image) = try? Export.temporaryFile(controller.canvas.document, source: controller.canvas.source) else {
+            NSSound.beep()
+            return
+        }
         let item = NSDraggingItem(pasteboardWriter: file as NSURL)
-        // The picture as it will land, annotations and crop included, read back from the file.
-        let picture = NSImage(contentsOf: file) ?? NSImage(cgImage: controller.canvas.source, size: .zero)
+        // The picture as it will land, annotations and crop included.
+        let picture = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         let preview = NSSize(width: 160, height: 160 * picture.size.height / max(picture.size.width, 1))
         item.setDraggingFrame(NSRect(origin: convert(event.locationInWindow, from: nil), size: preview), contents: picture)
         let session = beginDraggingSession(with: [item], event: event, source: self)

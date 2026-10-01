@@ -47,20 +47,21 @@ public enum Export {
         return "\(prefix) \(stamp).\(fileExtension)"
     }
 
-    /// Writes the PNG.
-    public static func write(_ document: Document, source: CGImage, to url: URL) throws {
+    /// Writes the PNG, and returns the picture written.
+    @discardableResult
+    public static func write(_ document: Document, source: CGImage, to url: URL) throws -> CGImage {
         guard let image = Renderer.image(of: document, source: source),
               let png = encode(image, scale: document.scale, as: .png) else { throw ExportError.render }
         try png.write(to: url, options: .atomic)
+        return image
     }
 
     /// A PNG for a drag out of the editor. It goes in one temporary folder that is emptied
     /// first, so no more than the latest drag's picture is ever left on disk: the app it was
     /// dropped on has had its copy by the next drag.
-    public static func temporaryFile(_ document: Document, source: CGImage) throws -> URL {
+    public static func temporaryFile(_ document: Document, source: CGImage) throws -> (url: URL, image: CGImage) {
         let url = try temporaryFolder("Shotts Drag").appendingPathComponent(suggestedName())
-        try write(document, source: source, to: url)
-        return url
+        return (url, try write(document, source: source, to: url))
     }
 
     /// A temporary folder of this name, emptied first, so it never holds more than the latest

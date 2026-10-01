@@ -175,12 +175,12 @@ func patternImage(_ width: Int, _ height: Int) -> CGImage {
     /// Each drag replaces the last drag's file rather than leaving another beside it.
     @Test func onlyTheLatestDragIsLeftOnDisk() throws {
         let document = Document(width: 30, height: 20, scale: 2)
-        let first = try Export.temporaryFile(document, source: blankImage(30, 20))
+        let first = try Export.temporaryFile(document, source: blankImage(30, 20)).url
         let folder = first.deletingLastPathComponent()
         defer { try? FileManager.default.removeItem(at: folder) }
         let older = folder.appendingPathComponent("Shotts 2020-01-01 at 1.02.03 PM.png")
         try Data([1]).write(to: older)
-        let second = try Export.temporaryFile(document, source: blankImage(30, 20))
+        let second = try Export.temporaryFile(document, source: blankImage(30, 20)).url
         #expect(second.deletingLastPathComponent() == folder)
         #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == [second.lastPathComponent])
         #expect(properties(try Data(contentsOf: second))?.dpi == 144)
