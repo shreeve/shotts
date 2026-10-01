@@ -374,6 +374,7 @@ build ignores its arguments.
 | `--select out.txt` | Runs the picker alone over a drawn stand-in for each display and writes `selected x,y,w,h on <display>`, `window <id> at x,y on <display>`, or `cancelled`. |
 | `--preview-overlay out.png [--dragged] [--dim] [--corner]` | Draws the picker off screen with the pointer three pixels inside the corner of the stand-in's square at 1600,1600, so the magnifier's mapping can be checked (`--dim` shows only with `--dragged`). |
 | `--capture-window <id> out.png [--no-shadow]` | Captures one window through ScreenCaptureKit (needs Screen Recording). |
+| `--preview-recording out.png [--recording]` | Draws the recording frame and the setup panel, or with `--recording` the recording bar, off screen over a light page. |
 | `--export-recording in.mov out.(mp4\|gif) [--width N] [--fps N] [--sound none\|system\|microphone\|both] [--microphone file]` | Makes the file a recording window would from any movie standing in for a recording, and prints its settings and time. |
 
 From a shell that macOS trusts for Accessibility, `CGEvent` posts reach a real editor: launch
@@ -458,6 +459,9 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
 - The hardened runtime keeps the microphone from an app that does not claim
   `com.apple.security.device.audio-input`; `package-app.sh` signs with `Support/Shotts.entitlements`
   for it. macOS still asks the user the first time.
+- A non-activating panel belongs to an app that is not active, and AppKit draws its standard
+  buttons faded, as in a window in the background: white on gray. The recording panel's buttons
+  are `PillButton`s, drawn by Shotts, on a solid panel, so they read the same either way.
 - A debug binary run from a shell has no feed to check, and Sparkle's modal alert about it would
   hold up the main thread, so a developer switch runs without the updater.
 - An arrow is one filled outline (`ArrowGeometry.outline`), not a stroked line plus a head:

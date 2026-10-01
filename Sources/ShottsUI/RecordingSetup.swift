@@ -103,10 +103,12 @@ public final class RecordingSetup {
     var setupPanel: SetupPanel? { panel }
     #endif
 
-    /// A window just around the area, clear inside, that draws a red line two points wide
-    /// with a point of space between it and the area, and lets every click through.
+    /// A frame just around the area, clear inside, that lets every click through: a red line
+    /// two points wide a point off the area, in a dark band with a faint light edge, so the
+    /// area reads as framed on any background.
     private static func makeOutline(around area: CGRect) -> NSWindow {
-        let window = NSWindow(contentRect: area.insetBy(dx: -3, dy: -3), styleMask: .borderless, backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: area.insetBy(dx: -OutlineView.width, dy: -OutlineView.width), styleMask: .borderless,
+                              backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.isOpaque = false
         window.backgroundColor = .clear
@@ -130,12 +132,91 @@ public final class RecordingSetup {
     }
 }
 
-private final class OutlineView: NSView {
+final class OutlineView: NSView {
+    /// How far the frame reaches out from the area.
+    static let width: CGFloat = 9
+
     override func draw(_ dirtyRect: NSRect) {
+        let outer = bounds, inner = bounds.insetBy(dx: Self.width, dy: Self.width)
+        // The band, between the area and the frame's outer edge.
+        let band = NSBezierPath(rect: outer)
+        band.append(NSBezierPath(rect: inner.insetBy(dx: -1, dy: -1)).reversed)
+        NSColor(white: 0.08, alpha: 0.5).setFill()
+        band.fill()
+        NSColor(white: 1, alpha: 0.35).setStroke()
+        let edge = NSBezierPath(rect: outer.insetBy(dx: 0.5, dy: 0.5))
+        edge.lineWidth = 1
+        edge.stroke()
         NSColor.systemRed.setStroke()
-        let path = NSBezierPath(rect: bounds.insetBy(dx: 1, dy: 1))
-        path.lineWidth = 2
-        path.stroke()
+        let line = NSBezierPath(rect: inner.insetBy(dx: -2, dy: -2))
+        line.lineWidth = 2
+        line.stroke()
+    }
+}
+
+/// A button Shotts draws itself, alike whether or not its panel is key. The panels belong to an
+/// app kept in the background, so nothing on screen moves, and AppKit draws a background app's
+/// buttons faded, which on a dark panel is hard to read.
+final class PillButton: NSButton {
+    var fill: NSColor { didSet { needsDisplay = true } }
+    /// The fill while on, for a button that stays pressed.
+    var onFill: NSColor?
+    /// The symbols for off and on, when they differ.
+    var symbols: (off: String, on: String)?
+
+    init(title: String, symbol: String?, fill: NSColor, toggles: Bool = false) {
+        self.fill = fill
+        super.init(frame: .zero)
+        self.title = title
+        if let symbol { image = NSImage(systemSymbolName: symbol, accessibilityDescription: title.isEmpty ? symbol : nil) }
+        isBordered = false
+        setButtonType(toggles ? .pushOnPushOff : .momentaryPushIn)
+        if title.isEmpty, let symbol { setAccessibilityLabel(symbol) }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    override var state: NSControl.StateValue {
+        didSet {
+            if let symbols { image = NSImage(systemSymbolName: state == .on ? symbols.on : symbols.off, accessibilityDescription: nil) }
+            needsDisplay = true
+        }
+    }
+
+    override var isHighlighted: Bool { didSet { needsDisplay = true } }
+
+    private static let font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+    private static let icon: CGFloat = 18
+
+    override var intrinsicContentSize: NSSize {
+        let text = title.isEmpty ? 0 : (title as NSString).size(withAttributes: [.font: Self.font]).width
+        let icon: CGFloat = image == nil ? 0 : Self.icon
+        let gap: CGFloat = text > 0 && icon > 0 ? 7 : 0
+        return NSSize(width: max(text + icon + gap + (title.isEmpty ? 18 : 28), 38), height: 32)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        var color = state == .on ? (onFill ?? fill) : fill
+        if isHighlighted { color = color.blended(withFraction: 0.3, of: .black) ?? color }
+        color.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
+        let attributes: [NSAttributedString.Key: Any] = [.font: Self.font, .foregroundColor: NSColor.white]
+        let text = title.isEmpty ? .zero : (title as NSString).size(withAttributes: attributes)
+        let icon: CGFloat = image == nil ? 0 : Self.icon
+        let gap: CGFloat = text.width > 0 && icon > 0 ? 7 : 0
+        var x = bounds.midX - (text.width + icon + gap) / 2
+        if let image {
+            let tinted = image.withSymbolConfiguration(.init(pointSize: 15, weight: .semibold))
+                .flatMap { $0.withSymbolConfiguration(.init(paletteColors: [.white])) } ?? image
+            let size = tinted.size, scale = min(icon / max(size.width, 1), icon / max(size.height, 1), 1)
+            let drawn = NSSize(width: size.width * scale, height: size.height * scale)
+            tinted.draw(in: NSRect(x: x + (icon - drawn.width) / 2, y: bounds.midY - drawn.height / 2, width: drawn.width, height: drawn.height))
+            x += icon + gap
+        }
+        if !title.isEmpty {
+            (title as NSString).draw(at: NSPoint(x: x, y: bounds.midY - text.height / 2), withAttributes: attributes)
+        }
     }
 }
 
@@ -146,18 +227,20 @@ final class SetupPanel: NSPanel {
     var onFinish: ((RecordingSetup.Outcome) -> Void)?
     var onControl: ((RecordingSetup.Control) -> Void)?
     var onTool: ((DrawingTool?) -> Void)?
-    let microphone: NSButton
-    let record: NSButton
-    let arrow = NSButton()
-    let rectangle = NSButton()
-    let pause = NSButton()
-    let stop = NSButton()
+    let record = PillButton(title: "Record", symbol: "record.circle", fill: .systemRed)
+    let microphone = PillButton(title: "Microphone", symbol: "mic.slash.fill", fill: SetupPanel.plain, toggles: true)
+    let cancel = PillButton(title: "Cancel", symbol: nil, fill: SetupPanel.plain)
+    let arrow = PillButton(title: "", symbol: "arrow.up.right", fill: SetupPanel.plain, toggles: true)
+    let rectangle = PillButton(title: "", symbol: "rectangle", fill: SetupPanel.plain, toggles: true)
+    let pause = PillButton(title: "", symbol: "pause.fill", fill: SetupPanel.plain, toggles: true)
+    let stop = PillButton(title: "Stop", symbol: "stop.fill", fill: .systemRed)
     private let row = NSStackView()
     private(set) var recording = false
+    /// A button's fill at rest, and while a toggle is on.
+    static let plain = NSColor(white: 0.32, alpha: 1)
+    static let on = NSColor(srgbRed: 0.16, green: 0.45, blue: 0.95, alpha: 1)
 
     init(microphone on: Bool) {
-        record = NSButton(title: "Record", target: nil, action: nil)
-        microphone = NSButton(checkboxWithTitle: "Microphone", target: nil, action: nil)
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
@@ -169,39 +252,30 @@ final class SetupPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         appearance = NSAppearance(named: .darkAqua)
 
-        record.image = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(paletteColors: [.white, .systemRed]))
-        record.imagePosition = .imageLeading
-        record.bezelStyle = .rounded
         record.keyEquivalent = "\r"
         record.target = self
         record.action = #selector(recordPressed)
         record.toolTip = "Start recording (Return)"
+        microphone.symbols = ("mic.slash.fill", "mic.fill")
+        microphone.onFill = Self.on
         microphone.state = on ? .on : .off
         microphone.toolTip = "Record your voice along with the screen"
-        let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancelPressed))
-        cancel.bezelStyle = .rounded
         cancel.keyEquivalent = "\u{1b}"
+        cancel.target = self
+        cancel.action = #selector(cancelPressed)
         cancel.toolTip = "Put it away (Escape)"
 
-        for (button, symbol, tip) in [(arrow, "arrow.up.right", "Draw arrows on the recording"),
-                                      (rectangle, "rectangle", "Draw rectangles on the recording")] {
-            button.setButtonType(.pushOnPushOff)
-            button.bezelStyle = .texturedRounded
-            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
+        for (button, tip) in [(arrow, "Draw arrows on the recording"), (rectangle, "Draw rectangles on the recording")] {
+            button.onFill = Self.on
             button.toolTip = tip + "; each fades after a few seconds"
+            button.setAccessibilityLabel(tip)
             button.target = self
             button.action = #selector(toolPressed(_:))
         }
-        pause.setButtonType(.pushOnPushOff)
-        pause.bezelStyle = .texturedRounded
+        pause.symbols = ("pause.fill", "play.fill")
+        pause.onFill = .systemOrange
         pause.target = self
         pause.action = #selector(pausePressed)
-        stop.title = "Stop"
-        stop.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(paletteColors: [.systemRed]))
-        stop.imagePosition = .imageLeading
-        stop.bezelStyle = .rounded
         stop.toolTip = "Stop recording (F10)"
         stop.target = self
         stop.action = #selector(stopPressed)
@@ -209,15 +283,15 @@ final class SetupPanel: NSPanel {
 
         row.setViews([record, microphone, cancel], in: .leading)
         row.orientation = .horizontal
-        row.spacing = 12
-        row.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
-        let background = NSVisualEffectView()
-        background.material = .hudWindow
-        background.blendingMode = .behindWindow
-        background.state = .active
+        row.spacing = 8
+        row.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        // Solid, so the buttons read the same over any background.
+        let background = NSView()
         background.wantsLayer = true
-        background.layer?.cornerRadius = 10
-        background.layer?.masksToBounds = true
+        background.layer?.backgroundColor = NSColor(white: 0.14, alpha: 0.96).cgColor
+        background.layer?.cornerRadius = 11
+        background.layer?.borderWidth = 1
+        background.layer?.borderColor = NSColor(white: 1, alpha: 0.14).cgColor
         background.addSubview(row)
         row.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -244,10 +318,8 @@ final class SetupPanel: NSPanel {
     /// The recording bar, in the setup's place.
     func showControls() {
         recording = true
-        let divider = NSBox()
-        divider.boxType = .separator
-        row.setViews([arrow, rectangle, divider, pause, stop], in: .leading)
-        row.spacing = 8
+        row.setViews([arrow, rectangle, pause, stop], in: .leading)
+        row.setCustomSpacing(16, after: rectangle)
         setContentSize(row.fittingSize)
     }
 
@@ -268,7 +340,51 @@ final class SetupPanel: NSPanel {
 
     func showPaused(_ paused: Bool) {
         pause.state = paused ? .on : .off
-        pause.image = NSImage(systemSymbolName: paused ? "play.fill" : "pause.fill", accessibilityDescription: paused ? "Resume" : "Pause")
+        pause.setAccessibilityLabel(paused ? "Resume" : "Pause")
         pause.toolTip = paused ? "Resume recording" : "Pause recording"
     }
 }
+
+#if DEBUG
+/// The recording frame and panel drawn off screen over a light page, as they show over most
+/// windows, before recording or while it records.
+public enum RecordingSetupPreview {
+    public static func write(to output: URL, recording: Bool) -> Bool {
+        let panel = SetupPanel(microphone: true)
+        if recording {
+            panel.showControls()
+            panel.showTool(.arrow)
+        }
+        let content = panel.contentView!
+        content.layoutSubtreeIfNeeded()
+        let frame = OutlineView(frame: CGRect(x: 0, y: 0, width: 320 + OutlineView.width * 2, height: 160 + OutlineView.width * 2))
+        let size = CGSize(width: max(frame.bounds.width, content.bounds.width) + 80, height: frame.bounds.height + content.bounds.height + 80)
+        let scale: CGFloat = 2
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let ctx = NSGraphicsContext(bitmapImageRep: rep) else { return false }
+        rep.size = size
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = ctx
+        ctx.cgContext.scaleBy(x: scale, y: scale)
+        NSColor(white: 0.97, alpha: 1).setFill()
+        CGRect(origin: .zero, size: size).fill()
+        ("Some text on the page behind" as NSString).draw(at: CGPoint(x: 70, y: size.height - 80), withAttributes: [.font: NSFont.systemFont(ofSize: 15)])
+        func place(_ view: NSView, at origin: CGPoint) {
+            ctx.cgContext.saveGState()
+            ctx.cgContext.translateBy(x: origin.x, y: origin.y)
+            if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                view.cacheDisplay(in: view.bounds, to: rep)
+                rep.draw(in: view.bounds)
+            }
+            ctx.cgContext.restoreGState()
+        }
+        place(frame, at: CGPoint(x: (size.width - frame.bounds.width) / 2, y: size.height - 40 - frame.bounds.height))
+        place(content, at: CGPoint(x: (size.width - content.bounds.width) / 2, y: 28))
+        NSGraphicsContext.restoreGraphicsState()
+        guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+        return (try? png.write(to: output)) != nil
+    }
+}
+#endif

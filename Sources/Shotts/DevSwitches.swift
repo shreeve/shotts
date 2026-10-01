@@ -49,6 +49,11 @@ enum DevSwitches {
             guard let (document, cg) = sample(from: URL(fileURLWithPath: v[0]), crop: arguments.contains("--crop")) else { exit(1) }
             exit(EditorWindowController.printPDF(document, source: cg, to: URL(fileURLWithPath: v[1])) ? 0 : 1)
         }
+        if let v = value(after: "--preview-recording") {
+            // The recording frame and panel, off screen over a light page; `--recording` for the
+            // recording bar rather than the setup.
+            exit(RecordingSetupPreview.write(to: URL(fileURLWithPath: v[0]), recording: arguments.contains("--recording")) ? 0 : 1)
+        }
         if let v = value(after: "--preview-style") {
             // The style popover's layout, drawn off screen.
             exit(StylePopoverPreview.write(to: URL(fileURLWithPath: v[0])) ? 0 : 1)
