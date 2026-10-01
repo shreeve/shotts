@@ -39,14 +39,13 @@ import Testing
     }
 
     @Test func defaultsKeepTheMicrophoneAndLeaveOutTheMacsSound() {
-        let recorded = (width: 2000, height: 1000)
-        let mp4 = RecordingRule.defaults(for: .mp4, recorded: recorded, scale: 2, hasMicrophone: true)
+        let mp4 = RecordingRule.defaults(for: .mp4, scale: 2, hasMicrophone: true)
         #expect(mp4 == RecordingSettings(format: .mp4, percent: 100, frameRate: 30, sound: .microphone))
-        #expect(RecordingRule.defaults(for: .mp4, recorded: recorded, scale: 2, hasMicrophone: false).sound == RecordingSettings.Sound.none)
+        #expect(RecordingRule.defaults(for: .mp4, scale: 2, hasMicrophone: false).sound == RecordingSettings.Sound.none)
         // A GIF starts at the size the area had on screen.
-        #expect(RecordingRule.defaults(for: .gif, recorded: recorded, scale: 2, hasMicrophone: true)
+        #expect(RecordingRule.defaults(for: .gif, scale: 2, hasMicrophone: true)
             == RecordingSettings(format: .gif, percent: 50, frameRate: 10, sound: .none))
-        #expect(RecordingRule.defaults(for: .gif, recorded: recorded, scale: 1, hasMicrophone: true).percent == 100)
+        #expect(RecordingRule.defaults(for: .gif, scale: 1, hasMicrophone: true).percent == 100)
     }
 
     @Test func sizesAreShareOfTheRecording() {
@@ -127,7 +126,7 @@ import Testing
 }
 
 /// A BGRA picture held for a test, filled by `color(x, y)` as 0xRRGGBB.
-private final class Picture {
+final class Picture {
     let width: Int, height: Int
     var bytes: [UInt8]
 
@@ -210,14 +209,14 @@ private func screenLike(_ width: Int = 96, _ height: Int = 48) -> Picture {
 
 /// A GIF as a viewer shows it: its palette, whether it loops, and each frame's delay, the
 /// rectangle it drew, and the whole picture after it, as palette indices.
-private struct DecodedGIF {
+struct DecodedGIF {
     var width = 0, height = 0
     var palette: [UInt32] = []
     var loops = false
     var frames: [(delay: Int, rect: (x: Int, y: Int, width: Int, height: Int), canvas: [UInt8])] = []
 }
 
-private func decode(_ data: [UInt8]) throws -> DecodedGIF {
+func decode(_ data: [UInt8]) throws -> DecodedGIF {
     struct Bad: Error {}
     var gif = DecodedGIF()
     var i = 0
@@ -443,5 +442,83 @@ private func lzwDecode(_ data: [UInt8], minimumCodeSize: Int, count: Int) throws
         clock.pause(at: 5)
         clock.resume(at: 6)
         #expect(clock.recorded(6) == 3)
+    }
+}
+
+@Suite struct GIFFixTests {
+    /// A one-pixel line that falls between the sampling grid's points in one frame is counted
+    /// in another, so it reaches the palette.
+    @Test func thinLinesReachThePalette() {
+        var builder = PaletteBuilder()
+        let picture = Picture(1920, 1080) { x, _ in x == 1 ? 0xFF0000 : 0xF5F5F7 }
+        for _ in 0..<9 { picture.frame { builder.add($0) } }
+        #expect(builder.palette().colors.contains(0xFF0000))
+    }
+
+    /// A palette color maps to itself even beside palette colors a shade away.
+    @Test func paletteColorsStayExactBesideNearOnes() {
+        var q = Quantizer(palette: GIFPalette(colors: [0x000000, 0x030303, 0x040404, 0xFFFFFF]))
+        for y in 0..<64 {
+            for x in 0..<64 {
+                #expect(q.index(0x000000, x: x, y: y) == 0)
+                #expect(q.index(0x030303, x: x, y: y) == 1)
+            }
+        }
+    }
+
+    /// Once many colors have been seen, a flat color that turns up later is still counted.
+    @Test func aLateFlatColorIsStillCounted() {
+        var builder = PaletteBuilder()
+        // 70,000 distinct colors, each seen once, then a flat color covering most samples.
+        for i in 0..<70_000 { builder.count(UInt32(i) * 239 & 0xFFFFFF | 0x010000, 1) }
+        for _ in 0..<5_000 { builder.count(0x123456, 1) }
+        #expect(builder.palette().colors.contains(0x123456))
+    }
+
+    /// A frame shown longer than a GIF delay can hold goes on through filler frames, so the
+    /// GIF lasts as long as the clip.
+    @Test func longStillsKeepTheirTime() throws {
+        var bytes: [UInt8] = []
+        var writer = GIFWriter(width: 4, height: 4, palette: GIFPalette(colors: [0, 0xFFFFFF])) { bytes += $0 }
+        Picture(4, 4) { _, _ in 0 }.frame { writer.add($0, at: 0) }
+        writer.finish(at: 1000) // 100,000 hundredths
+        let gif = try decode(bytes)
+        #expect(gif.frames.map(\.delay).reduce(0, +) == 100_000)
+        #expect(gif.frames.count == 2 && gif.frames.allSatisfy { $0.canvas == gif.frames[0].canvas })
+    }
+}
+
+@Suite struct RecordingTimelineTests {
+    /// Frames go where they came, in order; one that comes no later than the last written is
+    /// left out; one the writer was not ready for can be offered again.
+    @Test func framesGoInOrder() {
+        var timeline = RecordingTimeline()
+        #expect(timeline.frame(at: 0) == .write(at: 0))
+        timeline.wrote(frameAt: 0)
+        #expect(timeline.frame(at: 0) == .drop)
+        #expect(timeline.frame(at: 0.5) == .write(at: 0.5))
+        // Not written (the writer was busy): the same frame is still wanted.
+        #expect(timeline.frame(at: 0.5) == .write(at: 0.5))
+        timeline.wrote(frameAt: 0.5)
+        #expect(timeline.frame(at: 0.4) == .drop)
+    }
+
+    /// A frame from a pause is held, and goes in where the recording resumes.
+    @Test func aPausedFrameGoesInAtTheResume() {
+        var timeline = RecordingTimeline()
+        timeline.wrote(frameAt: 0)
+        timeline.pause(at: 2)
+        #expect(timeline.isPaused && timeline.frame(at: 3) == .hold && timeline.sound(at: 3) == nil)
+        #expect(timeline.resume(at: 5) == 2)
+        #expect(timeline.frame(at: 6) == .write(at: 3))
+        #expect(timeline.sound(at: 6) == 3)
+        #expect(timeline.elapsed(at: 6) == 3)
+        #expect(timeline.resume(at: 7) == nil) // not paused
+    }
+
+    @Test func aClipShorterThanTheShortestTrimKeepsItself() {
+        let whole = Trim.whole(0.05)
+        #expect(whole.movingStart(to: 0.02) == whole)
+        #expect(whole.movingEnd(to: 0.01, duration: 0.05) == whole)
     }
 }

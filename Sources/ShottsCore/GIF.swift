@@ -28,13 +28,14 @@ public struct BGRAFrame {
 /// thresholds are spread as evenly as can be at every density, so dithering with it looks like
 /// fine grain rather than a grid. Being fixed, it gives a pixel the same threshold in every
 /// frame: what stays still in a recording stays still, and costs nothing, in the GIF.
-public enum BlueNoise {
-    public static let size = 64
-    /// Each cell's rank among the 4096, row by row: its threshold is (rank + 0.5) / 4096.
-    public static let ranks: [UInt16] = make()
+enum BlueNoise {
+    /// The map is 2^6 cells a side, so a pixel's cell is its coordinates' low six bits.
+    static let shift = 6, size = 1 << shift
+    /// Each cell's rank among size², row by row: its threshold is (rank + 0.5) / size².
+    static let ranks: [UInt16] = make()
 
-    @inline(__always) public static func threshold(_ x: Int, _ y: Int) -> Float {
-        (Float(ranks[(y & 63) << 6 | (x & 63)]) + 0.5) / 4096
+    @inline(__always) static func threshold(_ x: Int, _ y: Int) -> Float {
+        (Float(ranks[(y & (size - 1)) << shift | (x & (size - 1))]) + 0.5) / Float(size * size)
     }
 
     static func make() -> [UInt16] {
@@ -126,10 +127,14 @@ public struct GIFPalette: Equatable, Sendable {
 /// text, a UI's flat fills) go in exactly as they are and are never dithered; the rest are
 /// chosen by median cut over what remains.
 public struct PaletteBuilder {
-    /// Exact colors and how often each was seen, until there are too many to be worth counting.
+    /// Exact colors and how often each was seen. When it fills up, the rarest are let go to
+    /// make room, so a flat color that turns up later is still counted.
     private var exact: [UInt32: Int] = [:]
-    private var tooMany = false
+    /// Whether colors have been let go, so `exact` no longer holds every color seen.
+    private var pruned = false
     private static let exactLimit = 1 << 16
+    /// Frames counted so far, which shifts the sampling grid frame by frame.
+    private var frames = 0
     /// Every sample by 5-bit color: how many, and the sums of their 8-bit channels.
     private var bins = [Int](repeating: 0, count: 1 << 15)
     private var sums = [Int](repeating: 0, count: 3 << 15)
@@ -137,12 +142,16 @@ public struct PaletteBuilder {
 
     public init() {}
 
-    /// Counts a frame's colors, from about 250,000 of its pixels at most.
+    /// Counts a frame's colors, from about 250,000 of its pixels at most. The grid of pixels
+    /// counted moves a pixel each frame, through every offset, so a line or a dot that falls
+    /// between the grid's points in one frame is counted in another.
     public mutating func add(_ frame: BGRAFrame) {
         let step = max(1, Int((Double(frame.width * frame.height) / 250_000).squareRoot().rounded(.up)))
-        var y = 0
+        let phase = frames % (step * step)
+        frames += 1
+        var y = phase / step
         while y < frame.height {
-            var x = 0
+            var x = phase % step
             while x < frame.width {
                 count(frame.rgb(x, y), 1)
                 x += step
@@ -155,8 +164,17 @@ public struct PaletteBuilder {
         samples += n
         if let seen = exact[rgb] {
             exact[rgb] = seen + n
-        } else if !tooMany {
-            if exact.count < Self.exactLimit { exact[rgb] = n } else { tooMany = true }
+        } else {
+            if exact.count >= Self.exactLimit {
+                // Down to half full, the rarest colors first, so pruning comes seldom.
+                var rare = 1
+                repeat {
+                    exact = exact.filter { $0.value > rare }
+                    rare *= 2
+                } while exact.count > Self.exactLimit / 2
+                pruned = true
+            }
+            if exact.count < Self.exactLimit { exact[rgb] = n }
         }
         let bin = Self.bin(rgb)
         bins[bin] += n
@@ -173,7 +191,7 @@ public struct PaletteBuilder {
     /// and median-cut colors for the rest.
     public func palette(maxColors: Int = 255) -> GIFPalette {
         guard samples > 0 else { return GIFPalette(colors: [0]) }
-        if !tooMany, exact.count <= maxColors {
+        if !pruned, exact.count <= maxColors {
             return GIFPalette(colors: exact.keys.sorted())
         }
         // A color is prominent when it covers at least 1 in 500 of the samples; at most half
@@ -251,15 +269,24 @@ public struct PaletteBuilder {
 /// proportion to where it lies between them, the blue noise at each pixel choosing which: a
 /// gradient comes out smooth rather than banded, and the grain is only as coarse as the
 /// palette's colors there are apart.
-public struct Quantizer {
-    public let palette: GIFPalette
+struct Quantizer {
+    let palette: GIFPalette
     private let r: [Int32], g: [Int32], b: [Int32]
+    /// Each palette color's index, so one maps to itself even beside a palette color a shade
+    /// away, where the nearest by cell might be the other; looked up only in the cells that
+    /// hold a palette color, so the colors in between pay nothing for it.
+    private let exact: [UInt32: UInt8]
+    private let holdsPaletteColor: [Bool]
     /// The nearest palette color to each 6-bit cell of color space, worked out on first use.
     private var nearest: [UInt16]
     private static let unknown = UInt16.max
 
-    public init(palette: GIFPalette) {
+    init(palette: GIFPalette) {
         self.palette = palette
+        exact = Dictionary(palette.colors.enumerated().map { ($1, UInt8($0)) }) { first, _ in first }
+        var cells = [Bool](repeating: false, count: 1 << 18)
+        for c in palette.colors { cells[Self.cell(Int32(c >> 16 & 0xFF), Int32(c >> 8 & 0xFF), Int32(c & 0xFF))] = true }
+        holdsPaletteColor = cells
         r = palette.colors.map { Int32($0 >> 16 & 0xFF) }
         g = palette.colors.map { Int32($0 >> 8 & 0xFF) }
         b = palette.colors.map { Int32($0 & 0xFF) }
@@ -267,13 +294,16 @@ public struct Quantizer {
     }
 
     /// The palette index for `rgb` at pixel `x`, `y`.
-    @inline(__always) public mutating func index(_ rgb: UInt32, x: Int, y: Int) -> UInt8 {
+    @inline(__always) mutating func index(_ rgb: UInt32, x: Int, y: Int) -> UInt8 {
         let pr = Int32(rgb >> 16 & 0xFF), pg = Int32(rgb >> 8 & 0xFF), pb = Int32(rgb & 0xFF)
-        let first = closest(pr, pg, pb)
+        let cell = Self.cell(pr, pg, pb)
+        let first = closest(cell, pr, pg, pb)
         if palette.colors[first] == rgb { return UInt8(first) }
+        if holdsPaletteColor[cell], let index = exact[rgb] { return index }
         // The color as far past this one as the nearest palette color is short of it: the
         // palette color nearest there is the other side of the step this color is on.
-        let second = closest(min(max(2 * pr - r[first], 0), 255), min(max(2 * pg - g[first], 0), 255), min(max(2 * pb - b[first], 0), 255))
+        let qr = min(max(2 * pr - r[first], 0), 255), qg = min(max(2 * pg - g[first], 0), 255), qb = min(max(2 * pb - b[first], 0), 255)
+        let second = closest(Self.cell(qr, qg, qb), qr, qg, qb)
         guard second != first else { return UInt8(first) }
         let dr = r[second] - r[first], dg = g[second] - g[first], db = b[second] - b[first]
         let along = (pr - r[first]) * dr + (pg - g[first]) * dg + (pb - b[first]) * db
@@ -283,10 +313,14 @@ public struct Quantizer {
         return BlueNoise.threshold(x, y) < t ? UInt8(second) : UInt8(first)
     }
 
-    /// The palette color nearest the middle of the 6-bit cell holding a color, weighing green
-    /// most and blue least, as the eye does.
-    @inline(__always) private mutating func closest(_ pr: Int32, _ pg: Int32, _ pb: Int32) -> Int {
-        let cell = Int(pr >> 2) << 12 | Int(pg >> 2) << 6 | Int(pb >> 2)
+    /// The 6-bit cell of color space holding a color.
+    @inline(__always) private static func cell(_ r: Int32, _ g: Int32, _ b: Int32) -> Int {
+        Int(r >> 2) << 12 | Int(g >> 2) << 6 | Int(b >> 2)
+    }
+
+    /// The palette color nearest the middle of `cell`, which holds the color `pr`, `pg`, `pb`,
+    /// weighing green most and blue least, as the eye does.
+    @inline(__always) private mutating func closest(_ cell: Int, _ pr: Int32, _ pg: Int32, _ pb: Int32) -> Int {
         let known = nearest[cell]
         if known != Self.unknown { return Int(known) }
         let cr = pr & ~3 | 2, cg = pg & ~3 | 2, cb = pb & ~3 | 2
@@ -319,7 +353,7 @@ public struct GIFWriter {
     private var previousIndices: [UInt8]
     private var hasPrevious = false
     /// The frame waiting for its delay, which is known once the next change comes.
-    private var pending: (image: [UInt8], start: Double)?
+    private var pending: (image: [UInt8], transparency: Bool, start: Double)?
 
     /// Writes the header, the palette, and the instruction to loop.
     public init(width: Int, height: Int, palette: GIFPalette, write: @escaping (Data) -> Void) {
@@ -379,7 +413,7 @@ public struct GIFWriter {
         previousIndices = indices
         hasPrevious = true
         flush(until: time)
-        pending = (image(region, rect: rect, transparency: !first), time)
+        pending = (image(region, rect: rect), !first, time)
     }
 
     /// Writes the last frame, shown until `end`, and the trailer.
@@ -389,22 +423,32 @@ public struct GIFWriter {
     }
 
     private mutating func flush(until time: Double) {
-        guard let (image, start) = pending else { return }
+        guard let (image, transparency, start) = pending else { return }
         pending = nil
-        let delay = GIFTiming.delay(from: start, to: time)
-        // Graphic control: leave the frame in place for the next to draw over; the delay; and
-        // whether "as before" is transparent.
-        var control = Data([0x21, 0xF9, 0x04, image[0] == 1 ? 0x05 : 0x04])
-        control.append(le16(min(delay, 65535)))
-        control.append(contentsOf: [transparent, 0x00])
-        write(control)
-        write(Data(image.dropFirst()))
+        // A delay is at most 65,535 hundredths; a frame shown longer goes on through frames of
+        // one unchanged pixel, which change nothing on screen.
+        var delay = GIFTiming.delay(from: start, to: time)
+        writeControl(delay: min(delay, 65535), transparency: transparency)
+        write(Data(image))
+        while delay > 65535 {
+            delay -= 65535
+            writeControl(delay: min(delay, 65535), transparency: true)
+            write(Data(self.image([transparent], rect: (0, 0, 1, 1))))
+        }
     }
 
-    /// An image descriptor and its compressed pixels, behind one byte that says whether the
-    /// frame uses transparency (read back by `flush`, not written).
-    private func image(_ region: [UInt8], rect: (x: Int, y: Int, width: Int, height: Int), transparency: Bool) -> [UInt8] {
-        var out: [UInt8] = [transparency ? 1 : 0, 0x2C]
+    /// Graphic control: leave the frame in place for the next to draw over; the delay; and
+    /// whether "as before" is transparent.
+    private func writeControl(delay: Int, transparency: Bool) {
+        var control = Data([0x21, 0xF9, 0x04, transparency ? 0x05 : 0x04])
+        control.append(le16(delay))
+        control.append(contentsOf: [transparent, 0x00])
+        write(control)
+    }
+
+    /// An image descriptor and its compressed pixels.
+    private func image(_ region: [UInt8], rect: (x: Int, y: Int, width: Int, height: Int)) -> [UInt8] {
+        var out: [UInt8] = [0x2C]
         out.append(contentsOf: le16(rect.x)); out.append(contentsOf: le16(rect.y))
         out.append(contentsOf: le16(rect.width)); out.append(contentsOf: le16(rect.height))
         out.append(0x00) // no local palette, not interlaced
@@ -483,5 +527,15 @@ enum LZW {
         emit(end)
         if used > 0 { out.append(UInt8(bits & 0xFF)) }
         return out
+    }
+}
+
+/// A GIF's frame times, which are whole hundredths of a second.
+enum GIFTiming {
+    /// The delay of a frame shown from `start` until `end`, in hundredths. Measured between the
+    /// two times each rounded, so rounding never adds up over a long GIF; never under two,
+    /// which browsers would slow to ten.
+    static func delay(from start: Double, to end: Double) -> Int {
+        max(2, Int((end * 100).rounded()) - Int((start * 100).rounded()))
     }
 }

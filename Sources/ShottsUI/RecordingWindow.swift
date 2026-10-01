@@ -41,10 +41,9 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     public init(recording: Recording, contents: RecordingExport.Contents, on screen: NSScreen? = NSScreen.main) {
         self.recording = recording
         self.contents = contents
-        let recorded = (recording.width, recording.height)
         settings = [
-            .mp4: RecordingRule.defaults(for: .mp4, recorded: recorded, scale: recording.scale, hasMicrophone: contents.hasMicrophone),
-            .gif: RecordingRule.defaults(for: .gif, recorded: recorded, scale: recording.scale, hasMicrophone: contents.hasMicrophone),
+            .mp4: RecordingRule.defaults(for: .mp4, scale: recording.scale, hasMicrophone: contents.hasMicrophone),
+            .gif: RecordingRule.defaults(for: .gif, scale: recording.scale, hasMicrophone: contents.hasMicrophone),
         ]
         timeline = Timeline(duration: contents.duration)
         let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
