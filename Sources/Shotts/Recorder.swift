@@ -202,7 +202,7 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         guard let recording else { throw Failure.nothingRecorded }
         guard let end, end > .zero else {
             writers.forEach { $0.cancelWriting() }
-            try? FileManager.default.removeItem(at: recording.folder)
+            Recording.removeFolder(recording.folder)
             throw Failure.nothingRecorded
         }
         for writer in writers {
@@ -210,7 +210,7 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
             await writer.finishWriting()
         }
         guard let failed = writers.first(where: { $0.status != .completed }) else { return recording }
-        try? FileManager.default.removeItem(at: recording.folder)
+        Recording.removeFolder(recording.folder)
         throw failed.error ?? Failure.nothingRecorded
     }
 

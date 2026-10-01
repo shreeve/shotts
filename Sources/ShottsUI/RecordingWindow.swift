@@ -30,8 +30,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     let formats = NSPopUpButton()
-    let widthField = NSTextField()
-    let heightLabel = NSTextField(labelWithString: "")
+    let sizes = NSPopUpButton()
     let rates = NSPopUpButton()
     let sounds = NSPopUpButton()
     let status = NSTextField(labelWithString: "")
@@ -94,17 +93,12 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         formats.target = self
         formats.action = #selector(formatChanged)
 
-        let number = NumberFormatter()
-        number.numberStyle = .none
-        number.allowsFloats = false
-        number.minimum = 1
-        widthField.formatter = number
-        widthField.alignment = .right
-        widthField.target = self
-        widthField.action = #selector(widthChanged)
-        widthField.toolTip = "Width in pixels; the height follows"
-        widthField.widthAnchor.constraint(equalToConstant: 56).isActive = true
-        heightLabel.textColor = .secondaryLabelColor
+        for percent in RecordingRule.sizes {
+            sizes.addItem(withTitle: "\(percent)%")
+            sizes.lastItem?.tag = percent
+        }
+        sizes.target = self
+        sizes.action = #selector(sizeChanged)
 
         rates.target = self
         rates.action = #selector(rateChanged)
@@ -132,11 +126,10 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
 
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let bar = NSStackView(views: [formats, widthField, heightLabel, rates, sounds, spacer, progress, status, grip, copy, save])
+        let bar = NSStackView(views: [formats, sizes, rates, sounds, spacer, progress, status, grip, copy, save])
         bar.orientation = .horizontal
         bar.spacing = 8
         bar.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
-        bar.setCustomSpacing(4, after: widthField)
 
         // The timeline below is the player's only control.
         player.controlsStyle = .none
@@ -245,9 +238,13 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     private func showSettings() {
         let s = current
         formats.selectItem(at: s.format == .mp4 ? 0 : 1)
-        let size = RecordingRule.size(width: s.width, format: s.format, recorded: (recording.width, recording.height))
-        widthField.integerValue = size.width
-        heightLabel.stringValue = "× \(size.height)"
+        sizes.selectItem(withTag: s.percent)
+        // The pixels, for anyone who wants them.
+        for item in sizes.itemArray {
+            let size = RecordingRule.size(percent: item.tag, format: s.format, recorded: (recording.width, recording.height))
+            item.toolTip = "\(size.width) × \(size.height) pixels"
+        }
+        sizes.toolTip = sizes.selectedItem?.toolTip.map { "Size: \($0)" }
 
         rates.removeAllItems()
         for rate in RecordingRule.frameRates(for: s.format) {
@@ -273,7 +270,6 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     private func change(_ edit: (inout RecordingSettings) -> Void) {
         var s = current
         edit(&s)
-        s.width = RecordingRule.size(width: s.width, format: s.format, recorded: (recording.width, recording.height)).width
         guard s != current else { showSettings(); return }
         settings[format] = s
         showSettings()
@@ -286,7 +282,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         remake()
     }
 
-    @objc func widthChanged() { change { $0.width = widthField.integerValue } }
+    @objc func sizeChanged() { change { $0.percent = sizes.selectedTag() } }
     @objc func rateChanged() { change { $0.frameRate = rates.selectedTag() } }
     @objc func soundChanged() {
         change { s in
@@ -326,8 +322,10 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
                 try? FileManager.default.removeItem(at: folder)
                 guard !(error is CancellationError), !Task.isCancelled else { return }
                 progress.isHidden = true
-                status.stringValue = "Could not make the file"
-                status.toolTip = error.localizedDescription
+                // What went wrong, short enough for the bar; all of it on hover.
+                status.stringValue = "Could not make the file: \(error.localizedDescription)"
+                status.lineBreakMode = .byTruncatingTail
+                status.toolTip = (error as NSError).description
             }
         }
     }
@@ -388,7 +386,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         if let timeObserver { player.player?.removeTimeObserver(timeObserver) }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         player.player = nil
-        try? FileManager.default.removeItem(at: recording.folder)
+        Recording.removeFolder(recording.folder)
         let done = onClose
         onClose = nil
         done?()

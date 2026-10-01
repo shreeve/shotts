@@ -26,7 +26,7 @@ hidden bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit c24b093): a cor
 security, and performance pass over the whole app, plus Open Sans; `CHANGELOG.md` says what
 changed for users. Screen recording (Command as the drag ends; MP4 and Shotts' own GIF encoder)
 is built, under Unreleased in `CHANGELOG.md`, and not yet released. The build has no warnings
-(warnings are errors) and `swift test` passes: 73 Core tests and 81 AppKit tests.
+(warnings are errors) and `swift test` passes: 74 Core tests and 82 AppKit tests.
 
 Next, in order:
 
@@ -204,7 +204,9 @@ frame, which starts both writers' sessions; the stop time ends them, so the last
 until then. The movie is HEVC at quality 0.9 with the Mac's sound as AAC; the microphone
 (`AVCaptureSession`, resampled to 48 kHz mono) goes to its own `Microphone.m4a`, so the window
 can offer either sound, both, or none. All of it is in one folder under `Recording.parentFolder`,
-removed when the window closes and at launch.
+removed when the window closes. Each folder holds a lock on a file in it (`.in-use`) while it
+is in use; at launch `Recording.removeLeftovers` removes only the folders no running Shotts
+holds, which a crash leaves.
 
 The window's `Timeline` replaces the player's own controls: play (Space), a playhead, and trim
 brackets whose `TimelineLayout` (Core) maps points to times and picks the handle a press takes.
@@ -375,7 +377,7 @@ build ignores its arguments.
 | `--preview-overlay out.png [--dragged] [--dim] [--corner]` | Draws the picker off screen with the pointer three pixels inside the corner of the stand-in's square at 1600,1600, so the magnifier's mapping can be checked (`--dim` shows only with `--dragged`). |
 | `--capture-window <id> out.png [--no-shadow]` | Captures one window through ScreenCaptureKit (needs Screen Recording). |
 | `--preview-recording out.png [--recording]` | Draws the recording frame and the setup panel, or with `--recording` the recording bar, off screen over a light page. |
-| `--export-recording in.mov out.(mp4\|gif) [--width N] [--fps N] [--sound none\|system\|microphone\|both] [--microphone file]` | Makes the file a recording window would from any movie standing in for a recording, and prints its settings and time. |
+| `--export-recording in.mov out.(mp4\|gif) [--size percent] [--fps N] [--sound none\|system\|microphone\|both] [--microphone file]` | Makes the file a recording window would from any movie standing in for a recording, and prints its settings and time. |
 
 From a shell that macOS trusts for Accessibility, `CGEvent` posts reach a real editor: launch
 `Shotts.app --args --edit sample.png`, find the window with `CGWindowListCopyWindowInfo` (owner
@@ -462,6 +464,9 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
 - A non-activating panel belongs to an app that is not active, and AppKit draws its standard
   buttons faded, as in a window in the background: white on gray. The recording panel's buttons
   are `PillButton`s, drawn by Shotts, on a solid panel, so they read the same either way.
+- Removing leftover recordings at launch must not take another running Shotts' open ones: a
+  second launch emptying the whole folder once deleted a recording being worked on. Folders are
+  held by a file lock, which a crash releases, and a developer switch skips the cleanup.
 - A debug binary run from a shell has no feed to check, and Sparkle's modal alert about it would
   hold up the main thread, so a developer switch runs without the updater.
 - An arrow is one filled outline (`ArrowGeometry.outline`), not a stroked line plus a head:

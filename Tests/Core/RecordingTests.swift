@@ -40,11 +40,21 @@ import Testing
     @Test func defaultsKeepTheMicrophoneAndLeaveOutTheMacsSound() {
         let recorded = (width: 2000, height: 1000)
         let mp4 = RecordingRule.defaults(for: .mp4, recorded: recorded, scale: 2, hasMicrophone: true)
-        #expect(mp4 == RecordingSettings(format: .mp4, width: 2000, frameRate: 30, sound: .microphone))
+        #expect(mp4 == RecordingSettings(format: .mp4, percent: 100, frameRate: 30, sound: .microphone))
         #expect(RecordingRule.defaults(for: .mp4, recorded: recorded, scale: 2, hasMicrophone: false).sound == RecordingSettings.Sound.none)
         // A GIF starts at the size the area had on screen.
         #expect(RecordingRule.defaults(for: .gif, recorded: recorded, scale: 2, hasMicrophone: true)
-            == RecordingSettings(format: .gif, width: 1000, frameRate: 15, sound: .none))
+            == RecordingSettings(format: .gif, percent: 50, frameRate: 15, sound: .none))
+        #expect(RecordingRule.defaults(for: .gif, recorded: recorded, scale: 1, hasMicrophone: true).percent == 100)
+    }
+
+    @Test func sizesAreShareOfTheRecording() {
+        #expect(RecordingRule.sizes == [100, 75, 50, 25])
+        let recorded = (width: 1898, height: 948)
+        let half = RecordingRule.size(percent: 50, format: .mp4, recorded: recorded)
+        #expect(half.width == 948 && half.height == 474)
+        let quarter = RecordingRule.size(percent: 25, format: .gif, recorded: recorded)
+        #expect(quarter.width % 2 == 0 && quarter.height % 2 == 0 && quarter.width == 474)
     }
 }
 
@@ -376,10 +386,10 @@ private func lzwDecode(_ data: [UInt8], minimumCodeSize: Int, count: Int) throws
     }
 
     @Test func settingsCarryTheTrim() {
-        var s = RecordingSettings(format: .mp4, width: 100, frameRate: 30, sound: .none)
+        var s = RecordingSettings(format: .mp4, percent: 100, frameRate: 30, sound: .none)
         #expect(s.trim == nil)
         s.trim = Trim(start: 1, end: 2)
-        #expect(s != RecordingSettings(format: .mp4, width: 100, frameRate: 30, sound: .none))
+        #expect(s != RecordingSettings(format: .mp4, percent: 100, frameRate: 30, sound: .none))
     }
 }
 

@@ -32,14 +32,47 @@ public nonisolated struct Recording: Sendable {
     }
 
     /// Where recordings are kept, each in a folder of its own. Nothing in it outlives its
-    /// window, and at launch, with no window open, it is emptied of anything a crash left.
+    /// window; at launch, what a crash left is removed (`removeLeftovers`).
     public static let parentFolder = FileManager.default.temporaryDirectory.appendingPathComponent("Shotts Recordings", isDirectory: true)
 
-    /// A new, empty folder for one recording.
+    /// The folders this process is using, each held by a lock on a file in it, kept open until
+    /// the folder goes. Another Shotts starting, which removes leftovers, leaves a held folder
+    /// alone; a crash lets go of the lock, so a crash's folders are taken.
+    nonisolated(unsafe) private static var held: [URL: Int32] = [:]
+    private static let heldLock = NSLock()
+    private static let lockName = ".in-use"
+
+    /// A new, empty folder for one recording, held until `removeFolder`.
     public static func makeFolder() throws -> URL {
         let folder = parentFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let fd = open(folder.appendingPathComponent(lockName).path, O_CREAT | O_RDWR | O_CLOEXEC, 0o600)
+        if fd >= 0, flock(fd, LOCK_EX | LOCK_NB) == 0 {
+            heldLock.withLock { held[folder] = fd }
+        } else if fd >= 0 {
+            close(fd)
+        }
         return folder
+    }
+
+    /// Lets go of a folder and deletes it, with everything made in it.
+    public static func removeFolder(_ folder: URL) {
+        if let fd = heldLock.withLock({ held.removeValue(forKey: folder) }) { close(fd) }
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    /// Removes the folders no running Shotts holds: what a crash left behind.
+    public static func removeLeftovers() {
+        let folders = (try? FileManager.default.contentsOfDirectory(at: parentFolder, includingPropertiesForKeys: nil)) ?? []
+        for folder in folders {
+            let fd = open(folder.appendingPathComponent(lockName).path, O_RDWR | O_CLOEXEC)
+            if fd >= 0 {
+                let free = flock(fd, LOCK_EX | LOCK_NB) == 0
+                close(fd)
+                guard free else { continue }
+            }
+            try? FileManager.default.removeItem(at: folder)
+        }
     }
 }
 
@@ -109,7 +142,7 @@ public nonisolated enum RecordingExport {
             }
         }
         let videoRange = try await video.load(.timeRange)
-        let size = RecordingRule.size(width: settings.width, format: settings.format, recorded: (recording.width, recording.height))
+        let size = RecordingRule.size(percent: settings.percent, format: settings.format, recorded: (recording.width, recording.height))
         let job = Job(assets: assets, video: (video, videoRange), sounds: sounds, kept: kept, size: size, rate: settings.frameRate, to: url, progress: progress)
         try? FileManager.default.removeItem(at: url)
         do {

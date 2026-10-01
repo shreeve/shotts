@@ -32,9 +32,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         if MoveToApplications.offerIfNeeded() { return }
         #endif
         NSApp.mainMenu = makeMainMenu()
-        // Recordings live only while their windows are open; none is open at launch, so
-        // anything left is from a crash.
-        try? FileManager.default.removeItem(at: Recording.parentFolder)
         flow.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
         let capture = HotKey.registerF10 { [weak self] in self?.flow.begin() }
         let showLast = HotKey.registerF10(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
@@ -46,6 +43,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             return
         }
         #endif
+        // Recordings live only while their windows are open: what no running Shotts holds is
+        // from a crash. Not under a developer switch, which another Shotts may be running beside.
+        Recording.removeLeftovers()
         updater.startUpdater()
     }
 

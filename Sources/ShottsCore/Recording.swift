@@ -22,17 +22,17 @@ public struct RecordingSettings: Equatable, Sendable {
     }
 
     public var format: Format
-    /// In pixels; the height follows the recording's proportions.
-    public var width: Int
+    /// The file's size as a percentage of the recording's, one of `RecordingRule.sizes`.
+    public var percent: Int
     public var frameRate: Int
     /// MP4 only: GIFs are silent.
     public var sound: Sound
     /// The part of the recording kept; nil keeps all of it.
     public var trim: Trim?
 
-    public init(format: Format, width: Int, frameRate: Int, sound: Sound, trim: Trim? = nil) {
+    public init(format: Format, percent: Int, frameRate: Int, sound: Sound, trim: Trim? = nil) {
         self.format = format
-        self.width = width
+        self.percent = percent
         self.frameRate = frameRate
         self.sound = sound
         self.trim = trim
@@ -182,6 +182,15 @@ public enum RecordingRule {
         return max(2, Int(Double(recorded.width) * fit) / 2 * 2)
     }
 
+    /// The sizes a file can be, as percentages of the recording: what matters is how big it is
+    /// beside what was recorded, not its count of pixels.
+    public static let sizes = [100, 75, 50, 25]
+
+    /// A file's size in pixels at `percent` of the recording, by `size(width:format:recorded:)`.
+    public static func size(percent: Int, format: RecordingSettings.Format, recorded: (width: Int, height: Int)) -> (width: Int, height: Int) {
+        size(width: recorded.width * percent / 100, format: format, recorded: recorded)
+    }
+
     /// The narrowest a file can be.
     public static let minWidth = 16
 
@@ -194,17 +203,16 @@ public enum RecordingRule {
     }
 
     /// Where a recording's window starts: MP4 at the recording's full size and 30 frames a second,
-    /// with the microphone if it was recorded; GIF at the size the area had on screen and 15
-    /// frames a second. The Mac's own sound is kept only when asked for.
+    /// with the microphone if it was recorded; GIF at the size the area had on screen (half, from
+    /// a Retina display) and 15 frames a second. The Mac's own sound is kept only when asked for.
     public static func defaults(for format: RecordingSettings.Format, recorded: (width: Int, height: Int), scale: Double,
                                 hasMicrophone: Bool) -> RecordingSettings {
         switch format {
         case .mp4:
-            RecordingSettings(format: .mp4, width: maxWidth(for: .mp4, recorded: recorded), frameRate: 30,
+            RecordingSettings(format: .mp4, percent: 100, frameRate: 30,
                               sound: hasMicrophone ? .microphone : .none)
         case .gif:
-            RecordingSettings(format: .gif, width: size(width: Int(Double(recorded.width) / max(scale, 1)), format: .gif, recorded: recorded).width,
-                              frameRate: 15, sound: .none)
+            RecordingSettings(format: .gif, percent: scale >= 2 ? 50 : 100, frameRate: 15, sound: .none)
         }
     }
 

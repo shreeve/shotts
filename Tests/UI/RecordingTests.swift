@@ -168,7 +168,7 @@ private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, 
         let recording = try await makeRecording()
         defer { try? FileManager.default.removeItem(at: recording.folder) }
         let url = recording.folder.appendingPathComponent("out.mp4")
-        try await RecordingExport.write(recording, settings: RecordingSettings(format: .mp4, width: 160, frameRate: 30, sound: .both), to: url)
+        try await RecordingExport.write(recording, settings: RecordingSettings(format: .mp4, percent: 50, frameRate: 30, sound: .both), to: url)
 
         let asset = AVURLAsset(url: url)
         let video = try #require(try await asset.loadTracks(withMediaType: .video).first)
@@ -186,7 +186,7 @@ private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, 
         let recording = try await makeRecording()
         defer { try? FileManager.default.removeItem(at: recording.folder) }
         let url = recording.folder.appendingPathComponent("out.mp4")
-        try await RecordingExport.write(recording, settings: RecordingSettings(format: .mp4, width: 320, frameRate: 60, sound: .none), to: url)
+        try await RecordingExport.write(recording, settings: RecordingSettings(format: .mp4, percent: 100, frameRate: 60, sound: .none), to: url)
         #expect(try await AVURLAsset(url: url).loadTracks(withMediaType: .audio).isEmpty)
     }
 
@@ -196,7 +196,7 @@ private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, 
         let recording = try await makeRecording()
         defer { try? FileManager.default.removeItem(at: recording.folder) }
         let url = recording.folder.appendingPathComponent("out.gif")
-        try await RecordingExport.write(recording, settings: RecordingSettings(format: .gif, width: 160, frameRate: 10, sound: .both), to: url)
+        try await RecordingExport.write(recording, settings: RecordingSettings(format: .gif, percent: 50, frameRate: 10, sound: .both), to: url)
         let gif = gifSummary(try Data(contentsOf: url))
         #expect(gif.width == 160 && gif.height == 100 && gif.loops)
         #expect(gif.delays == [10, 20, 70])
@@ -209,10 +209,10 @@ private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, 
         defer { try? FileManager.default.removeItem(at: recording.folder) }
         let trim = Trim(start: 0.15, end: 0.9)
         let gifURL = recording.folder.appendingPathComponent("out.gif")
-        try await RecordingExport.write(recording, settings: RecordingSettings(format: .gif, width: 160, frameRate: 10, sound: .none, trim: trim), to: gifURL)
+        try await RecordingExport.write(recording, settings: RecordingSettings(format: .gif, percent: 50, frameRate: 10, sound: .none, trim: trim), to: gifURL)
         #expect(gifSummary(try Data(contentsOf: gifURL)).delays == [10, 65])
         let mp4URL = recording.folder.appendingPathComponent("out.mp4")
-        try await RecordingExport.write(recording, settings: RecordingSettings(format: .mp4, width: 160, frameRate: 30, sound: .both, trim: trim), to: mp4URL)
+        try await RecordingExport.write(recording, settings: RecordingSettings(format: .mp4, percent: 50, frameRate: 30, sound: .both, trim: trim), to: mp4URL)
         let asset = AVURLAsset(url: mp4URL)
         #expect(abs(try await asset.load(.duration).seconds - 0.75) < 0.05)
         #expect(try await videoFrames(asset) == 2)
@@ -223,10 +223,26 @@ private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, 
         let recording = try await makeRecording(width: 1280, height: 720, times: (0..<60).map { Double($0) / 30 }, end: 2)
         defer { try? FileManager.default.removeItem(at: recording.folder) }
         let url = recording.folder.appendingPathComponent("out.gif")
-        let task = Task { try await RecordingExport.write(recording, settings: RecordingSettings(format: .gif, width: 1280, frameRate: 30, sound: .none), to: url) }
+        let task = Task { try await RecordingExport.write(recording, settings: RecordingSettings(format: .gif, percent: 100, frameRate: 30, sound: .none), to: url) }
         task.cancel()
         await #expect(throws: (any Error).self) { try await task.value }
         #expect(!FileManager.default.fileExists(atPath: url.path))
     }
 }
 
+
+@Suite struct RecordingFolderTests {
+    /// Another Shotts starting removes what a crash left, but never a folder a running Shotts
+    /// still holds.
+    @Test func leftoversGoButHeldFoldersStay() throws {
+        let held = try Recording.makeFolder()
+        defer { Recording.removeFolder(held) }
+        let leftover = Recording.parentFolder.appendingPathComponent("left by a crash", isDirectory: true)
+        try FileManager.default.createDirectory(at: leftover, withIntermediateDirectories: true)
+        Recording.removeLeftovers()
+        #expect(FileManager.default.fileExists(atPath: held.path))
+        #expect(!FileManager.default.fileExists(atPath: leftover.path))
+        Recording.removeFolder(held)
+        #expect(!FileManager.default.fileExists(atPath: held.path))
+    }
+}

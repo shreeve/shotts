@@ -61,15 +61,15 @@ enum DevSwitches {
         if let v = value(after: "--export-recording", 2) {
             // A recording's export, from any movie standing in for one (its sound as the Mac's,
             // and `--microphone file` as the microphone), as the recording window makes it:
-            // `--width`, `--fps`, and `--sound none|system|microphone|both`; the format by the
-            // output's extension.
+            // `--size` (a percentage), `--fps`, and `--sound none|system|microphone|both`; the
+            // format by the output's extension.
             let out = URL(fileURLWithPath: v[1])
             let microphone = value(after: "--microphone").map { URL(fileURLWithPath: $0[0]) }
-            let width = value(after: "--width").flatMap { Int($0[0]) }
+            let percent = value(after: "--size").flatMap { Int($0[0]) }
             let rate = value(after: "--fps").flatMap { Int($0[0]) }
             let sound = value(after: "--sound").flatMap { RecordingSettings.Sound(rawValue: $0[0]) }
             Task {
-                exit(await exportRecording(URL(fileURLWithPath: v[0]), microphone: microphone, to: out, width: width, rate: rate, sound: sound) ? 0 : 1)
+                exit(await exportRecording(URL(fileURLWithPath: v[0]), microphone: microphone, to: out, percent: percent, rate: rate, sound: sound) ? 0 : 1)
             }
         }
         if let v = value(after: "--capture-window", 2), let id = CGWindowID(v[0]) {
@@ -117,7 +117,7 @@ enum DevSwitches {
                             windows: [WindowInfo(id: 0, frame: CGRect(x: 700, y: 700, width: 600, height: 400))])
     }
 
-    static func exportRecording(_ movie: URL, microphone: URL?, to out: URL, width: Int?, rate: Int?, sound: RecordingSettings.Sound?) async -> Bool {
+    static func exportRecording(_ movie: URL, microphone: URL?, to out: URL, percent: Int?, rate: Int?, sound: RecordingSettings.Sound?) async -> Bool {
         do {
             let asset = AVURLAsset(url: movie)
             guard let track = try await asset.loadTracks(withMediaType: .video).first else { return false }
@@ -128,7 +128,7 @@ enum DevSwitches {
             let contents = try await RecordingExport.contents(of: recording)
             var settings = RecordingRule.defaults(for: format, recorded: (recording.width, recording.height), scale: 2,
                                                   hasMicrophone: contents.hasMicrophone)
-            if let width { settings.width = width }
+            if let percent { settings.percent = percent }
             if let rate { settings.frameRate = rate }
             if let sound { settings.sound = sound }
             let started = Date.now

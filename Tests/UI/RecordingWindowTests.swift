@@ -70,8 +70,8 @@ import Testing
     @Test func itMakesTheFileItsSettingsSay() async throws {
         let controller = try await window(for: try await testRecording())
         defer { controller.close() }
-        #expect(controller.current == RecordingSettings(format: .mp4, width: 320, frameRate: 30, sound: .microphone))
-        #expect(controller.widthField.integerValue == 320 && controller.heightLabel.stringValue == "× 200")
+        #expect(controller.current == RecordingSettings(format: .mp4, percent: 100, frameRate: 30, sound: .microphone))
+        #expect(controller.sizes.selectedTag() == 100 && controller.sizes.toolTip == "Size: 320 × 200 pixels")
         #expect(!controller.sounds.isHidden && controller.sounds.numberOfItems == 4)
         let file = try await waitForFile(controller)
         #expect(file.pathExtension == "mp4" && file.lastPathComponent.hasPrefix("Shotts Recording "))
@@ -87,7 +87,7 @@ import Testing
         controller.rateChanged()
         controller.formats.selectItem(at: 1)
         controller.formatChanged()
-        #expect(controller.current == RecordingSettings(format: .gif, width: 160, frameRate: 15, sound: .none))
+        #expect(controller.current == RecordingSettings(format: .gif, percent: 50, frameRate: 15, sound: .none))
         #expect(controller.sounds.isHidden)
         #expect(controller.rates.itemArray.map(\.tag) == [30, 20, 15, 12, 10])
         let gif = try await waitForFile(controller)
@@ -97,16 +97,17 @@ import Testing
         #expect(controller.current.frameRate == 60)
     }
 
-    /// A width is kept even and within the recording, and the height follows.
-    @Test func aTypedWidthIsKeptInBounds() async throws {
+    /// The size is a share of the recording: 100, 75, 50, or 25 percent, with the pixels it
+    /// comes to on hover.
+    @Test func theSizeIsAShareOfTheRecording() async throws {
         let controller = try await window(for: try await testRecording())
         defer { controller.close() }
-        controller.widthField.integerValue = 9999
-        controller.widthChanged()
-        #expect(controller.current.width == 320)
-        controller.widthField.integerValue = 161
-        controller.widthChanged()
-        #expect(controller.current.width == 160 && controller.heightLabel.stringValue == "× 100")
+        #expect(controller.sizes.itemArray.map(\.tag) == [100, 75, 50, 25])
+        #expect(controller.sizes.itemArray.map(\.title) == ["100%", "75%", "50%", "25%"])
+        controller.sizes.selectItem(withTag: 25)
+        controller.sizeChanged()
+        #expect(controller.current.percent == 25)
+        #expect(controller.sizes.toolTip == "Size: 80 × 50 pixels")
     }
 
     /// Copy puts the file itself on the pasteboard, as the Finder does.
