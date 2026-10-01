@@ -31,6 +31,11 @@ public nonisolated struct Recording: Sendable {
         self.started = started
     }
 
+    /// The same recording with no microphone, for when its file could not be finished.
+    public func withoutMicrophone() -> Recording {
+        Recording(folder: folder, movie: movie, microphone: nil, width: width, height: height, scale: scale, started: started)
+    }
+
     /// Where recordings are kept, each in a folder of its own. Nothing in it outlives its
     /// window; at launch, what a crash left is removed (`removeLeftovers`).
     public static let parentFolder = FileManager.default.temporaryDirectory.appendingPathComponent("Shotts Recordings", isDirectory: true)
@@ -42,10 +47,13 @@ public nonisolated struct Recording: Sendable {
     private static let heldLock = NSLock()
     private static let lockName = ".in-use"
 
-    /// A new, empty folder for one recording, held until `removeFolder`.
+    /// A new, empty folder for one recording, held until `removeFolder`, readable by its user
+    /// alone: it holds the screen and the microphone as they were recorded.
     public static func makeFolder() throws -> URL {
         let folder = parentFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let private0700: [FileAttributeKey: Any] = [.posixPermissions: 0o700]
+        try FileManager.default.createDirectory(at: parentFolder, withIntermediateDirectories: true, attributes: private0700)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false, attributes: private0700)
         let fd = open(folder.appendingPathComponent(lockName).path, O_CREAT | O_RDWR | O_CLOEXEC, 0o600)
         if fd >= 0, flock(fd, LOCK_EX | LOCK_NB) == 0 {
             heldLock.withLock { held[folder] = fd }
@@ -61,15 +69,19 @@ public nonisolated struct Recording: Sendable {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    /// Removes the folders no running Shotts holds: what a crash left behind.
+    /// Removes the folders no running Shotts holds: what a crash left behind. A folder with no
+    /// lock yet may be one another Shotts has just made and is about to lock, so it is left
+    /// for a minute.
     public static func removeLeftovers() {
-        let folders = (try? FileManager.default.contentsOfDirectory(at: parentFolder, includingPropertiesForKeys: nil)) ?? []
+        let folders = (try? FileManager.default.contentsOfDirectory(at: parentFolder, includingPropertiesForKeys: [.creationDateKey])) ?? []
         for folder in folders {
             let fd = open(folder.appendingPathComponent(lockName).path, O_RDWR | O_CLOEXEC)
             if fd >= 0 {
                 let free = flock(fd, LOCK_EX | LOCK_NB) == 0
                 close(fd)
                 guard free else { continue }
+            } else if let made = try? folder.resourceValues(forKeys: [.creationDateKey]).creationDate, made.timeIntervalSinceNow > -60 {
+                continue
             }
             try? FileManager.default.removeItem(at: folder)
         }
@@ -225,6 +237,7 @@ public nonisolated enum RecordingExport {
             defer { reader.cancelReading() }
             let scaler = try Scaler(width: size.width, height: size.height, format: format)
             var held: (image: CVPixelBuffer, time: Double)?
+            var reported = -1.0
             func hand(until next: Double) throws {
                 guard let (image, time) = held, let tick = FrameSampler.tick(for: time, until: next, rate: rate) else { return }
                 try body(try scaler.scale(image), tick)
@@ -235,7 +248,12 @@ public nonisolated enum RecordingExport {
                 let time = sample.presentationTimeStamp.seconds
                 try hand(until: time)
                 held = (image, time)
-                progress(span.lowerBound + (span.upperBound - span.lowerBound) * min(time / seconds, 1))
+                // In steps of a hundredth: each goes to the main thread.
+                let done = span.lowerBound + (span.upperBound - span.lowerBound) * min(time / seconds, 1)
+                if done - reported >= 0.01 {
+                    reported = done
+                    progress(done)
+                }
             }
             if reader.status == .failed { throw reader.error ?? Failure.failed("The recording could not be read.") }
             try hand(until: max(seconds, (held?.time ?? 0) + 0.001))
@@ -305,6 +323,8 @@ public nonisolated enum RecordingExport {
             defer { sound?.reader.cancelReading() }
 
             guard writer.startWriting() else { throw writer.error ?? Failure.failed("The file could not be written.") }
+            // A file given up on part way is cancelled, not left half-written.
+            defer { if writer.status == .writing { writer.cancelWriting() } }
             writer.startSession(atSourceTime: .zero)
             let end = duration
             var soundDone = sound == nil
@@ -394,7 +414,8 @@ public nonisolated enum RecordingExport {
     /// them, so text stays smooth rather than dropping pixels.
     private nonisolated final class Scaler {
         private let session: VTPixelTransferSession
-        private let width: Int, height: Int, format: OSType
+        /// Buffers of the output size, used again once whoever took one lets it go.
+        private let pool: CVPixelBufferPool
 
         init(width: Int, height: Int, format: OSType) throws {
             var session: VTPixelTransferSession?
@@ -406,19 +427,26 @@ public nonisolated enum RecordingExport {
             VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_DestinationColorPrimaries, value: kCVImageBufferColorPrimaries_ITU_R_709_2)
             VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_DestinationTransferFunction, value: kCVImageBufferTransferFunction_ITU_R_709_2)
             VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_DestinationYCbCrMatrix, value: kCVImageBufferYCbCrMatrix_ITU_R_709_2)
+            var pool: CVPixelBufferPool?
+            let attributes: [String: Any] = [
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height,
+                kCVPixelBufferPixelFormatTypeKey as String: format,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+            ]
+            guard CVPixelBufferPoolCreate(nil, nil, attributes as CFDictionary, &pool) == kCVReturnSuccess, let pool else {
+                throw Failure.failed("Frames could not be scaled.")
+            }
             self.session = session
-            self.width = width
-            self.height = height
-            self.format = format
+            self.pool = pool
         }
 
         deinit { VTPixelTransferSessionInvalidate(session) }
 
-        /// A new buffer each time: the writer may still hold the one before.
+        /// A buffer from the pool, not one the writer still holds.
         func scale(_ image: CVPixelBuffer) throws -> CVPixelBuffer {
             var out: CVPixelBuffer?
-            let attributes = [kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any]()] as CFDictionary
-            guard CVPixelBufferCreate(nil, width, height, format, attributes, &out) == kCVReturnSuccess, let out,
+            guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &out) == kCVReturnSuccess, let out,
                   VTPixelTransferSessionTransferImage(session, from: image, to: out) == noErr
             else { throw Failure.failed("Frames could not be scaled.") }
             return out

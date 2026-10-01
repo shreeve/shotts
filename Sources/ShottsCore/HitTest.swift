@@ -13,17 +13,19 @@ public enum HitTest {
     static func hits(_ p: CGPoint, _ a: Annotation, scale: Double, tolerance: Double) -> Bool {
         let width = a.style.stroke(scale: scale)
         let reach = tolerance + width / 2
+        /// A rectangle's or ellipse's stroke line: drawn inside it, centered half a width in.
+        func strokeLine(_ rect: CGRect) -> CGRect {
+            let r = rect.standardized
+            return r.insetBy(dx: min(width / 2, r.width / 2), dy: min(width / 2, r.height / 2))
+        }
         switch a.shape {
         case .arrow, .callout, .line:
             return arrowPart(at: p, of: a, scale: scale, tolerance: tolerance) != nil
         case let .rectangle(rect, filled):
-            // The stroke is drawn inside the rectangle, centered half a width in.
-            let r = rect.standardized
-            let line = r.insetBy(dx: min(width / 2, r.width / 2), dy: min(width / 2, r.height / 2))
+            let line = strokeLine(rect)
             return line.insetBy(dx: -reach, dy: -reach).contains(p) && (filled || !line.insetBy(dx: reach, dy: reach).contains(p))
         case let .ellipse(rect, filled):
-            let r = rect.standardized
-            let line = r.insetBy(dx: min(width / 2, r.width / 2), dy: min(width / 2, r.height / 2))
+            let line = strokeLine(rect)
             guard line.width > 0, line.height > 0 else { return line.insetBy(dx: -reach, dy: -reach).contains(p) }
             // Distance to the ellipse to first order: its implicit function over its gradient.
             let a = line.width / 2, b = line.height / 2

@@ -5,36 +5,19 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.4.0 is released: tag `v0.4.0` on `main` (commit "Shotts 0.4.0"), the GitHub release with its
-notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#27);
-installed copies are offered it through Sparkle. 0.4.0 (shreeve/shotts#63) runs on macOS 14
-Sonoma and later, not yet tried on anything but 27. 0.3.1 (shreeve/shotts#62) zips the app without
-the build machine's extended attributes. 0.3.0 (shreeve/shotts#61) adds About Shotts at
-the top of the menu bar menu and the app menu. 0.2.9 (shreeve/shotts#60) offers to move itself
-into Applications when opened elsewhere, checked by hand with a zip downloaded in Chrome. Test
-a download through a browser: a zip fetched by clicking a link inside the Claude app gets a
-quarantine Gatekeeper calls "damaged", though the app is fine. 0.2.8 (shreeve/shotts#59) adds the Line tool. 0.2.7 (shreeve/shotts#58): Return
-starts a new line and only Command-Return finishes typing. 0.2.6 (shreeve/shotts#57): the arrow
-keys nudge the selection, Option-Return breaks a line, and a new capture replaces the editor in
-front. 0.2.5 (shreeve/shotts#56): F10 no longer brings Shotts to the front (the picker is a
-non-activating panel), a wide picture prints turned onto a portrait page, and the menu bar
-options follow a capture's order. 0.2.4 (shreeve/shotts#55): Escape cancels typing, and
-Trebuchet and the Show Hints option are gone. 0.2.3 (shreeve/shotts#54) made the screen live
-while capturing, kept the editor open with Option-F10 to bring the last capture back, and added
-New Window per Capture; 0.2.2 printed through the standard Print window; 0.2.1 fixed 0.2.0's
-hidden bar. 0.2.0 is the revamp (shreeve/shotts#51, merge commit c24b093): a correctness,
-security, and performance pass over the whole app, plus Open Sans; `CHANGELOG.md` says what
-changed for users. Screen recording (Command as the drag ends; MP4 and Shotts' own GIF encoder)
-is built, under Unreleased in `CHANGELOG.md`, and not yet released. The build has no warnings
-(warnings are errors) and `swift test` passes: 74 Core tests and 82 AppKit tests.
+0.4.0 is the latest release (tag `v0.4.0`, Homebrew cask shreeve/homebrew-tap#27, offered through
+Sparkle); `CHANGELOG.md` has every release. Since then: screen recording (shreeve/shotts#64) and
+a second revamp, both under Unreleased in `CHANGELOG.md`, for 0.5.0. The build has no warnings
+(warnings are errors) and `swift test` passes: 86 Core tests and 84 AppKit tests. Shotts has
+only ever run on macOS 27, and recording has been tried by hand only briefly.
 
 Next, in order:
 
-1. Use 0.4.0 by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
+1. Use `main` by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
    and headless renders check a lot, but they missed 0.2.0's hidden bar, which only a real window
    showed: look at the bar first, then a capture, every tool, copy into Mail or Notes (it should
    paste at on-screen size), save, drag out, F10 from inside an editor, two displays.
-2. Check 0.4.0 on macOS 14, 15, and 26, in virtual machines (UTM runs them on Apple
+2. Check the next release on macOS 14, 15, and 26, in virtual machines (UTM runs them on Apple
    silicon). The target is macOS 14, where ScreenCaptureKit gained what Shotts uses (the one-shot
    window capture, `captureResolution`, and the shadow switches), and it builds and tests there,
    but it has only ever run on macOS 27. Watch what could differ: the editor and Option-F10
@@ -47,9 +30,13 @@ Next, in order:
    and resume, changing the screen while paused; stop with F10, the bar, and the menu bar item;
    trim with both brackets; in the window, save an MP4 and a GIF at a few sizes
    and rates, copy each into Messages and Mail, drag one to the Finder, close, and check the
-   folder under `Recording.parentFolder` is gone. Record an area that includes the menu bar and
-   check the timer is not in it.
-4. Deferred work, below. New changes collect under a `## Unreleased` heading in `CHANGELOG.md`.
+   folder under `Recording.parentFolder` is gone, while the copied file still pastes. Record an
+   area that includes the menu bar and check the timer is not in it. Quit while recording: it
+   stops and opens instead. Compare a recording's colors in QuickTime with the screen (it is
+   captured in BT.709 to match its tags).
+4. Before shipping 0.5.0, update an installed 0.4.0 to it through Sparkle (`docs/RELEASING.md`,
+   "Testing an update"): the app now ships Sparkle thinned to arm64 without its headers.
+5. Deferred work, below.
 
 Decided against, so they are not rebuilt:
 
@@ -70,6 +57,13 @@ Deferred, with the reason each waits:
   selection's width or font.
 - VoiceOver sees the canvas as one image; annotations are not accessibility elements.
 - If one display fails to picture, the whole capture fails rather than leaving that display out.
+- Crash recovery: a recording's movie is written in fragments, so a crash leaves it playable, but
+  the next launch removes it as a leftover instead of offering it back.
+- Pausing a recording drops samples but leaves the stream running (and the GPU busy) until it
+  resumes; stopping and restarting the stream would need its own frame-continuity handling.
+- The second revamp's audit tables (deferred rows: Sparkle feed signing, text/TextBox overlap in
+  `Annotation`, one-pass GIF export, an `EditorStack` with tests for replacement and focus) are
+  summarized here; the full rows lived outside the repository.
 - Not built: see SPEC.
 
 ## Map
@@ -86,14 +80,15 @@ Deferred, with the reason each waits:
 | | `Selection.swift` | `SelectionRule`: the drag rectangle rules the picker and the shape tools share. |
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
-| | `Recording.swift` | `RecordingSettings` (format, width, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), `GIFTiming`. |
-| | `GIF.swift` | The GIF encoder: `BlueNoise` (void-and-cluster), `PaletteBuilder` (exact prominent colors, median cut for the rest), `Quantizer` (blue-noise dithering), `GIFWriter` (GIF89a, changed rectangles only), `LZW`. |
+| | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
+| | `GIF.swift` | The GIF encoder: `BlueNoise` (void-and-cluster), `PaletteBuilder` (exact prominent colors, median cut for the rest), `Quantizer` (blue-noise dithering), `GIFWriter` (GIF89a, changed rectangles only), `GIFTiming`, `LZW`. |
 | ShottsUI | `AreaSelection.swift` | The picker: `DisplayImage` (a display's latest picture, its windows, and `cut`), one overlay window per display, the crosshair, magnifier, hints, window outlines, `PixelSampler`. |
 | | `EditorWindow.swift` | `EditorWindowController`: the bar, copy, save, print, closing, resizing, the drag grip, remembered tool and style. |
 | | `CanvasView.swift` | The picture with its annotations, every tool's mouse handling, text entry (`TextEntry`), selection drawing. |
 | | `Renderer.swift` | Draws a `Document` into any `CGContext`; measures text; an annotation's extent. |
 | | `StylePopover.swift` | The color and style popover. |
-| | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file. |
+| | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file, one-file temporary folders. |
+| | `Front.swift` | The one way Shotts comes to the front, and the one way it hands focus back. |
 | | `RecordingSetup.swift` | The red outline around an area being recorded, and the panel beside it: Record, Microphone, and Cancel, then the recording bar (Arrow, Rectangle, Pause, Stop). |
 | | `DrawingLayer.swift` | The clear, recorded window over the area that takes arrows and rectangles while recording and fades each out. |
 | | `Timeline.swift` | The recording window's timeline: play, the playhead, and the trim brackets. |
@@ -111,8 +106,8 @@ Deferred, with the reason each waits:
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
 `capture.askedPermission` once the system's permission prompt has been shown, `editor.newWindows`,
-`recording.microphone`; the editor's last
-style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
+`recording.microphone`, `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
+editor's last style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 
 ## The seam
 
@@ -191,19 +186,26 @@ exactly over the area that lets every click through until a tool is on. Shapes a
 zoom of one over the display's scale; each is opaque for four seconds and fades over one, a
 timer redrawing only while any are showing. The recorder leaves out Shotts' windows above layer
 0 but keeps the layer (`keptNumbers`), so what is drawn is recorded. Pause and resume go to
-`Recorder`, whose `PauseClock` (Core) takes the paused time out: samples from within a pause
-are dropped, later ones move back by the time paused, and the last frame that came while paused
-is written at the resume, since an unchanging screen sends no new one.
+`Recorder`, which asks Core's `RecordingTimeline` where each sample goes: samples from within a
+pause are dropped, later ones move back by the time paused, the last frame that came while
+paused is written at the resume (an unchanging screen sends no new one), and a frame the
+encoder was not ready for is offered again with the next sample and at the stop rather than
+lost; a frame from a pause already over is dropped. Quitting while recording
+(`applicationShouldTerminate`) stops it and opens its window, unless macOS has announced a
+logout or shutdown (`willPowerOffNotification`), which is never held up.
 
 `Recorder` streams the area with `SCStreamConfiguration.sourceRect` at full pixels, 4:2:0
-(`420v`, BT.709), up to 60 frames a second, with the pointer and `capturesAudio` (the Mac's own
+(`420v`, captured in BT.709 to match the files' tags), up to 60 frames a second, with the pointer and `capturesAudio` (the Mac's own
 sound, Shotts' excluded). Only `.complete` frames are written: an idle stream sends frames with
-no picture, and the frame before goes on showing. The filter leaves out the setup's windows and
-every Shotts window above layer 0, which is the menu bar item. Everything is retimed to the first
+no picture, and the frame before goes on showing. The filter leaves out the outline, the panel,
+and every other Shotts window above layer 0 (the menu bar item among them), but keeps the
+drawing layer. Everything is retimed to the first
 frame, which starts both writers' sessions; the stop time ends them, so the last frame lasts
-until then. The movie is HEVC at quality 0.9 with the Mac's sound as AAC; the microphone
-(`AVCaptureSession`, resampled to 48 kHz mono) goes to its own `Microphone.m4a`, so the window
-can offer either sound, both, or none. All of it is in one folder under `Recording.parentFolder`,
+until then. The movie is HEVC at quality 0.9, a key frame at least every 2 s, with the Mac's
+sound as AAC; the microphone (`AVCaptureSession`, resampled to 48 kHz mono, its clock converted
+to the host's) goes to its own `Microphone.m4a`, so the window can offer either sound, both, or
+none. Both are written in 10 s fragments: a movie whose writer fails at the stop (a full disk)
+is kept with what it holds, and a microphone file that fails is dropped and the recording kept. All of it is in one folder under `Recording.parentFolder`,
 removed when the window closes. Each folder holds a lock on a file in it (`.in-use`) while it
 is in use; at launch `Recording.removeLeftovers` removes only the folders no running Shotts
 holds, which a crash leaves.
@@ -216,8 +218,9 @@ composition from just that part, so the first frame is the one showing at the tr
 `RecordingWindowController` keeps settings per format and, 250 ms after any change, makes the
 file for them in a folder of its own (`RecordingExport.write`), so a file still being made for
 earlier settings never meets it; files made earlier stay until the window closes, so one already
-copied still pastes. Copy writes the file's URL to the pasteboard; Save copies it; the grip drags
-it. `RecordingExport` reads the movie back with `AVAssetReader` through an `AVMutableComposition`,
+copied still pastes. Copy puts a copy of the file outside the recording's folder (one at a time,
+in `Shotts Copied`) on the pasteboard, so it pastes after the window closes; Save copies it off
+the main thread and replaces an existing file only once the copy worked; the grip drags it. `RecordingExport` reads the movie back with `AVAssetReader` through an `AVMutableComposition`,
 keeps the frames `FrameSampler` picks (the latest frame at each tick of the rate, so the last
 change before a pause is never lost), and scales them with `VTPixelTransferSession`, averaging
 as it shrinks. MP4: H.264 High, BT.709 tags, one AAC track mixed by
@@ -373,7 +376,7 @@ build ignores its arguments.
 | `--render in.png out.png [--crop]` | Draws one of every annotation on a picture and writes the PNG. |
 | `--print-pdf in.png out.pdf [--crop]` | Writes the same sample's print page as a PDF, laid out as Command-P would print it. |
 | `--preview-style out.png` | Draws the style popover off screen. |
-| `--select out.txt` | Runs the picker alone over a drawn stand-in for each display and writes `selected x,y,w,h on <display>`, `window <id> at x,y on <display>`, or `cancelled`. |
+| `--select out.txt` | Runs the picker alone over a drawn stand-in for each display and writes `selected x,y,w,h on <display>`, `window <id> at x,y on <display>`, `record x,y,w,h on <display>`, or `cancelled`. |
 | `--preview-overlay out.png [--dragged] [--dim] [--corner]` | Draws the picker off screen with the pointer three pixels inside the corner of the stand-in's square at 1600,1600, so the magnifier's mapping can be checked (`--dim` shows only with `--dragged`). |
 | `--capture-window <id> out.png [--no-shadow]` | Captures one window through ScreenCaptureKit (needs Screen Recording). |
 | `--preview-recording out.png [--recording]` | Draws the recording frame and the setup panel, or with `--recording` the recording bar, off screen over a light page. |
@@ -419,8 +422,14 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   As a sheet on the editor it took the editor's dark look and was squeezed to the window's
   height, cutting off its options.
 - `NSWindowController.close()` and `NSWindow.close()` skip `windowShouldClose`; only
-  `performClose` asks. Escape closed annotated captures without asking until it used
-  `performClose`.
+  `performClose` asks. Anything that must happen on every close goes in `windowWillClose`: a new
+  capture replacing an editor closes it with `close()`, and typing in it was lost until finishing
+  the text moved there.
+- A zip of a release fetched by clicking a link inside the Claude app gets a quarantine
+  Gatekeeper calls "damaged", though the app is fine; test downloads through a browser.
+- Swift Testing interleaves `@MainActor` tests at their `await`s, and a notification one test
+  posts is delivered later on the main queue, possibly to the next test's observer. The picker
+  tests are `.serialized` for that reason.
 - A sheet on a window that is never shown can end a test process quietly, and `swift test` then
   reports only the other target, exiting 0. Never show a real alert or sheet from a test.
 - Core Graphics sizes a transparency layer to the clip: without the clip to an annotation's

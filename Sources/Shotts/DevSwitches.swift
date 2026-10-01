@@ -126,7 +126,7 @@ enum DevSwitches {
                                       width: Int(size.width), height: Int(size.height), scale: 2, started: .now)
             let format: RecordingSettings.Format = out.pathExtension.lowercased() == "gif" ? .gif : .mp4
             let contents = try await RecordingExport.contents(of: recording)
-            var settings = RecordingRule.defaults(for: format, recorded: (recording.width, recording.height), scale: 2,
+            var settings = RecordingRule.defaults(for: format, scale: 2,
                                                   hasMicrophone: contents.hasMicrophone)
             if let percent { settings.percent = percent }
             if let rate { settings.frameRate = rate }

@@ -47,23 +47,30 @@ public enum Export {
         return "\(prefix) \(stamp).\(fileExtension)"
     }
 
-    /// Writes the PNG.
-    public static func write(_ document: Document, source: CGImage, to url: URL) throws {
+    /// Writes the PNG, and returns the picture written.
+    @discardableResult
+    public static func write(_ document: Document, source: CGImage, to url: URL) throws -> CGImage {
         guard let image = Renderer.image(of: document, source: source),
               let png = encode(image, scale: document.scale, as: .png) else { throw ExportError.render }
         try png.write(to: url, options: .atomic)
+        return image
     }
 
     /// A PNG for a drag out of the editor. It goes in one temporary folder that is emptied
     /// first, so no more than the latest drag's picture is ever left on disk: the app it was
     /// dropped on has had its copy by the next drag.
-    public static func temporaryFile(_ document: Document, source: CGImage) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Shotts Drag", isDirectory: true)
+    public static func temporaryFile(_ document: Document, source: CGImage) throws -> (url: URL, image: CGImage) {
+        let url = try temporaryFolder("Shotts Drag").appendingPathComponent(suggestedName())
+        return (url, try write(document, source: source, to: url))
+    }
+
+    /// A temporary folder of this name, emptied first, so it never holds more than the latest
+    /// file put in it: the app it went to has had its copy by the next. Readable by its user alone.
+    public static func temporaryFolder(_ name: String) throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(name, isDirectory: true)
         try? FileManager.default.removeItem(at: folder)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent(suggestedName())
-        try write(document, source: source, to: url)
-        return url
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return folder
     }
 
     public enum ExportError: Error { case render }

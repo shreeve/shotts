@@ -1,5 +1,6 @@
 import AppKit
 import ShottsCore
+import ShottsUI
 
 /// On a release build's launch from anywhere but an Applications folder, offers to move Shotts
 /// there, and does it: copies the bundle in, replacing an older copy; clears the download
@@ -14,10 +15,10 @@ enum MoveToApplications {
         let home = NSHomeDirectory()
         guard AppLocation.offersMove(bundlePath: running.path, home: home),
               !UserDefaults.standard.bool(forKey: skipKey) else { return false }
-        NSApp.activate(ignoringOtherApps: true)
+        Front.bringShotts()
         let alert = NSAlert()
         alert.messageText = "Move Shotts to your Applications folder?"
-        alert.informativeText = "There it stays put, and it can keep itself up to date."
+        alert.informativeText = "There it stays put, and it can keep itself up to date. The downloaded copy goes to the Trash."
         alert.addButton(withTitle: "Move to Applications")
         alert.addButton(withTitle: "Not Now")
         alert.showsSuppressionButton = true
@@ -40,8 +41,19 @@ enum MoveToApplications {
                          isDirectory: true)
         try files.createDirectory(at: folder, withIntermediateDirectories: true)
         let destination = folder.appendingPathComponent(running.lastPathComponent)
-        if files.fileExists(atPath: destination.path) { try files.trashItem(at: destination, resultingItemURL: nil) }
-        try files.copyItem(at: running, to: destination)
+        // Copied beside it first: a copy that fails leaves the Shotts already there as it was.
+        let staged = folder.appendingPathComponent(".\(UUID().uuidString)-\(running.lastPathComponent)")
+        var trashed: NSURL?
+        do {
+            try files.copyItem(at: running, to: staged)
+            if files.fileExists(atPath: destination.path) { try files.trashItem(at: destination, resultingItemURL: &trashed) }
+            try files.moveItem(at: staged, to: destination)
+        } catch {
+            // Back as it was: no half copy left, and the Shotts that was there out of the Trash.
+            try? files.removeItem(at: staged)
+            if let trashed = trashed as URL?, !files.fileExists(atPath: destination.path) { try? files.moveItem(at: trashed, to: destination) }
+            throw error
+        }
         // Downloaded is not installed: with the quarantine left on, macOS would run the copy from
         // a read-only stand-in where Sparkle cannot update it.
         removexattr(destination.path, "com.apple.quarantine", XATTR_NOFOLLOW)

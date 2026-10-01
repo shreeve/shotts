@@ -33,8 +33,26 @@ cp -R "$root/Support/Fonts" "$app/Contents/Resources/Fonts"
 # its own copy and an rpath that finds it.
 sparkle="$(find "$scratch/artifacts" -type d -name Sparkle.framework -path '*macos-arm64*' 2>/dev/null | head -1)"
 [ -n "$sparkle" ] || { echo "error: no Sparkle.framework for macos-arm64 under $scratch/artifacts" >&2; exit 1; }
-cp -R "$sparkle" "$app/Contents/Frameworks/Sparkle.framework"
+framework="$app/Contents/Frameworks/Sparkle.framework"
+cp -R "$sparkle" "$framework"
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$app/Contents/MacOS/Shotts"
+# Sparkle ships universal, with headers for building against it: Shotts runs on Apple silicon
+# only and builds against the copy in the build folder, so the app keeps the arm64 slices and
+# none of the headers. Its XPC services and translations stay: an update needs them.
+for binary in "$framework/Versions/B/Sparkle" "$framework/Versions/B/Autoupdate" \
+              "$framework/Versions/B/Updater.app/Contents/MacOS/Updater" \
+              "$framework"/Versions/B/XPCServices/*.xpc/Contents/MacOS/*; do
+    if lipo -archs "$binary" 2>/dev/null | grep -q x86_64; then lipo -thin arm64 "$binary" -output "$binary"; fi
+done
+rm -rf "$framework/Headers" "$framework/PrivateHeaders" "$framework/Modules" \
+       "$framework/Versions/B/Headers" "$framework/Versions/B/PrivateHeaders" "$framework/Versions/B/Modules"
+
+# A release ships without local symbols, about a third of the binary; the dSYM made first, kept
+# beside the app and never shipped, turns a crash log's addresses back into names.
+if [ "$config" = release ]; then
+    dsymutil "$app/Contents/MacOS/Shotts" -o "$scratch/Shotts.app.dSYM" >&2
+    strip -x "$app/Contents/MacOS/Shotts"
+fi
 
 # Every piece is signed with the same identity, inner components first, with the hardened
 # runtime for a real identity (ad-hoc signatures cannot use it: library validation refuses a
@@ -43,7 +61,6 @@ sign="${SIGN:-Developer ID Application: Steve Shreeve (SD6N7Z8P9P)}"
 options=()
 if [ "$sign" != "-" ]; then options=(--options=runtime); fi
 if [ "$sign" != "-" ] && [ "$config" = release ]; then options+=(--timestamp); fi
-framework="$app/Contents/Frameworks/Sparkle.framework"
 resign() { codesign --force --sign "$sign" ${options[@]+"${options[@]}"} "$@"; }
 resign "$framework/Versions/B/XPCServices/Installer.xpc"
 resign --preserve-metadata=entitlements "$framework/Versions/B/XPCServices/Downloader.xpc"

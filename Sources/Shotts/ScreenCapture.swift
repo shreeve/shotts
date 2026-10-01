@@ -46,11 +46,10 @@ enum ScreenCapture {
     }
 
     /// The ordinary windows on screen, front to back, in the window server's space (origin at
-    /// the primary display's top-left): layer 0, visible, at least 40 points each way, not
-    /// Shotts' own, and not ones their app keeps out of captures, which ScreenCaptureKit
-    /// would not picture.
-    /// The ordinary windows on screen, front to back: Shotts' editors among them, since what is on
-    /// screen can be captured, but not the picker, which sits far above ordinary windows.
+    /// the primary display's top-left): layer 0, visible, at least 40 points each way, and not
+    /// ones their app keeps out of captures, which ScreenCaptureKit would not picture. Shotts'
+    /// editors are among them, since what is on screen can be captured; the picker, far above
+    /// ordinary windows, is not.
     static func windowList() -> [(id: CGWindowID, frame: CGRect)] {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
         else { return [] }
@@ -67,9 +66,8 @@ enum ScreenCapture {
         }
     }
 
-    /// The windows that show on one display, in points from its top-left corner as the picker
-    /// measures. `CGDisplayBounds` is the display in the window server's space.
-    /// The windows in `list` that show on `display`, in points from its top-left corner.
+    /// The windows in `list` that show on `display`, in points from its top-left corner as the
+    /// picker measures. `CGDisplayBounds` is the display in the window server's space.
     static func windows(in list: [(id: CGWindowID, frame: CGRect)], on display: CGDirectDisplayID) -> [WindowInfo] {
         let bounds = CGDisplayBounds(display)
         return list.compactMap { id, frame in

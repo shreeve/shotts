@@ -23,6 +23,25 @@ public struct Document: Equatable, Sendable {
 
     public var pixelBounds: CGRect { CGRect(x: 0, y: 0, width: width, height: height) }
 
+    /// The scale of a picture opened from a file, which carries none of its own: its DPI when that
+    /// says more than 1x (`pixelWidth` over the `pointWidth` its DPI gives); otherwise, a picture
+    /// wider than the screen is taken for a capture from a display of `screenScale`.
+    public static func scale(ofFile pixelWidth: Int, pointWidth: Double, screenWidth: Double?, screenScale: Double) -> Double {
+        let dpi = Double(pixelWidth) / pointWidth
+        if dpi.isFinite, dpi > 1 { return dpi }
+        if let screenWidth, Double(pixelWidth) > screenWidth { return max(screenScale, 1) }
+        return 1
+    }
+
+    /// Whether the user has drawn on it or cropped it.
+    public var isEdited: Bool { !annotations.isEmpty || crop != nil }
+
+    /// Option-F10 brings back one closed capture: a capture closing takes its place, unless that
+    /// would put annotated work out for a capture with none.
+    public static func keepsAsLast(_ closed: Document, over kept: Document?) -> Bool {
+        closed.isEdited || !(kept?.isEdited ?? false)
+    }
+
     /// The part of the image the export shows.
     public var visibleRect: CGRect { crop?.intersection(pixelBounds) ?? pixelBounds }
 

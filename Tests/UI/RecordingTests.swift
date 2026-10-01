@@ -239,9 +239,18 @@ private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, 
         defer { Recording.removeFolder(held) }
         let leftover = Recording.parentFolder.appendingPathComponent("left by a crash", isDirectory: true)
         try FileManager.default.createDirectory(at: leftover, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.creationDate: Date.now.addingTimeInterval(-120)], ofItemAtPath: leftover.path)
+        // One with no lock yet, just made: another Shotts may be about to lock it.
+        let fresh = Recording.parentFolder.appendingPathComponent("being made", isDirectory: true)
+        try FileManager.default.createDirectory(at: fresh, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: fresh) }
         Recording.removeLeftovers()
         #expect(FileManager.default.fileExists(atPath: held.path))
         #expect(!FileManager.default.fileExists(atPath: leftover.path))
+        #expect(FileManager.default.fileExists(atPath: fresh.path))
+        // Private to its user.
+        let permissions = try FileManager.default.attributesOfItem(atPath: held.path)[.posixPermissions] as? Int
+        #expect(permissions == 0o700)
         Recording.removeFolder(held)
         #expect(!FileManager.default.fileExists(atPath: held.path))
     }

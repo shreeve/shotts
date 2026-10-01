@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.5.0 — 2026-09-30
 
 - Screen recording: hold Command as the drag ends to record the area. A small panel starts it,
   with or without the microphone; the menu bar item shows the time, and F10 or a click on it
@@ -18,6 +18,16 @@ Unreleased, whose heading becomes the version's when it ships.
   bracket at either end.
 - GIFs are made by Shotts' own encoder: one palette for the clip, flat colors kept exact, and
   blue-noise dithering, so gradients stay smooth and still areas stay still.
+- Option-F10 keeps annotated work: a capture closed without annotations no longer takes the
+  place of one with them.
+- A new capture replacing the editor keeps the words you were typing in it.
+- Option-F10 brings back a minimized editor.
+- Picking an area and pressing Escape before the screen came up no longer leaves the screen
+  being read behind the scenes.
+- A capture, copy, or opened image that fails now beeps instead of doing nothing.
+- Move to Applications copies the new Shotts in before it moves an old one to the Trash, and says
+  the download goes to the Trash.
+- The app is smaller: 3.8 MB instead of 5.8 MB, a 2.1 MB download instead of 2.7 MB.
 
 ## 0.4.0 — 2026-09-28
 

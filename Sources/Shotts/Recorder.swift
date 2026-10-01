@@ -21,16 +21,19 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
     /// The clock the microphone's times are on, which need not be the screen's.
     private var voiceClock: CMClock?
     /// The first frame's time, once it comes: everything is measured from it.
-    private var start: CMTime?
-    /// The pauses, in seconds from the first frame.
-    private var pauses = PauseClock()
-    /// The latest frame that came while paused, shown once recording resumes: the screen may
+    private var firstFrame: CMTime?
+    /// Where each sample goes, in seconds from the first frame (Core's `RecordingTimeline`).
+    private var timeline = RecordingTimeline()
+    /// The latest frame that came while paused, written when recording resumes: the screen may
     /// not change again for a while, and the frame before the pause is no longer what it shows.
-    private var frameWhilePaused: CMSampleBuffer?
-    /// Where the last frame written went, so a frame is never written before it.
-    private var lastFrame = -1.0
+    private var heldFrame: CMSampleBuffer?
+    /// A frame the writer was not ready for, and its place, offered again with the next sample
+    /// and at the stop: the screen sends no frame until it changes again.
+    private var unwritten: (buffer: CMSampleBuffer, place: Double)?
     private var recording: Recording?
-    /// Called on the main thread when the stream stops by itself, as when its display goes.
+    /// Called on the main thread when the stream stops by itself, as when its display goes. Set
+    /// before `start`, like everything outside `queue`: `start`, `pause`, `resume`, and `stop`
+    /// are called one at a time, from the main actor.
     var onInterrupted: (@MainActor () -> Void)?
 
     /// Starts recording `rect` (points from the top-left of the display `id`, which has `scale`
@@ -55,6 +58,9 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
                               scale: scale, started: .now)
 
         let movie = try AVAssetWriter(outputURL: movieURL, fileType: .mov)
+        // Written in fragments, so what was recorded before a full disk still plays and is kept.
+        // (After a crash the next launch removes it as a leftover; offering it back is not built.)
+        movie.movieFragmentInterval = CMTime(seconds: 10, preferredTimescale: 600)
         let video = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.hevc,
             AVVideoWidthKey: size.width,
@@ -69,6 +75,9 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
                 AVVideoQualityKey: 0.9,
                 AVVideoExpectedSourceFrameRateKey: RecordingRule.recordedFrameRate,
                 AVVideoAllowFrameReorderingKey: false,
+                // A key frame at least every two seconds, however seldom the screen changes, so
+                // the window's playhead and trim find a frame at once.
+                AVVideoMaxKeyFrameIntervalDurationKey: 2,
             ],
         ])
         video.expectsMediaDataInRealTime = true
@@ -78,7 +87,7 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         ])
         sound.expectsMediaDataInRealTime = true
         movie.add(sound)
-        guard movie.startWriting() else { throw movie.error ?? ScreenCapture.Failure.noDisplay }
+        guard movie.startWriting() else { throw movie.error ?? Failure.notWritten }
         queue.sync {
             self.movie = movie
             self.video = video
@@ -95,7 +104,8 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         configuration.captureResolution = .best
         configuration.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         configuration.colorMatrix = CGDisplayStream.yCbCrMatrix_ITU_R_709_2
-        configuration.colorSpaceName = CGColorSpace.sRGB
+        // The color space the files are tagged with, so players show what was on screen.
+        configuration.colorSpaceName = CGColorSpace.itur_709
         configuration.showsCursor = true
         configuration.ignoreShadowsDisplay = false
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(RecordingRule.recordedFrameRate))
@@ -127,6 +137,7 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         guard session.canAddOutput(output) else { throw Failure.noMicrophone }
         session.addOutput(output)
         let writer = try AVAssetWriter(outputURL: url, fileType: .m4a)
+        writer.movieFragmentInterval = CMTime(seconds: 10, preferredTimescale: 600)
         let voice = AVAssetWriterInput(mediaType: .audio, outputSettings: [
             AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 128_000,
         ])
@@ -143,11 +154,13 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
 
     enum Failure: LocalizedError {
         case noMicrophone
+        case notWritten
         case nothingRecorded
 
         var errorDescription: String? {
             switch self {
             case .noMicrophone: "The microphone could not be used."
+            case .notWritten: "The recording could not be written."
             case .nothingRecorded: "Nothing was recorded."
             }
         }
@@ -155,77 +168,96 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
 
     /// How long it has been recording, from its first frame, not counting pauses.
     var elapsed: TimeInterval {
-        queue.sync { now().map { pauses.elapsed(at: $0) } ?? 0 }
+        queue.sync { now().map { timeline.elapsed(at: $0) } ?? 0 }
     }
 
-    var isPaused: Bool { queue.sync { pauses.isPaused } }
+    var isPaused: Bool { queue.sync { timeline.isPaused } }
 
     /// Seconds since the first frame, once it has come.
     private func now() -> Double? {
-        start.map { (CMClockGetTime(CMClockGetHostTimeClock()) - $0).seconds }
+        firstFrame.map { (CMClockGetTime(CMClockGetHostTimeClock()) - $0).seconds }
     }
 
     /// Stops taking frames and sound until `resume`; the recording goes straight on from here.
     func pause() {
         queue.sync {
             guard let now = now() else { return }
-            pauses.pause(at: now)
+            timeline.pause(at: now)
         }
     }
 
     func resume() {
         queue.sync {
-            guard let now = now(), pauses.isPaused else { return }
-            pauses.resume(at: now)
-            if let frame = frameWhilePaused {
-                frameWhilePaused = nil
-                append(frame, to: video, at: pauses.elapsed(at: now))
-            }
+            let frame = heldFrame
+            heldFrame = nil
+            guard let now = now(), let place = timeline.resume(at: now), let frame else { return }
+            writeFrame(frame, at: place)
         }
     }
 
-    /// Stops, and finishes the files: the last frame lasts until now.
+    /// Stops, and finishes the files: the last frame lasts until now. The video is what makes a
+    /// recording: if only the microphone's file fails, the recording is kept without it.
     func stop() async throws -> Recording {
         try? await stream?.stopCapture()
         stream = nil
         capture?.stopRunning()
         capture = nil
-        let (writers, end) = queue.sync { () -> ([AVAssetWriter], CMTime?) in
-            let end = now().map { CMTime(seconds: pauses.elapsed(at: $0), preferredTimescale: 1_000_000_000) }
+        let (movie, voice, end) = queue.sync { () -> (AVAssetWriter?, AVAssetWriter?, CMTime?) in
+            // A frame still waiting gets one last chance before the end.
+            if let (buffer, place) = unwritten {
+                for _ in 0..<50 where video?.isReadyForMoreMediaData == false { usleep(10_000) }
+                writeFrame(buffer, at: place)
+            }
+            unwritten = nil
+            heldFrame = nil
+            let end = now().map { CMTime(seconds: timeline.elapsed(at: $0), preferredTimescale: 1_000_000_000) }
             video?.markAsFinished()
             sound?.markAsFinished()
-            voice?.input.markAsFinished()
-            let writers = [movie, voice?.writer].compactMap { $0 }
-            movie = nil; video = nil; sound = nil; voice = nil
-            return (writers, end)
+            self.voice?.input.markAsFinished()
+            defer { self.movie = nil; video = nil; sound = nil; self.voice = nil }
+            return (self.movie, self.voice?.writer, end)
         }
-        guard let recording else { throw Failure.nothingRecorded }
-        guard let end, end > .zero else {
-            writers.forEach { $0.cancelWriting() }
+        guard var recording else { throw Failure.nothingRecorded }
+        guard let movie, let end, end > .zero else {
+            movie?.cancelWriting()
+            voice?.cancelWriting()
             Recording.removeFolder(recording.folder)
             throw Failure.nothingRecorded
         }
-        for writer in writers {
-            writer.endSession(atSourceTime: end)
-            await writer.finishWriting()
+        movie.endSession(atSourceTime: end)
+        await movie.finishWriting()
+        guard movie.status == .completed else {
+            voice?.cancelWriting()
+            // A disk that filled up leaves the fragments written before it, which still play.
+            if let video = try? await AVURLAsset(url: recording.movie).loadTracks(withMediaType: .video).first,
+               let range = try? await video.load(.timeRange), range.duration > .zero {
+                return recording.withoutMicrophone()
+            }
+            Recording.removeFolder(recording.folder)
+            throw movie.error ?? Failure.notWritten
         }
-        guard let failed = writers.first(where: { $0.status != .completed }) else { return recording }
-        Recording.removeFolder(recording.folder)
-        throw failed.error ?? Failure.nothingRecorded
+        if let voice {
+            voice.endSession(atSourceTime: end)
+            await voice.finishWriting()
+            if voice.status != .completed, let url = recording.microphone {
+                try? FileManager.default.removeItem(at: url)
+                recording = recording.withoutMicrophone()
+            }
+        }
+        return recording
     }
 
     // MARK: - Samples, on `queue`
 
-    /// A sample buffer moved to the recording's own time, from its first frame: `by` is
-    /// subtracted from every time in it.
-    private func retimed(_ buffer: CMSampleBuffer, by start: CMTime) -> CMSampleBuffer? {
+    /// A sample buffer moved to the recording's own time: every time in it shifted by `by`.
+    private func retimed(_ buffer: CMSampleBuffer, by shift: CMTime) -> CMSampleBuffer? {
         var count: CMItemCount = 0
         CMSampleBufferGetSampleTimingInfoArray(buffer, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count)
         var timing = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(), count: count)
         CMSampleBufferGetSampleTimingInfoArray(buffer, entryCount: count, arrayToFill: &timing, entriesNeededOut: &count)
         for i in timing.indices {
-            timing[i].presentationTimeStamp = timing[i].presentationTimeStamp - start
-            if timing[i].decodeTimeStamp.isValid { timing[i].decodeTimeStamp = timing[i].decodeTimeStamp - start }
+            timing[i].presentationTimeStamp = timing[i].presentationTimeStamp - shift
+            if timing[i].decodeTimeStamp.isValid { timing[i].decodeTimeStamp = timing[i].decodeTimeStamp - shift }
         }
         var out: CMSampleBuffer?
         CMSampleBufferCreateCopyWithNewTiming(allocator: nil, sampleBuffer: buffer, sampleTimingEntryCount: count,
@@ -233,26 +265,58 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         return out
     }
 
-    /// Appends a buffer whose times are on `clock` (the host's, as the screen's are, unless
-    /// given), at its place in the recording: measured from the first frame with the pauses
-    /// taken out, or `at` seconds when given. Anything from before the first frame, or from
-    /// within a pause, is dropped; a frame from within a pause is kept aside for the resume.
-    private func append(_ buffer: CMSampleBuffer, to input: AVAssetWriterInput?, clock: CMClock? = nil, at forced: Double? = nil) {
-        guard let start, let input else { return }
-        let time = buffer.presentationTimeStamp
-        let host = clock.map { CMSyncConvertTime(time, from: $0, to: CMClockGetHostTimeClock()) } ?? time
-        guard host >= start else { return }
-        guard let place = forced ?? pauses.recorded((host - start).seconds) else {
-            if input === video { frameWhilePaused = buffer }
-            return
+    /// Seconds after the first frame of a sample on `clock` (the host's, as the screen's are,
+    /// unless given); nil before the first frame.
+    private func time(of buffer: CMSampleBuffer, clock: CMClock? = nil) -> Double? {
+        guard let firstFrame else { return nil }
+        let pts = buffer.presentationTimeStamp
+        let host = clock.map { CMSyncConvertTime(pts, from: $0, to: CMClockGetHostTimeClock()) } ?? pts
+        return host >= firstFrame ? (host - firstFrame).seconds : nil
+    }
+
+    /// Appends `buffer` to `input` with its first sample at `place` seconds, if the writer will
+    /// take it now.
+    @discardableResult
+    private func append(_ buffer: CMSampleBuffer, to input: AVAssetWriterInput?, at place: Double) -> Bool {
+        guard let input, input.isReadyForMoreMediaData,
+              let moved = retimed(buffer, by: buffer.presentationTimeStamp - CMTime(seconds: place, preferredTimescale: 1_000_000_000))
+        else { return false }
+        return input.append(moved)
+    }
+
+    /// A frame at `place`, or kept to be offered again when the writer is busy.
+    private func writeFrame(_ buffer: CMSampleBuffer, at place: Double) {
+        if append(buffer, to: video, at: place) {
+            timeline.wrote(frameAt: place)
+            unwritten = nil
+        } else {
+            unwritten = (buffer, place)
         }
-        if input === video {
-            guard place > lastFrame else { return }
-            lastFrame = place
+    }
+
+    private func received(frame buffer: CMSampleBuffer) {
+        if firstFrame == nil {
+            firstFrame = buffer.presentationTimeStamp
+            movie?.startSession(atSourceTime: .zero)
+            voice?.writer.startSession(atSourceTime: .zero)
         }
-        guard input.isReadyForMoreMediaData,
-              let moved = retimed(buffer, by: time - CMTime(seconds: place, preferredTimescale: 1_000_000_000)) else { return }
-        input.append(moved)
+        guard let time = time(of: buffer) else { return }
+        switch timeline.frame(at: time) {
+        case let .write(place): writeFrame(buffer, at: place)
+        case .hold: heldFrame = buffer
+        case .drop: break
+        }
+    }
+
+    /// Offers the waiting frame again, before anything newer.
+    private func retryUnwritten() {
+        guard let (buffer, place) = unwritten else { return }
+        writeFrame(buffer, at: place)
+    }
+
+    private func received(sound buffer: CMSampleBuffer, to input: AVAssetWriterInput?, clock: CMClock? = nil) {
+        guard let time = time(of: buffer, clock: clock), let place = timeline.sound(at: time) else { return }
+        append(buffer, to: input, at: place)
     }
 }
 
@@ -265,22 +329,21 @@ extension Recorder: SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSa
             // and the frame before goes on showing.
             guard let info = (CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]])?.first,
                   let raw = info[.status] as? Int, SCFrameStatus(rawValue: raw) == .complete, buffer.imageBuffer != nil
-            else { return }
-            if start == nil {
-                start = buffer.presentationTimeStamp
-                movie?.startSession(atSourceTime: .zero)
-                voice?.writer.startSession(atSourceTime: .zero)
-            }
-            append(buffer, to: video)
+            else { retryUnwritten(); return }
+            // A newer frame supersedes one still waiting.
+            unwritten = nil
+            received(frame: buffer)
         case .audio:
-            append(buffer, to: sound)
+            retryUnwritten()
+            received(sound: buffer, to: sound)
         default:
             break
         }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput buffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        append(buffer, to: voice?.input, clock: voiceClock)
+        retryUnwritten()
+        received(sound: buffer, to: voice?.input, clock: voiceClock)
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {

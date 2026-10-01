@@ -152,8 +152,10 @@ annotation is one step.
 
 The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.
 Option-F10 brings the newest open editor to the front, or, when none is open, opens the one
-closed last again exactly as it was, annotations still editable. Shotts keeps that one closed
-capture in memory until another editor closes and takes its place.
+closed last again exactly as it was, annotations still editable; a minimized editor comes back
+too. Shotts keeps that one closed capture in memory until another editor closes and takes its
+place, except that a capture with no annotations or crop never takes the place of one with
+them: annotated work is what Option-F10 is for.
 
 ### Output
 
@@ -195,11 +197,16 @@ and the bar beside the area has:
 | Pause | Stops taking the screen and sound until pressed again; the recording goes straight from before the pause to after it. The menu bar item shows ❚❚ and holds the time. |
 | Stop | Ends the recording, as F10 and a click on the menu bar item do. |
 
+Quitting Shotts while it records stops the recording and opens it instead; quitting again
+quits. Logging out or shutting down is not held up, and the recording goes with it. If the display being recorded goes, the recording stops there and opens.
+With the microphone on but turned off for Shotts in System Settings, Record asks: record
+without the microphone, open System Settings, or cancel.
+
 The recording then opens in a window of its own, which plays it and makes files from it:
 
 | Setting | Choices |
 | --- | --- |
-| Format | MP4: H.264, which plays nearly everywhere. GIF: animated, looping, silent, 256 colors. |
+| Format | MP4: H.264, which plays nearly everywhere. GIF: animated, looping, silent, 255 colors. |
 | Size | 100%, 75%, 50%, or 25% of the recording, the pixels it comes to shown on hover; an MP4 stays within 4096 by 2304. |
 | Frame rate | 60, 30, 20, 10, 5, or 1 frames a second; a GIF up to 30. |
 | Sound | MP4 only: none, the Mac's sound, the microphone, or both mixed, of what was recorded. |
@@ -211,12 +218,13 @@ every file made keeps only the part between, whatever its format.
 An MP4 starts at the recording's full size, 30 frames a second, with the microphone if it was
 on; a GIF at the size the area had on screen (50% from a Retina display), 10 frames a second. Each format keeps its own
 settings while the window is open. Whenever they change, the window makes the file again in the
-background and shows its size, or why it could not be made. Copy puts the file on the clipboard, as the Finder copies files;
-Save… asks where, suggesting the Desktop and a name like `Shotts Recording 2026-09-30 at
-2.15.00 PM.mp4`; dragging the hand icon drags the file out. Each leaves the window open, so one
+background and shows its size, or why it could not be made. Copy puts the file on the
+clipboard, as the Finder copies files, and it still pastes after the window closes (the last
+file copied is kept until the next); Save… asks where, suggesting the Desktop and a name like
+`Shotts Recording 2026-09-30 at 2.15.00 PM.mp4`, and replaces a file already there only once the
+copy has worked; dragging the hand icon drags the file out. Each leaves the window open, so one
 recording can be saved several ways. Command-W, the red button, or Escape closes the window,
-which deletes the recording and every file made from it, those on the clipboard included; saved
-copies stay. When the window you are working in closes, focus goes back to the app that was in
+which deletes the recording and every file made from it; saved and copied files stay. When the window you are working in closes, focus goes back to the app that was in
 front when F10 was pressed.
 
 A GIF has one palette for the whole clip. Colors that cover much of the picture are kept

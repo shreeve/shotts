@@ -8,7 +8,7 @@ public struct RecordingSettings: Equatable, Sendable {
     public enum Format: String, CaseIterable, Sendable {
         /// H.264 video in an MP4, the one that plays nearly everywhere.
         case mp4
-        /// An animated GIF: loops, silent, 256 colors.
+        /// An animated GIF: loops, silent, 255 colors.
         case gif
 
         public var fileExtension: String { rawValue }
@@ -57,12 +57,13 @@ public struct Trim: Equatable, Sendable {
 
     /// The start dragged to `time`, stopping short of the end.
     public func movingStart(to time: Double) -> Trim {
-        Trim(start: min(max(time, 0), end - Self.shortest), end: end)
+        Trim(start: min(max(time, 0), max(end - Self.shortest, 0)), end: end)
     }
 
-    /// The end dragged to `time`, stopping short of the start and at the recording's end.
+    /// The end dragged to `time`, stopping short of the start and at the recording's end. A
+    /// recording shorter than `shortest` keeps all of itself.
     public func movingEnd(to time: Double, duration: Double) -> Trim {
-        Trim(start: start, end: max(min(time, duration), start + Self.shortest))
+        Trim(start: start, end: min(max(time, start + Self.shortest), duration))
     }
 
     /// Whether it keeps all of a recording `duration` long, near enough that no one could see.
@@ -106,19 +107,13 @@ public struct TimelineLayout: Equatable, Sendable {
 /// A recording's time with its pauses taken out: what was recorded while paused is dropped,
 /// and what comes after a pause follows straight on from what came before it. Times are
 /// seconds on any clock that only goes forward.
-public struct PauseClock: Equatable, Sendable {
+public struct PauseClock: Sendable {
     /// When the current pause began, while paused.
     public private(set) var pausedAt: Double?
-    /// All the time spent paused before now.
-    public private(set) var paused: Double = 0
     /// Pauses so far, as clock times, for samples that arrive late.
     private var pauses: [(start: Double, end: Double)] = []
 
     public init() {}
-
-    public static func == (a: PauseClock, b: PauseClock) -> Bool {
-        a.pausedAt == b.pausedAt && a.paused == b.paused && a.pauses.elementsEqual(b.pauses) { $0 == $1 }
-    }
 
     public var isPaused: Bool { pausedAt != nil }
 
@@ -131,7 +126,6 @@ public struct PauseClock: Equatable, Sendable {
         guard let start = pausedAt else { return }
         pausedAt = nil
         pauses.append((start, max(time, start)))
-        paused += max(time - start, 0)
     }
 
     /// Where a sample at clock `time` goes in the recording, counted from the clock's zero; nil
@@ -147,10 +141,65 @@ public struct PauseClock: Equatable, Sendable {
 
     /// How much has been recorded by clock `now`: held still while paused.
     public func elapsed(at now: Double) -> Double {
-        (pausedAt ?? now) - paused
+        (pausedAt ?? now) - pauses.reduce(0) { $0 + $1.end - $1.start }
     }
 }
 
+/// Where each sample a recording receives goes in it: seconds from its first frame, with the
+/// pauses taken out (`PauseClock`). The screen sends a frame only when it changes, so a frame
+/// that cannot go in must not simply be lost, or the picture before it would stand in until
+/// the next change: a frame from a pause is held for the resume, and one the writer was not
+/// ready for is offered again (`wrote` is said only once a frame is in). A frame is never
+/// placed at or before the last one written.
+public struct RecordingTimeline: Sendable {
+    public private(set) var pauses = PauseClock()
+    /// Where the last frame written went.
+    private var lastFrame = -Double.infinity
+
+    public init() {}
+
+    /// What becomes of a frame received `time` seconds after the first.
+    public enum Frame: Equatable, Sendable {
+        /// Write it at this place in the recording.
+        case write(at: Double)
+        /// Keep it for when recording resumes: it came during a pause.
+        case hold
+        /// Leave it out: it comes no later than the frame written last.
+        case drop
+    }
+
+    public func frame(at time: Double) -> Frame {
+        guard let place = pauses.recorded(time) else {
+            // From the pause going on now, held for its resume; from one already over, too late.
+            return pauses.isPaused && time >= (pauses.pausedAt ?? .infinity) ? .hold : .drop
+        }
+        return place > lastFrame ? .write(at: place) : .drop
+    }
+
+    /// Where a sound sample received `time` seconds after the first frame goes; nil while paused.
+    public func sound(at time: Double) -> Double? {
+        pauses.recorded(time)
+    }
+
+    /// A frame is in the recording at `place`.
+    public mutating func wrote(frameAt place: Double) {
+        lastFrame = max(lastFrame, place)
+    }
+
+    public mutating func pause(at time: Double) { pauses.pause(at: time) }
+
+    /// Resumes at `time`, and says where the frame held from the pause goes, if one was.
+    public mutating func resume(at time: Double) -> Double? {
+        guard pauses.isPaused else { return nil }
+        pauses.resume(at: time)
+        let place = pauses.elapsed(at: time)
+        return place > lastFrame ? place : nil
+    }
+
+    public var isPaused: Bool { pauses.isPaused }
+
+    public func elapsed(at time: Double) -> Double { pauses.elapsed(at: time) }
+}
 
 /// The rules a recording's files follow: their sizes, frame rates, and timing.
 public enum RecordingRule {
@@ -192,6 +241,12 @@ public enum RecordingRule {
         size(width: recorded.width * percent / 100, format: format, recorded: recorded)
     }
 
+    /// A recording's time as the timer and the timeline show it: `m:ss`, or `h:mm:ss` from an hour.
+    public static func clock(_ seconds: Double) -> String {
+        let s = Int(max(seconds, 0))
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
+    }
+
     /// The narrowest a file can be.
     public static let minWidth = 16
 
@@ -206,8 +261,7 @@ public enum RecordingRule {
     /// Where a recording's window starts: MP4 at the recording's full size and 30 frames a second,
     /// with the microphone if it was recorded; GIF at the size the area had on screen (half, from
     /// a Retina display) and 10 frames a second. The Mac's own sound is kept only when asked for.
-    public static func defaults(for format: RecordingSettings.Format, recorded: (width: Int, height: Int), scale: Double,
-                                hasMicrophone: Bool) -> RecordingSettings {
+    public static func defaults(for format: RecordingSettings.Format, scale: Double, hasMicrophone: Bool) -> RecordingSettings {
         switch format {
         case .mp4:
             RecordingSettings(format: .mp4, percent: 100, frameRate: 30,
@@ -239,15 +293,5 @@ public enum FrameSampler {
         // A time a hair past a tick, from rounding, still counts as that tick.
         let t = ((time * r) - 1e-6).rounded(.up) / r
         return t < next - 1e-9 ? t : nil
-    }
-}
-
-/// A GIF's frame times, which are whole hundredths of a second.
-public enum GIFTiming {
-    /// The delay of a frame shown from `start` until `end`, in hundredths. Measured between the
-    /// two times each rounded, so rounding never adds up over a long GIF; never under two,
-    /// which browsers would slow to ten.
-    public static func delay(from start: Double, to end: Double) -> Int {
-        max(2, Int((end * 100).rounded()) - Int((start * 100).rounded()))
     }
 }

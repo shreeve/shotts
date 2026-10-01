@@ -41,7 +41,7 @@ cask "shotts" do
 
   url "https://github.com/$repo/releases/download/v#{version}/Shotts-#{version}.zip"
   name "Shotts"
-  desc "Screenshots with annotations: press a key, select, mark up, paste"
+  desc "Screenshots and screen recordings: press a key, select, mark up, paste"
   homepage "https://github.com/$repo"
 
   livecheck do

@@ -1,9 +1,9 @@
 import Foundation
 
-/// Where Shotts belongs, and whether to offer moving it there. A download run from Downloads, the
-/// Desktop, or the read-only spot macOS runs a freshly downloaded app from, is offered a move to
-/// Applications on launch: there it stays put and can update itself. Paths only; the moving is
-/// the app's.
+/// Where Shotts belongs, and whether to offer moving it there. Run from anywhere but an
+/// Applications folder (Downloads, the Desktop, the read-only spot macOS runs a fresh download
+/// from), it is offered a move to Applications on launch: there it stays put and can update
+/// itself. Paths only; the moving is the app's.
 public enum AppLocation {
     /// Whether an app bundle at `bundlePath` should offer to move itself: anywhere but an
     /// Applications folder, the shared one or the user's own, or a folder inside either.

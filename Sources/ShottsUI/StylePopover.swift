@@ -96,8 +96,21 @@ final class StylePopover: NSViewController {
         panel.isContinuous = false
         panel.setTarget(self)
         panel.setAction(#selector(panelColorChanged(_:)))
+        Self.colorPanelOwner = self
         panel.orderFront(nil)
     }
+
+    /// The shared color panel outlives an editor; once this one's editor closes, the panel stops
+    /// sending it colors.
+    func releaseColorPanel() {
+        guard Self.colorPanelOwner === self else { return }
+        Self.colorPanelOwner = nil
+        NSColorPanel.shared.setTarget(nil)
+        NSColorPanel.shared.setAction(nil)
+    }
+
+    /// The popover the shared color panel sends its colors to; the panel cannot be asked.
+    private static weak var colorPanelOwner: StylePopover?
 
     @objc private func panelColorChanged(_ panel: NSColorPanel) {
         guard let c = panel.color.usingColorSpace(.sRGB) else { return }

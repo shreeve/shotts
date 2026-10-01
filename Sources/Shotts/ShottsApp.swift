@@ -33,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         #endif
         NSApp.mainMenu = makeMainMenu()
         flow.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
+        powerOffObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil,
+                                                                             queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.poweringOff = true }
+        }
         let capture = HotKey.registerF10 { [weak self] in self?.flow.begin() }
         let showLast = HotKey.registerF10(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
         makeStatusItem(hasHotKey: capture, hasShowLastKey: showLast)
@@ -51,6 +55,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
+    /// Quitting while recording would lose the recording: it stops instead and opens in its
+    /// window, and quitting again quits. Logging out or shutting down is not held up: macOS
+    /// says so first (`willPowerOffNotification`), and then Shotts quits as asked.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard flow.isRecording, !poweringOff else { return .terminateNow }
+        flow.stopRecording()
+        return .terminateCancel
+    }
+
+    private var poweringOff = false
+    private var powerOffObserver: NSObjectProtocol?
+
     @objc private func showLastCapture() {
         flow.showLast()
     }
@@ -65,21 +81,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let returnTo = flow.appToReturnTo()
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.png, .jpeg, .tiff]
-        NSApp.activate(ignoringOtherApps: true) // see AreaSelection.show()
-        guard panel.runModal() == .OK, let url = panel.url else { returnTo?.activate(); return }
+        Front.bringShotts()
+        guard panel.runModal() == .OK, let url = panel.url else { Front.giveBack(to: returnTo); return }
         openFile(url, returningTo: returnTo)
     }
 
     private func openFile(_ url: URL, returningTo returnTo: NSRunningApplication?) {
         guard let image = NSImage(contentsOf: url),
-              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-        // A file carries no backing scale. Trust its DPI when it says 2x; otherwise a picture
-        // wider than the screen in points is taken for a Retina capture.
-        var scale = Double(cg.width) / Double(image.size.width)
-        if !(scale.isFinite && scale > 1), let screen = NSScreen.main, Double(cg.width) > screen.frame.width {
-            scale = screen.backingScaleFactor
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            NSSound.beep()
+            return
         }
-        flow.open(image: cg, scale: max(scale, 1), on: NSScreen.main, returningTo: returnTo)
+        let scale = Document.scale(ofFile: cg.width, pointWidth: image.size.width, screenWidth: NSScreen.main.map { Double($0.frame.width) },
+                                   screenScale: Double(NSScreen.main?.backingScaleFactor ?? 1))
+        flow.open(image: cg, scale: scale, on: NSScreen.main, returningTo: returnTo)
     }
 
     /// Without the hot key, because another app holds F10, Capture Area says so instead of
@@ -150,10 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     @objc private func tick() {
         guard let recorder else { return }
-        let seconds = Int(recorder.elapsed)
-        let time = seconds >= 3600
-            ? String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
-            : String(format: "%d:%02d", seconds / 60, seconds % 60)
+        let time = RecordingRule.clock(recorder.elapsed)
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         // A red dot while recording; paused, the pause sign, and the time held.
         let title = recorder.isPaused
@@ -177,7 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     /// The standard About window: icon, name, version, the copyright from Info.plist, and a link
     /// to the project. The build number is the version, so it is not shown twice.
     @objc private func showAbout() {
-        NSApp.activate(ignoringOtherApps: true)
+        Front.bringShotts()
         let centered = NSMutableParagraphStyle()
         centered.alignment = .center
         let credits = NSAttributedString(string: "github.com/shreeve/shotts", attributes: [

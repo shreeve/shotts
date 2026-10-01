@@ -421,3 +421,34 @@ import Testing
         #expect(l.origin(for: CGSize(width: 300, height: 40)).x == 0)
     }
 }
+
+@Suite struct LastCaptureTests {
+    private let blank = Document(width: 10, height: 10, scale: 1)
+    private var annotated: Document {
+        Document(width: 10, height: 10, scale: 1, annotations: [Annotation(shape: .rectangle(CGRect(x: 1, y: 1, width: 5, height: 5)), style: .standard)])
+    }
+
+    /// Option-F10's one closed capture: the latest closed, unless that would put annotated work
+    /// out for a capture with none.
+    @Test func annotatedWorkKeepsItsPlace() {
+        #expect(Document.keepsAsLast(blank, over: nil))
+        #expect(Document.keepsAsLast(blank, over: blank))
+        #expect(!Document.keepsAsLast(blank, over: annotated))
+        #expect(Document.keepsAsLast(annotated, over: annotated))
+        #expect(Document.keepsAsLast(annotated, over: blank))
+        // A crop is work too.
+        #expect(!Document.keepsAsLast(blank, over: Document(width: 10, height: 10, scale: 1, crop: CGRect(x: 0, y: 0, width: 5, height: 5))))
+    }
+}
+
+@Suite struct OpenedFileScaleTests {
+    /// A file's DPI says its scale when it says more than 1x; else a picture wider than the
+    /// screen is taken for a capture from that screen.
+    @Test func dpiThenWidth() {
+        #expect(Document.scale(ofFile: 2000, pointWidth: 1000, screenWidth: 1512, screenScale: 2) == 2)
+        #expect(Document.scale(ofFile: 3000, pointWidth: 3000, screenWidth: 1512, screenScale: 2) == 2)
+        #expect(Document.scale(ofFile: 800, pointWidth: 800, screenWidth: 1512, screenScale: 2) == 1)
+        #expect(Document.scale(ofFile: 3000, pointWidth: 3000, screenWidth: nil, screenScale: 2) == 1)
+        #expect(Document.scale(ofFile: 3000, pointWidth: 3000, screenWidth: 1920, screenScale: 1) == 1)
+    }
+}
