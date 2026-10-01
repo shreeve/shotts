@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.5.0 — 2026-09-30
 
 - Screen recording: hold Command as the drag ends to record the area. A small panel starts it,
   with or without the microphone; the menu bar item shows the time, and F10 or a click on it
