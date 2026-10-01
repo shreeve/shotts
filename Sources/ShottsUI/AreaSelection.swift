@@ -117,7 +117,8 @@ public struct SelectionOptions: Equatable, Sendable {
 
 /// The area picker: one full-screen window per display showing that display as it was, where
 /// the user drags out a rectangle. Escape cancels, Shift squares the selection, Space moves it
-/// while dragging, Command-C copies the color under the crosshair and cancels.
+/// while dragging, Command held as the drag ends records the area instead, and Command-C copies
+/// the color under the crosshair and cancels.
 public final class AreaSelection {
     public enum Outcome {
         case cancelled
@@ -125,6 +126,8 @@ public final class AreaSelection {
         case selected(display: DisplayImage, rect: CGRect)
         /// A click on a window: capture that window on its own.
         case window(display: DisplayImage, window: WindowInfo)
+        /// A drag ended with Command down: record the area, in points like `selected`.
+        case record(display: DisplayImage, rect: CGRect)
     }
 
     private var windows: [OverlayWindow] = []
@@ -233,6 +236,8 @@ final class OverlayView: NSView {
     /// shows no crosshair, magnifier, hints, or window outline: there is one pointer.
     private(set) var pointer: CGPoint?
     private var moving = false
+    /// Command is down: letting go of the drag records the area rather than capturing it.
+    private(set) var records = false
     /// Where the drag is, on this display or past its edge.
     private var lastPointer: CGPoint = .zero
     private var hasDragged = false
@@ -339,7 +344,15 @@ final class OverlayView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        commandChanged(event.modifierFlags.contains(.command))
         dragged(to: convert(event.locationInWindow, from: nil), square: event.modifierFlags.contains(.shift))
+    }
+
+    /// The selection turns red, and reads "Record", while Command is down.
+    func commandChanged(_ down: Bool) {
+        guard down != records else { return }
+        records = down
+        needsDisplay = true
     }
 
     /// `p` in the view's coordinates, which may be past the display's edge.
@@ -368,18 +381,23 @@ final class OverlayView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        released(at: convert(event.locationInWindow, from: nil), recording: event.modifierFlags.contains(.command))
+    }
+
+    /// `p` in the view's coordinates; `recording` when Command is down as the drag ends.
+    func released(at p: CGPoint, recording: Bool) {
         defer { anchor = nil }
         guard let rect = selection, SelectionRule.isUsable(rect) else {
             // A click without a drag captures the window under it, if any.
             selection = nil
-            if let window = display.windows.first(where: { $0.frame.contains(convert(event.locationInWindow, from: nil)) }) {
+            if let window = display.windows.first(where: { $0.frame.contains(p) }) {
                 onFinish?(.window(display: display, window: window))
                 return
             }
             needsDisplay = true
             return
         }
-        onFinish?(.selected(display: display, rect: rect))
+        onFinish?(recording ? .record(display: display, rect: rect) : .selected(display: display, rect: rect))
     }
 
     override func keyDown(with event: NSEvent) {
@@ -398,6 +416,7 @@ final class OverlayView: NSView {
     }
 
     override func flagsChanged(with event: NSEvent) {
+        commandChanged(event.modifierFlags.contains(.command))
         if anchor != nil, !moving {
             select(to: lastPointer, square: event.modifierFlags.contains(.shift))
             needsDisplay = true
@@ -451,9 +470,16 @@ final class OverlayView: NSView {
         }
 
         if let selection {
-            ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.9))
-            ctx.setLineWidth(1)
-            ctx.stroke(selection.insetBy(dx: -0.5, dy: -0.5))
+            if records {
+                // Red, and just outside the area, as the outline stays while it records.
+                ctx.setStrokeColor(NSColor.systemRed.cgColor)
+                ctx.setLineWidth(2)
+                ctx.stroke(selection.insetBy(dx: -1, dy: -1))
+            } else {
+                ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.9))
+                ctx.setLineWidth(1)
+                ctx.stroke(selection.insetBy(dx: -0.5, dy: -0.5))
+            }
             // The magnifier's label shows the size, while it is on this display.
             if !options.magnifies || pointer == nil { drawSizeLabel(selection, in: ctx) }
         }
@@ -526,7 +552,11 @@ final class OverlayView: NSView {
         // The pointer's pixel while aiming (a comma pair, as coordinates are written), the
         // selection's size while dragging (with ×, as sizes are), and the color under the pointer.
         let text: String
-        if let selection {
+        if let selection, records {
+            // The color matters little to a recording; the size it will have does.
+            let size = display.pixelRect(for: selection).size
+            text = "Record  \(Int(size.width)) × \(Int(size.height))"
+        } else if let selection {
             let size = display.pixelRect(for: selection).size
             text = "\(Int(size.width)) × \(Int(size.height))   " + hex
         } else {
@@ -595,15 +625,26 @@ final class OverlayView: NSView {
         let label = CGRect(x: panel.minX, y: pixels.maxY, width: panel.width, height: Self.labelHeight)
         ctx.setFillColor(CGColor(gray: 0.12, alpha: 0.95))
         ctx.fill(label)
-        let textSize = (m.text as NSString).size(withAttributes: Self.labelAttributes)
-        (m.text as NSString).draw(at: CGPoint(x: label.midX - textSize.width / 2, y: label.minY + (Self.labelHeight - textSize.height) / 2),
-                                  withAttributes: Self.labelAttributes)
+        let text = Self.label(m.text, recording: records)
+        let textSize = text.size()
+        text.draw(at: CGPoint(x: label.midX - textSize.width / 2, y: label.minY + (Self.labelHeight - textSize.height) / 2))
         ctx.restoreGState()
 
         ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.6))
         ctx.setLineWidth(1)
         ctx.addPath(CGPath(roundedRect: panel.insetBy(dx: 0.5, dy: 0.5), cornerWidth: 6, cornerHeight: 6, transform: nil))
         ctx.strokePath()
+    }
+
+    /// A label's words, behind a red dot while Command would record.
+    static func label(_ text: String, recording: Bool) -> NSAttributedString {
+        let label = NSMutableAttributedString(string: text, attributes: labelAttributes)
+        if recording {
+            var dot = labelAttributes
+            dot[.foregroundColor] = NSColor.systemRed
+            label.insert(NSAttributedString(string: "● ", attributes: dot), at: 0)
+        }
+        return label
     }
 
     /// Where a panel of `size` goes near the pointer: below and to the right by `gap`, else
@@ -621,6 +662,7 @@ final class OverlayView: NSView {
     static let hints = [
         "Drag an area, or click a window, to capture it",
         "⇧ keeps it square, Space moves it",
+        "⌘ as you let go records it instead",
         "⌘C copies the color under the crosshair",
         "Esc cancels",
     ]
@@ -655,8 +697,8 @@ final class OverlayView: NSView {
 
     private func drawSizeLabel(_ rect: CGRect, in ctx: CGContext) {
         let size = display.pixelRect(for: rect).size
-        let text = "\(Int(size.width)) × \(Int(size.height))"
-        let textSize = (text as NSString).size(withAttributes: Self.labelAttributes)
+        let text = Self.label(records ? "Record  \(Int(size.width)) × \(Int(size.height))" : "\(Int(size.width)) × \(Int(size.height))", recording: records)
+        let textSize = text.size()
         var origin = CGPoint(x: rect.maxX - textSize.width - 6, y: rect.maxY + 6)
         if origin.y + textSize.height + 4 > bounds.height { origin.y = rect.maxY - textSize.height - 10 }
         origin.x = max(4, origin.x)
@@ -664,7 +706,7 @@ final class OverlayView: NSView {
         ctx.setFillColor(CGColor(gray: 0, alpha: 0.7))
         ctx.addPath(CGPath(roundedRect: box, cornerWidth: 4, cornerHeight: 4, transform: nil))
         ctx.fillPath()
-        (text as NSString).draw(at: origin, withAttributes: Self.labelAttributes)
+        text.draw(at: origin)
     }
 }
 

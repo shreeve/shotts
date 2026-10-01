@@ -5,6 +5,20 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Screen recording: hold Command as the drag ends to record the area. A small panel starts it,
+  with or without the microphone; the menu bar item shows the time, and F10 or a click on it
+  stops it. The recording opens in a window that saves, copies, or drags it out as an MP4
+  (H.264, plays nearly everywhere) or an animated GIF, at the size, frame rate, and sound you
+  choose, as many times as you like.
+- While recording, a bar beside the area draws arrows and rectangles on it, in your editor
+  style, each fading after four seconds, and pauses the recording, which then cuts straight on.
+- The recording's window has a timeline that plays it and trims what the files keep: drag the
+  bracket at either end.
+- GIFs are made by Shotts' own encoder: one palette for the clip, flat colors kept exact, and
+  blue-noise dithering, so gradients stay smooth and still areas stay still.
+
 ## 0.4.0 — 2026-09-28
 
 - Runs on macOS 14 Sonoma and later, where it needed macOS 27 before.

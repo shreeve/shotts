@@ -1,10 +1,12 @@
 import AppKit
+import AVFoundation
 import ScreenCaptureKit
 import ShottsCore
 import ShottsUI
 
 /// One capture from key press to editor: picture every display, pick an area on it, cut it
-/// out, edit it, and hand focus back to the app that had it.
+/// out, edit it, and hand focus back to the app that had it. Or, with Command held as the drag
+/// ends, a recording of the area: set up, recorded, and opened in a window of its own.
 final class CaptureFlow {
     /// The capture under way, from the hot key until its editor opens or it ends. There is one
     /// at a time: the hot key does nothing while the picker is up, a window is being captured,
@@ -15,6 +17,22 @@ final class CaptureFlow {
     /// The editor closed last, as it was: Option-F10 opens it again. Only this one capture is
     /// kept after its editor closes, until another editor closes and takes its place.
     private var lastClosed: (document: Document, source: CGImage)?
+    /// The recording being set up or made, from Command-release until it stops.
+    private var recording: RecordingSession?
+    /// The open recording windows.
+    private var recordings: [RecordingWindowController] = []
+    /// Tells the menu bar item when a recording starts, with its recorder, and stops, with nil.
+    var onRecording: ((Recorder?) -> Void)?
+
+    private struct RecordingSession {
+        var setup: RecordingSetup
+        /// Set once recording has started.
+        var recorder: Recorder?
+        /// The app in front when the hot key fired, for a recording cancelled before it starts.
+        var frontmost: NSRunningApplication?
+        /// The app the recording's window gives focus back to.
+        var returnTo: NSRunningApplication?
+    }
 
     private struct Capture {
         /// The app in front when the hot key fired, Shotts itself when an editor was: a capture
@@ -28,8 +46,11 @@ final class CaptureFlow {
         var displays: [LiveDisplay] = []
     }
 
+    /// F10: a capture, or while recording, the end of the recording. Nothing while a capture or
+    /// a recording is being set up.
     func begin() {
-        guard capture == nil else { return }
+        if recording?.recorder != nil { stopRecording(); return }
+        guard capture == nil, recording == nil else { return }
         let frontmost = NSWorkspace.shared.frontmostApplication
         capture = Capture(frontmost: frontmost, returnTo: appToReturnTo(from: frontmost))
         guard ScreenCapture.hasPermission else {
@@ -77,6 +98,9 @@ final class CaptureFlow {
                     guard let image else { self.end(); return }
                     self.deliver(image, scale: display.scale, on: display.screen)
                 }
+            case let .record(display, rect):
+                live.forEach { $0.stop() }
+                setUpRecording(on: display.screen, rect: rect)
             case let .window(display, window):
                 // The window on its own, whatever covered it. If it has gone meanwhile, the
                 // area it occupied on the display stands in.
@@ -137,6 +161,130 @@ final class CaptureFlow {
         }
         editors.append((editor, returnTo))
         editor.present()
+    }
+
+    // MARK: - Recording
+
+    private static let microphoneKey = "recording.microphone"
+
+    /// The area outlined, with Record, Microphone, and Cancel beside it; nothing records yet.
+    private func setUpRecording(on screen: NSScreen, rect: CGRect) {
+        let frontmost = capture?.frontmost, returnTo = capture?.returnTo
+        capture = nil
+        let setup = RecordingSetup(screen: screen, rect: rect, microphone: UserDefaults.standard.bool(forKey: Self.microphoneKey)) { [weak self] outcome in
+            guard let self else { return }
+            switch outcome {
+            case .cancelled:
+                cancelRecording()
+            case let .record(microphone):
+                UserDefaults.standard.set(microphone, forKey: Self.microphoneKey)
+                Task { await self.startRecording(on: screen, rect: rect, microphone: microphone) }
+            }
+        }
+        recording = RecordingSession(setup: setup, frontmost: frontmost, returnTo: returnTo)
+        setup.show()
+    }
+
+    private func startRecording(on screen: NSScreen, rect: CGRect, microphone wanted: Bool) async {
+        guard let setup = recording?.setup else { return }
+        var microphone = wanted
+        if microphone, !(await Self.microphoneAllowed()) {
+            switch askAboutMicrophone() {
+            case .withoutIt: microphone = false
+            case .cancel: cancelRecording(); return
+            }
+        }
+        let recorder = Recorder()
+        recorder.onInterrupted = { [weak self] in self?.stopRecording() }
+        do {
+            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { throw ScreenCapture.Failure.noDisplay }
+            try await recorder.start(display: number.uint32Value, scale: screen.backingScaleFactor, rect: rect,
+                                     excluding: setup.windowNumbers, keeping: setup.keptNumbers, microphone: microphone)
+        } catch {
+            _ = try? await recorder.stop()
+            cancelRecording()
+            fail("Shotts could not record the screen", error)
+            return
+        }
+        guard recording != nil else { _ = try? await recorder.stop(); return }
+        recording?.recorder = recorder
+        setup.onControl = { [weak self, weak setup, weak recorder] control in
+            guard let self, let setup, let recorder else { return }
+            switch control {
+            case .pause: recorder.pause()
+            case .resume: recorder.resume()
+            case .stop: stopRecording()
+            }
+            setup.showPaused(recorder.isPaused)
+        }
+        setup.recording()
+        onRecording?(recorder)
+    }
+
+    /// Takes the outline and panel down and leaves focus with the app that had it.
+    private func cancelRecording() {
+        let app = recording?.frontmost
+        recording?.setup.close()
+        recording = nil
+        if let app, app.processIdentifier != NSRunningApplication.current.processIdentifier { app.activate() }
+    }
+
+    /// F10, or the menu bar timer: the recording ends and opens in its window.
+    func stopRecording() {
+        guard let session = recording, let recorder = session.recorder else { return }
+        recording = nil
+        onRecording?(nil)
+        session.setup.close()
+        Task {
+            do {
+                let made = try await recorder.stop()
+                let contents = try await RecordingExport.contents(of: made)
+                openRecording(made, contents: contents, on: session.setup.screen, returningTo: session.returnTo)
+            } catch {
+                fail("Shotts could not finish the recording", error)
+            }
+        }
+    }
+
+    private func openRecording(_ made: Recording, contents: RecordingExport.Contents, on screen: NSScreen, returningTo returnTo: NSRunningApplication?) {
+        let window = RecordingWindowController(recording: made, contents: contents, on: screen)
+        window.onClose = { [weak self, weak window] in
+            let working = window?.window?.isKeyWindow ?? false
+            self?.recordings.removeAll { $0 === window }
+            if working { returnTo?.activate() }
+        }
+        recordings.append(window)
+        window.present()
+    }
+
+    private static func microphoneAllowed() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: true
+        case .notDetermined: await AVCaptureDevice.requestAccess(for: .audio)
+        default: false
+        }
+    }
+
+    private enum MicrophoneAnswer { case withoutIt, cancel }
+
+    /// The microphone is turned off for Shotts: record without it, or go and turn it on.
+    private func askAboutMicrophone() -> MicrophoneAnswer {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Shotts can't use the microphone"
+        alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › Microphone, then record again."
+        alert.addButton(withTitle: "Record Without Microphone")
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return .withoutIt
+        case .alertSecondButtonReturn:
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") { NSWorkspace.shared.open(url) }
+            return .cancel
+        default:
+            return .cancel
+        }
     }
 
     /// Whether Option-F10 has anything to show.

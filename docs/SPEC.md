@@ -6,10 +6,12 @@ the code disagree, find out which is wrong and fix that one.
 ## The product
 
 Shotts is a Mac screenshot tool that lives in the menu bar and takes one motion from key press
-to paste: F10, drag out an area, mark it up, Command-C. It runs on macOS 14 and later on Apple silicon.
-It captures only what the user selects, only when the user asks, and keeps nothing on disk
-that the user did not save or drag out. With Copy to Clipboard on, a capture is on the
-clipboard as soon as it is taken.
+to paste: F10, drag out an area, mark it up, Command-C. Holding Command as the drag ends records
+the area instead, to save as an MP4 or an animated GIF. It runs on macOS 14 and later on Apple
+silicon. It captures and records only what the user selects, only when the user asks, and keeps
+nothing on disk that the user did not save or drag out, but for a recording's own files while
+its window is open. With Copy to Clipboard on, a capture is on the clipboard as soon as it is
+taken.
 
 ## Installing
 
@@ -24,7 +26,8 @@ it uses the user's own. Not Now leaves it where it is, and "Don't ask again" sto
 F10 is the hot key, and Option-F10 brings the last capture back (see The editor). On a Mac
 keyboard whose top row controls the Mac, that is fn-F10, unless "Use F1, F2, etc. keys as
 standard function keys" is on. If another app already holds F10, the menu says so: Capture Area
-(another app has F10). F10 does nothing while a capture is under way.
+(another app has F10). F10 does nothing while a capture or a recording is being set up, and
+stops a recording under way.
 
 | Action | Result |
 | --- | --- |
@@ -34,6 +37,7 @@ standard function keys" is on. If another app already holds F10, the menu says s
 | Drag | Selects an area; everything outside it dims (unless Dim Outside Selection is off). Its size in pixels shows in the magnifier, or beside the selection when the magnifier is off. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
+| Command as the drag ends | Records the area instead (see Recording). While Command is down, the selection's outline is red and its size reads "Record". |
 | Release | Captures the area as it is at that moment, at the display's full resolution, puts it on the clipboard (unless Copy to Clipboard is off), and opens the editor. |
 | Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
 | Escape | Cancels, even mid-drag. Nothing is kept. |
@@ -58,7 +62,9 @@ indicator in the menu bar.
 
 The menu bar menu holds About Shotts (the icon, version, copyright, and a link to the project),
 Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into the editor), Check for
-Updates…, Quit, and the picker's options, remembered across launches:
+Updates…, Quit, and the picker's options, remembered across launches. While a recording is
+under way the menu bar item is a red dot and the time so far instead, and a click on it stops
+the recording.
 
 | Option | Default | Effect |
 | --- | --- | --- |
@@ -69,8 +75,8 @@ Updates…, Quit, and the picker's options, remembered across launches:
 | New Window per Capture | off | Each capture opens in an editor of its own. Off, a new capture takes the place of the open editor, where it was on screen, and the one it replaces becomes the last capture. |
 
 The first F10 asks macOS for Screen Recording permission with the system's own dialog. Until it
-is granted, later presses explain where to turn it on and capture nothing. Screen Recording is
-the only permission Shotts asks for. Shotts checks for updates once a day without asking, and
+is granted, later presses explain where to turn it on and capture nothing. The microphone is
+the only other permission Shotts asks for, the first time a recording uses it. Shotts checks for updates once a day without asking, and
 Check for Updates… checks at once.
 
 ## The editor
@@ -166,7 +172,60 @@ When the editor you are working in closes, the app that was in front when its F1
 comes back to the front; with several editors open, each gives focus back to the app its own
 capture came from. A cancelled capture goes back to the app that was in front.
 
+## Recording
+
+Holding Command as the drag ends records the area rather than capturing it. Letting go leaves
+the area outlined in red, with a small panel beside it; nothing records yet.
+
+| Control | Effect |
+| --- | --- |
+| Record, or Return | Starts recording. The panel becomes the recording bar; the outline stays. |
+| Microphone | Records your voice as well. Off until turned on, and remembered. The first recording with it on asks macOS for the microphone. |
+| Cancel, or Escape | Ends without recording. |
+
+Everything in the area is recorded as it happens, at the display's full resolution, up to 60
+frames a second, with the pointer, and with the Mac's own sound, kept apart from the
+microphone. The outline sits just outside the area; neither it, the bar, nor Shotts' menu bar
+item is ever recorded. While recording, the menu bar item shows a red dot and the time so far,
+and the bar beside the area has:
+
+| Control | Effect |
+| --- | --- |
+| Arrow, Rectangle | Draws on the area as it records, in the editor's last style: tapered or even arrows, the color, the width, the shadow. Each shape stays four seconds, then fades over one, and is recorded. While a tool is on, clicks in the area draw rather than reaching what is underneath; its button again, or Escape, turns it off. Shift keeps a rectangle square. |
+| Pause | Stops taking the screen and sound until pressed again; the recording goes straight from before the pause to after it. The menu bar item shows ❚❚ and holds the time. |
+| Stop | Ends the recording, as F10 and a click on the menu bar item do. |
+
+The recording then opens in a window of its own, which plays it and makes files from it:
+
+| Setting | Choices |
+| --- | --- |
+| Format | MP4: H.264, which plays nearly everywhere. GIF: animated, looping, silent, 256 colors. |
+| Size | 100%, 75%, 50%, or 25% of the recording, the pixels it comes to shown on hover; an MP4 stays within 4096 by 2304. |
+| Frame rate | 60, 30, 20, 10, 5, or 1 frames a second; a GIF up to 30. |
+| Sound | MP4 only: none, the Mac's sound, the microphone, or both mixed, of what was recorded. |
+
+Below the video, a timeline plays it (Space plays and pauses; the playhead can be clicked or
+dragged) and trims it: the bracket at either end drags in, the part left out is dimmed, and
+every file made keeps only the part between, whatever its format.
+
+An MP4 starts at the recording's full size, 30 frames a second, with the microphone if it was
+on; a GIF at the size the area had on screen (50% from a Retina display), 10 frames a second. Each format keeps its own
+settings while the window is open. Whenever they change, the window makes the file again in the
+background and shows its size, or why it could not be made. Copy puts the file on the clipboard, as the Finder copies files;
+Save… asks where, suggesting the Desktop and a name like `Shotts Recording 2026-09-30 at
+2.15.00 PM.mp4`; dragging the hand icon drags the file out. Each leaves the window open, so one
+recording can be saved several ways. Command-W, the red button, or Escape closes the window,
+which deletes the recording and every file made from it, those on the clipboard included; saved
+copies stay. When the window you are working in closes, focus goes back to the app that was in
+front when F10 was pressed.
+
+A GIF has one palette for the whole clip. Colors that cover much of the picture are kept
+exactly, so text and flat backgrounds stay crisp; colors between the palette's are dithered with
+a fixed blue-noise pattern, so gradients do not band and what stays still in the recording stays
+still in the GIF, which stores only the part of each frame that changed. An MP4 puts its index
+first, so a preview in Messages or Mail plays at once.
+
 ## Not built
 
-Full-screen capture, repeating the previous area, delayed capture, screen recording, uploads,
-cloud storage, and OCR.
+Full-screen capture, repeating the previous area, delayed capture, recording a single window,
+clicks shown in a recording, uploads, cloud storage, and OCR.
