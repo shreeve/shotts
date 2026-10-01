@@ -201,7 +201,7 @@ The recording then opens in a window of its own, which plays it and makes files 
 | --- | --- |
 | Format | MP4: H.264, which plays nearly everywhere. GIF: animated, looping, silent, 256 colors. |
 | Size | 100%, 75%, 50%, or 25% of the recording, the pixels it comes to shown on hover; an MP4 stays within 4096 by 2304. |
-| Frame rate | 60, 30, 20, 15, 12, or 10 frames a second; a GIF up to 30. |
+| Frame rate | 60, 30, 20, 10, 5, or 1 frames a second; a GIF up to 30. |
 | Sound | MP4 only: none, the Mac's sound, the microphone, or both mixed, of what was recorded. |
 
 Below the video, a timeline plays it (Space plays and pauses; the playhead can be clicked or
@@ -209,7 +209,7 @@ dragged) and trims it: the bracket at either end drags in, the part left out is 
 every file made keeps only the part between, whatever its format.
 
 An MP4 starts at the recording's full size, 30 frames a second, with the microphone if it was
-on; a GIF at the size the area had on screen (50% from a Retina display), 15 frames a second. Each format keeps its own
+on; a GIF at the size the area had on screen (50% from a Retina display), 10 frames a second. Each format keeps its own
 settings while the window is open. Whenever they change, the window makes the file again in the
 background and shows its size, or why it could not be made. Copy puts the file on the clipboard, as the Finder copies files;
 Save… asks where, suggesting the Desktop and a name like `Shotts Recording 2026-09-30 at

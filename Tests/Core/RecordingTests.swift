@@ -34,7 +34,8 @@ import Testing
             for rate in RecordingRule.frameRates(for: format) { #expect(RecordingRule.recordedFrameRate % rate == 0) }
         }
         #expect(RecordingRule.frameRates(for: .gif).max() == 30)
-        #expect(RecordingRule.frameRates(for: .mp4).max() == 60)
+        #expect(RecordingRule.frameRates(for: .mp4) == [60, 30, 20, 10, 5, 1])
+        #expect(RecordingRule.frameRates(for: .gif) == [30, 20, 10, 5, 1])
     }
 
     @Test func defaultsKeepTheMicrophoneAndLeaveOutTheMacsSound() {
@@ -44,7 +45,7 @@ import Testing
         #expect(RecordingRule.defaults(for: .mp4, recorded: recorded, scale: 2, hasMicrophone: false).sound == RecordingSettings.Sound.none)
         // A GIF starts at the size the area had on screen.
         #expect(RecordingRule.defaults(for: .gif, recorded: recorded, scale: 2, hasMicrophone: true)
-            == RecordingSettings(format: .gif, percent: 50, frameRate: 15, sound: .none))
+            == RecordingSettings(format: .gif, percent: 50, frameRate: 10, sound: .none))
         #expect(RecordingRule.defaults(for: .gif, recorded: recorded, scale: 1, hasMicrophone: true).percent == 100)
     }
 

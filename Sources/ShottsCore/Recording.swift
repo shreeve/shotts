@@ -157,11 +157,12 @@ public enum RecordingRule {
     /// The rate a recording is made at, at most: a frame comes only when the screen changes.
     public static let recordedFrameRate = 60
 
-    /// The frame rates a file can have. Every one divides 60, so a lower rate keeps whole frames
-    /// and never blends two. A GIF stops at 30: its frame times are whole hundredths of a
-    /// second, and browsers slow anything under two hundredths to a tenth.
+    /// The frame rates a file can have: smooth video, UI demos, steps, and a slideshow. Every one
+    /// divides 60, so a lower rate keeps whole frames and never blends two. A GIF stops at 30:
+    /// its frame times are whole hundredths of a second, and browsers slow anything under two
+    /// hundredths to a tenth.
     public static func frameRates(for format: RecordingSettings.Format) -> [Int] {
-        format == .gif ? [30, 20, 15, 12, 10] : [60, 30, 20, 15, 12, 10]
+        format == .gif ? [30, 20, 10, 5, 1] : [60, 30, 20, 10, 5, 1]
     }
 
     /// The largest frame H.264 players are sure to take (level 5.2): 4096 by 2304.
@@ -204,7 +205,7 @@ public enum RecordingRule {
 
     /// Where a recording's window starts: MP4 at the recording's full size and 30 frames a second,
     /// with the microphone if it was recorded; GIF at the size the area had on screen (half, from
-    /// a Retina display) and 15 frames a second. The Mac's own sound is kept only when asked for.
+    /// a Retina display) and 10 frames a second. The Mac's own sound is kept only when asked for.
     public static func defaults(for format: RecordingSettings.Format, recorded: (width: Int, height: Int), scale: Double,
                                 hasMicrophone: Bool) -> RecordingSettings {
         switch format {
@@ -212,7 +213,7 @@ public enum RecordingRule {
             RecordingSettings(format: .mp4, percent: 100, frameRate: 30,
                               sound: hasMicrophone ? .microphone : .none)
         case .gif:
-            RecordingSettings(format: .gif, percent: scale >= 2 ? 50 : 100, frameRate: 15, sound: .none)
+            RecordingSettings(format: .gif, percent: scale >= 2 ? 50 : 100, frameRate: 10, sound: .none)
         }
     }
 
