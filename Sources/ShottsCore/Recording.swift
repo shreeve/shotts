@@ -238,6 +238,12 @@ public enum RecordingRule {
         size(width: recorded.width * percent / 100, format: format, recorded: recorded)
     }
 
+    /// A recording's time as the timer and the timeline show it: `m:ss`, or `h:mm:ss` from an hour.
+    public static func clock(_ seconds: Double) -> String {
+        let s = Int(max(seconds, 0))
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
+    }
+
     /// The narrowest a file can be.
     public static let minWidth = 16
 

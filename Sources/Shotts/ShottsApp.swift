@@ -51,6 +51,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
+    /// Quitting while recording, as logging out does, would lose the recording: it stops
+    /// instead and opens in its window, and quitting again quits.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard flow.isRecording else { return .terminateNow }
+        flow.stopRecording()
+        return .terminateCancel
+    }
+
     @objc private func showLastCapture() {
         flow.showLast()
     }
@@ -150,10 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     @objc private func tick() {
         guard let recorder else { return }
-        let seconds = Int(recorder.elapsed)
-        let time = seconds >= 3600
-            ? String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
-            : String(format: "%d:%02d", seconds / 60, seconds % 60)
+        let time = RecordingRule.clock(recorder.elapsed)
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         // A red dot while recording; paused, the pause sign, and the time held.
         let title = recorder.isPaused

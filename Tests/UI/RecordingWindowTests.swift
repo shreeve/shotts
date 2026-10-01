@@ -110,17 +110,35 @@ import Testing
         #expect(controller.sizes.toolTip == "Size: 80 × 50 pixels")
     }
 
-    /// Copy puts the file itself on the pasteboard, as the Finder does.
+    /// Copy puts the file on the pasteboard, as the Finder does: a copy of its own, outside the
+    /// recording's folder, which still pastes after the window closes.
     @Test func copyPutsTheFileOnThePasteboard() async throws {
         let controller = try await window(for: try await testRecording())
-        defer { controller.close() }
         let pasteboard = privatePasteboard()
         defer { pasteboard.releaseGlobally() }
         controller.pasteboard = pasteboard
         controller.copyPressed()
         let file = try await waitForFile(controller)
-        let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL]
-        #expect(urls == [file])
+        let copied = try #require((pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL])?.first)
+        #expect(copied.lastPathComponent == file.lastPathComponent && copied != file)
+        #expect(try Data(contentsOf: copied) == Data(contentsOf: file))
+        controller.window?.close()
+        #expect(FileManager.default.fileExists(atPath: copied.path))
+    }
+
+    /// Saving over a file replaces it only with a complete copy.
+    @Test func savingOverAFileReplacesIt() throws {
+        let folder = try Recording.makeFolder()
+        defer { Recording.removeFolder(folder) }
+        let made = folder.appendingPathComponent("made.mp4"), there = folder.appendingPathComponent("there.mp4")
+        try Data("new".utf8).write(to: made)
+        try Data("old".utf8).write(to: there)
+        try RecordingWindowController.copy(made, to: there)
+        #expect(try Data(contentsOf: there) == Data("new".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == [".in-use", "made.mp4", "there.mp4"])
+        // A copy that cannot be made leaves what was there.
+        #expect(throws: (any Error).self) { try RecordingWindowController.copy(folder.appendingPathComponent("missing.mp4"), to: there) }
+        #expect(try Data(contentsOf: there) == Data("new".utf8))
     }
 
     /// Closing the window takes the recording and every file made from it.

@@ -28,6 +28,8 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     let player = AVPlayerView()
     let timeline: Timeline
     private var timeObserver: Any?
+    /// Setting up the player, which closing stops.
+    private var loading: Task<Void, Never>?
     private var endObserver: NSObjectProtocol?
     let formats = NSPopUpButton()
     let sizes = NSPopUpButton()
@@ -47,8 +49,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         ]
         timeline = Timeline(duration: contents.duration)
         let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = Export.suggestedName(date: recording.started, prefix: "Shotts Recording", fileExtension: "mp4")
-            .replacingOccurrences(of: ".mp4", with: "")
+        window.title = (Self.fileName(for: recording, format: .mp4) as NSString).deletingPathExtension
         window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -169,10 +170,15 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
 
     private static let timelineHeight: CGFloat = 40
 
+    /// `Shotts Recording 2026-09-30 at 2.15.00 PM.mp4`, from when it was recorded.
+    static func fileName(for recording: Recording, format: RecordingSettings.Format) -> String {
+        Export.suggestedName(date: recording.started, prefix: "Shotts Recording", fileExtension: format.fileExtension)
+    }
+
     /// Plays the video with every sound it has, the microphone's file alongside.
     private func loadPlayer() {
         let recording = recording
-        Task {
+        loading = Task {
             let composition = AVMutableComposition()
             let movie = AVURLAsset(url: recording.movie)
             var sources: [(AVAsset, AVMediaType)] = [(movie, .video), (movie, .audio)]
@@ -184,6 +190,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
                 else { continue }
                 try? added.insertTimeRange(range, of: track, at: .zero)
             }
+            guard !Task.isCancelled else { return }
             let item = AVPlayerItem(asset: composition)
             let playing = AVPlayer(playerItem: item)
             player.player = playing
@@ -299,7 +306,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         file = nil
         grip.isEnabled = false
         let settings = current
-        let name = Export.suggestedName(date: recording.started, prefix: "Shotts Recording", fileExtension: settings.format.fileExtension)
+        let name = Self.fileName(for: recording, format: settings.format)
         let folder = recording.folder.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let url = folder.appendingPathComponent(name)
         status.stringValue = "Making \(settings.format == .mp4 ? "MP4" : "GIF")…"
@@ -320,6 +327,9 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
             } catch {
                 try? FileManager.default.removeItem(at: folder)
                 guard !(error is CancellationError), !Task.isCancelled else { return }
+                // A Copy or Save waiting for this file is dropped rather than run later by surprise.
+                waiting = []
+                NSSound.beep()
                 progress.isHidden = true
                 // What went wrong, short enough for the bar; all of it on hover.
                 status.stringValue = "Could not make the file: \(error.localizedDescription)"
@@ -347,33 +357,58 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     }
 
     /// The file itself on the pasteboard, as the Finder copies files: it pastes into Messages,
-    /// Mail, and Slack as the video or GIF. It is there while this window is open.
+    /// Mail, and Slack as the video or GIF. What is copied is a copy of its own, outside the
+    /// recording's folder, so it still pastes after this window closes; one at a time is kept,
+    /// as with a drag from the editor.
     @objc public func copyPressed() {
         withFile { [weak self] url in
             guard let self else { return }
-            pasteboard.clearContents()
-            pasteboard.writeObjects([url as NSURL])
+            do {
+                let copy = try Export.temporaryFolder("Shotts Copied").appendingPathComponent(url.lastPathComponent)
+                try FileManager.default.copyItem(at: url, to: copy)
+                pasteboard.clearContents()
+                pasteboard.writeObjects([copy as NSURL])
+            } catch {
+                NSSound.beep()
+            }
         }
     }
 
+    /// Save…: the file copied where the user says, off the main thread, since a long recording
+    /// can be a large file. A file already there is replaced only once the copy has worked.
     @objc public func savePressed() {
         guard let window else { return }
         let settings = current
         let panel = NSSavePanel()
         panel.allowedContentTypes = [settings.format == .mp4 ? .mpeg4Movie : .gif]
-        panel.nameFieldStringValue = Export.suggestedName(date: recording.started, prefix: "Shotts Recording", fileExtension: settings.format.fileExtension)
+        panel.nameFieldStringValue = Self.fileName(for: recording, format: settings.format)
         panel.directoryURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let destination = panel.url, let self else { return }
             withFile { url in
-                do {
-                    // The panel has asked about replacing a file already there.
-                    if FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.removeItem(at: destination) }
-                    try FileManager.default.copyItem(at: url, to: destination)
-                } catch {
-                    NSAlert(error: error).beginSheetModal(for: window)
+                Task {
+                    do {
+                        try await Task.detached(priority: .userInitiated) { try Self.copy(url, to: destination) }.value
+                    } catch {
+                        NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil)
+                    }
                 }
             }
+        }
+    }
+
+    /// Copies `url` to `destination` beside it first, then swaps it in, so a failed copy leaves
+    /// whatever was there.
+    nonisolated static func copy(_ url: URL, to destination: URL) throws {
+        let files = FileManager.default
+        guard files.fileExists(atPath: destination.path) else { return try files.copyItem(at: url, to: destination) }
+        let staged = destination.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString)-\(destination.lastPathComponent)")
+        try files.copyItem(at: url, to: staged)
+        do {
+            _ = try files.replaceItemAt(destination, withItemAt: staged)
+        } catch {
+            try? files.removeItem(at: staged)
+            throw error
         }
     }
 
@@ -381,6 +416,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
 
     public func windowWillClose(_ notification: Notification) {
         making?.cancel()
+        loading?.cancel()
         player.player?.pause()
         if let timeObserver { player.player?.removeTimeObserver(timeObserver) }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }

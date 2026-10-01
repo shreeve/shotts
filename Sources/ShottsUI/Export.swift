@@ -58,12 +58,18 @@ public enum Export {
     /// first, so no more than the latest drag's picture is ever left on disk: the app it was
     /// dropped on has had its copy by the next drag.
     public static func temporaryFile(_ document: Document, source: CGImage) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Shotts Drag", isDirectory: true)
-        try? FileManager.default.removeItem(at: folder)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent(suggestedName())
+        let url = try temporaryFolder("Shotts Drag").appendingPathComponent(suggestedName())
         try write(document, source: source, to: url)
         return url
+    }
+
+    /// A temporary folder of this name, emptied first, so it never holds more than the latest
+    /// file put in it: the app it went to has had its copy by the next. Readable by its user alone.
+    public static func temporaryFolder(_ name: String) throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(name, isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return folder
     }
 
     public enum ExportError: Error { case render }

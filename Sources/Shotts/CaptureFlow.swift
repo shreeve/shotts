@@ -23,6 +23,11 @@ final class CaptureFlow {
     private var recordings: [RecordingWindowController] = []
     /// Tells the menu bar item when a recording starts, with its recorder, and stops, with nil.
     var onRecording: ((Recorder?) -> Void)?
+    /// A stopped recording's files are being finished; its window opens next.
+    private var finishing = false
+
+    /// Whether a recording is being made or finished, which quitting would lose.
+    var isRecording: Bool { recording?.recorder != nil || finishing }
 
     private struct RecordingSession {
         var setup: RecordingSetup
@@ -50,7 +55,7 @@ final class CaptureFlow {
     /// a recording is being set up.
     func begin() {
         if recording?.recorder != nil { stopRecording(); return }
-        guard capture == nil, recording == nil else { return }
+        guard capture == nil, recording == nil, !finishing else { return }
         let frontmost = NSWorkspace.shared.frontmostApplication
         capture = Capture(frontmost: frontmost, returnTo: appToReturnTo(from: frontmost))
         guard ScreenCapture.hasPermission else {
@@ -233,13 +238,20 @@ final class CaptureFlow {
     func stopRecording() {
         guard let session = recording, let recorder = session.recorder else { return }
         recording = nil
+        finishing = true
         onRecording?(nil)
         session.setup.close()
         Task {
+            defer { finishing = false }
             do {
                 let made = try await recorder.stop()
-                let contents = try await RecordingExport.contents(of: made)
-                openRecording(made, contents: contents, on: session.setup.screen, returningTo: session.returnTo)
+                do {
+                    let contents = try await RecordingExport.contents(of: made)
+                    openRecording(made, contents: contents, on: session.setup.screen, returningTo: session.returnTo)
+                } catch {
+                    Recording.removeFolder(made.folder)
+                    throw error
+                }
             } catch {
                 fail("Shotts could not finish the recording", error)
             }

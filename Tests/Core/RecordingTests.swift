@@ -48,6 +48,12 @@ import Testing
         #expect(RecordingRule.defaults(for: .gif, scale: 1, hasMicrophone: true).percent == 100)
     }
 
+    @Test func theClockReadsMinutesThenHours() {
+        #expect(RecordingRule.clock(0) == "0:00" && RecordingRule.clock(-3) == "0:00")
+        #expect(RecordingRule.clock(65.9) == "1:05")
+        #expect(RecordingRule.clock(3600 + 62) == "1:01:02")
+    }
+
     @Test func sizesAreShareOfTheRecording() {
         #expect(RecordingRule.sizes == [100, 75, 50, 25])
         let recorded = (width: 1898, height: 948)

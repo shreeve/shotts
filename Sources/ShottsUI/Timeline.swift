@@ -56,14 +56,9 @@ final class Timeline: NSView {
     }
 
     private func showTime() {
-        time.stringValue = "\(Self.clock(track.playhead)) / \(Self.clock(track.duration))"
+        time.stringValue = "\(RecordingRule.clock(track.playhead)) / \(RecordingRule.clock(track.duration))"
     }
 
-    /// `m:ss`, or `h:mm:ss` from an hour.
-    static func clock(_ seconds: Double) -> String {
-        let s = Int(max(seconds, 0))
-        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
-    }
 }
 
 /// The track: the whole recording across it, the part kept between two brackets, and the
