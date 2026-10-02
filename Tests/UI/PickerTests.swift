@@ -301,3 +301,36 @@ extension OverlayView {
         #expect(window.id == 7)
     }
 }
+
+@MainActor @Suite struct PickerArrowKeyTests {
+    /// The arrow keys move the crosshair a pixel (ten with Shift), and the real pointer with it;
+    /// during a drag they move the corner being dragged.
+    @Test func arrowKeysMoveAPixel() throws {
+        let view = try overlay()
+        var warps = 0
+        view.warp = { _ in warps += 1 }
+        view.point(at: CGPoint(x: 20.2, y: 30.2))
+        view.nudge(by: CGPoint(x: 1, y: 0))
+        let pointer = try #require(view.pointer)
+        #expect(abs(pointer.x - 20.75) < 1e-6 && abs(pointer.y - 30.25) < 1e-6)
+        #expect(warps == 1)
+        view.pressed(at: CGPoint(x: 10, y: 10))
+        view.dragged(to: CGPoint(x: 50.25, y: 40.25), square: false)
+        view.nudge(by: CGPoint(x: 10, y: 0))
+        let selection = try #require(view.selection)
+        #expect(abs(selection.maxX - 55.25) < 1e-6 && abs(selection.maxY - 40.25) < 1e-6 && selection.minX == 10)
+        #expect(warps == 2)
+    }
+
+    /// Keyboard events reach it: Shift moves ten.
+    @Test func shiftArrowMovesTen() throws {
+        let view = try overlay()
+        view.warp = { _ in }
+        view.point(at: CGPoint(x: 20.2, y: 30.2))
+        let down = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .shift, timestamp: 0, windowNumber: 0,
+                                                 context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 125))
+        view.keyDown(with: down)
+        let pointer = try #require(view.pointer)
+        #expect(abs(pointer.y - 35.25) < 1e-6)
+    }
+}

@@ -203,8 +203,7 @@ import Testing
         #expect(canvas.textField != nil && canvas.selectedID == nil)
     }
 
-    /// The arrow keys nudge the selection a point (two pixels at 2x), ten with Shift, each
-    /// press one undo step.
+    /// The arrow keys nudge the selection a pixel, ten with Shift, each press one undo step.
     @Test func arrowKeysNudgeTheSelection() throws {
         let canvas = canvasInWindow()
         let mouse = Mouse(canvas: canvas)
@@ -216,12 +215,76 @@ import Testing
             NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: canvas.window!.windowNumber,
                              context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
         }
-        canvas.keyDown(with: arrow(124))              // right a point
+        canvas.keyDown(with: arrow(124))              // right a pixel
         canvas.keyDown(with: arrow(125, .shift))      // down ten
         let moved = try #require(canvas.document.annotations.first).bounds
-        #expect(moved.origin == CGPoint(x: 42, y: 60))
+        #expect(moved.origin == CGPoint(x: 41, y: 50))
         canvas.undo(nil)
-        #expect(try #require(canvas.document.annotations.first).bounds.origin == CGPoint(x: 42, y: 40))
+        #expect(try #require(canvas.document.annotations.first).bounds.origin == CGPoint(x: 41, y: 40))
+    }
+
+    private func space(_ type: NSEvent.EventType, in canvas: CanvasView) -> NSEvent {
+        NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: canvas.window!.windowNumber,
+                         context: nil, characters: " ", charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49)!
+    }
+
+    /// Space held while drawing moves the shape with the pointer instead of growing it; let go,
+    /// and the drag goes on resizing from where it was moved to.
+    @Test func spaceMovesTheShapeBeingDrawn() throws {
+        for tool in [Tool.rectangle, .ellipse, .obscure, .arrow, .line] {
+            let canvas = canvasInWindow()
+            let mouse = Mouse(canvas: canvas)
+            canvas.tool = tool
+            mouse.down(CGPoint(x: 40, y: 40))
+            mouse.drag(CGPoint(x: 140, y: 140))
+            canvas.keyDown(with: space(.keyDown, in: canvas))
+            mouse.drag(CGPoint(x: 160, y: 150))
+            canvas.keyUp(with: space(.keyUp, in: canvas))
+            mouse.drag(CGPoint(x: 170, y: 150))
+            mouse.up(CGPoint(x: 170, y: 150))
+            let shape = try #require(canvas.document.annotations.first).shape
+            switch shape {
+            case let .rectangle(r, _), let .ellipse(r, _), let .obscure(r):
+                #expect(r == CGRect(x: 60, y: 50, width: 110, height: 100), "\(tool)")
+            case let .arrow(from, to), let .line(from, to):
+                #expect(from == CGPoint(x: 60, y: 50) && to == CGPoint(x: 170, y: 150), "\(tool)")
+            default:
+                Issue.record("unexpected \(shape)")
+            }
+        }
+    }
+
+    /// A drawing tool pressed on what is already there selects it, and a drag moves it, rather
+    /// than drawing a new one on top.
+    @Test func drawingToolsSelectWhatTheyPress() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .rectangle
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 140, y: 140))
+        let id = try #require(canvas.document.annotations.first).id
+        for tool in [Tool.ellipse, .callout, .text, .obscure] {
+            canvas.tool = tool
+            mouse.down(CGPoint(x: 40, y: 90))
+            #expect(canvas.selectedID == id, "\(tool)")
+            mouse.drag(CGPoint(x: 50, y: 90))
+            mouse.up(CGPoint(x: 50, y: 90))
+            canvas.undo(nil)
+            #expect(canvas.document.annotations.count == 1 && canvas.textField == nil, "\(tool)")
+        }
+    }
+
+    /// The pen and highlighter mark over anything, and every tool but obscure draws over an
+    /// obscured area.
+    @Test func someToolsDrawOverWhatIsThere() throws {
+        let canvas = canvasInWindow()
+        let mouse = Mouse(canvas: canvas)
+        canvas.tool = .obscure
+        mouse.stroke(CGPoint(x: 40, y: 40), CGPoint(x: 140, y: 140))
+        canvas.tool = .arrow
+        mouse.stroke(CGPoint(x: 90, y: 90), CGPoint(x: 200, y: 200))
+        canvas.tool = .pen
+        mouse.stroke(CGPoint(x: 200, y: 200), CGPoint(x: 250, y: 220))
+        #expect(canvas.document.annotations.count == 3)
     }
 
     @Test func aMoveIsOneStep() {

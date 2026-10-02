@@ -37,6 +37,7 @@ stops a recording under way.
 | Drag | Selects an area; everything outside it dims (unless Dim Outside Selection is off). Its size in pixels shows in the magnifier, or beside the selection when the magnifier is off. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
+| Arrow keys | Move the crosshair a pixel, or ten with Shift, and the pointer with it; while dragging, the corner being dragged. |
 | Command as the drag ends | Records the area instead (see Recording). While Command is down, the selection's outline is red and its size reads "Record". |
 | Release | Captures the area as it is at that moment, at the display's full resolution, puts it on the clipboard (unless Copy to Clipboard is off), and opens the editor. |
 | Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
@@ -94,11 +95,11 @@ as the screen allows.
 
 | Tool | Key | What it draws |
 | --- | --- | --- |
-| Select | V | Click an annotation to select it; drag to move it, or nudge it with the arrow keys, a point at a time or ten with Shift; Delete removes it. Double-click text or a callout's words to edit them. |
+| Select | V | Click an annotation to select it; drag to move it, or nudge it with the arrow keys, a pixel at a time or ten with Shift; Delete removes it. Double-click text or a callout's words to edit them. |
 | Arrow with text | N | An arrow with words at its tail, one object; see below. The tool a first capture starts with. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
-| Line | L | A straight line, round at both ends. Shift snaps it to horizontal, vertical, or 45°. Drag either end to reshape it; clicking an existing line with this tool selects it. |
-| Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line; Command-Return finishes, as do a click elsewhere or another tool, and Escape cancels the text. Clicking an existing text edits it. |
+| Line | L | A straight line, round at both ends. Shift snaps it to horizontal, vertical, or 45°. Drag either end to reshape it. |
+| Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line; Command-Return finishes, as do a click elsewhere or another tool, and Escape cancels the text. Clicking an existing text, or a callout's words, edits them. |
 | Rectangle | R | A stroked rectangle. Shift for a square; Option for a solid one. |
 | Ellipse | E | A stroked ellipse. Shift for a circle; Option for a solid one. |
 | Pen | P | A smooth freehand stroke. |
@@ -107,6 +108,13 @@ as the screen allows.
 | Crop | C | Drag the part to keep; everything outside is left out of the export. Shift for a square. A click clears the crop. |
 
 After the first capture, a new capture starts with the drawing tool last used.
+
+With any drawing tool, pressing on an annotation already there selects it, as the select tool
+would, and dragging moves or reshapes it, rather than drawing a new one on top. The pen and
+highlighter mark over anything, crop crops, and only Obscure selects an obscured area: every
+other tool draws over one. Holding Space while dragging out a shape (a rectangle, ellipse,
+obscured area, crop, arrow, or line) moves it with the pointer instead of growing it, as in the
+picker; letting go of Space goes back to growing it.
 
 Every tool but Obscure draws with the chosen color and line width; the highlighter uses them
 translucent and three times as wide, never under 12 points. Text uses the chosen size and font:
@@ -130,8 +138,8 @@ the tail:
 - A line runs to within 8 points of the picture's edge before it wraps; Return breaks a line
   sooner, and Command-Return finishes. The words keep that margin from every edge.
 
-An arrow and its words are one object. With the select tool, or with either arrow tool clicking
-an existing arrow, dragging the shaft moves the whole; dragging the dot at the tail's end, or
+An arrow and its words are one object. Pressed with the select tool, or any drawing tool but
+the pen, highlighter, and crop, dragging the shaft moves the whole; dragging the dot at the tail's end, or
 the words, moves the tail with the tip staying put; dragging the head moves the tip with the
 tail staying put. The words lay themselves out again after any reshape. Double-click the words
 to retype them; words left empty turn the callout into a plain arrow.

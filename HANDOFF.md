@@ -10,7 +10,7 @@ with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/
 installed copies are offered it through Sparkle. It brings screen recording (shreeve/shotts#64)
 and a second revamp (shreeve/shotts#65): recording made robust against busy encoders, quits and
 failed files, GIF fixes, editor fixes, and a smaller app. `CHANGELOG.md` has every release. The
-build has no warnings (warnings are errors) and `swift test` passes: 86 Core tests and 84 AppKit
+build has no warnings (warnings are errors) and `swift test` passes: 87 Core tests and 89 AppKit
 tests. Shotts has only ever run on macOS 27, and recording has been tried by hand only briefly.
 
 Next, in order:
@@ -269,9 +269,13 @@ tool builds a `live` annotation that commits on mouse up; Shift squares a rectan
 and Option fills it, and either may change mid-drag. A change made in place (a move with the
 select tool, a text entry, a new callout with its words) keeps `base`, the document when it
 began, and ends with `History.record(since:)`: one undo step, or none if nothing changed. Escape
-during a move restores `base`. The arrow tools select an existing arrow or callout on click
-instead of drawing, and the text tool edits a text it clicks. The arrow keys nudge the selection (`nudge`), a
-point at a time or ten with Shift, one undo step each; while typing they are the text view's. Arrows and callouts show a dot at
+during a move restores `base`. A drawing tool pressed on an annotation selects it instead of
+drawing (`Tool.selects`: not the pen, highlighter, or crop, and an obscured area only for
+Obscure), and the text tool edits the text or callout words it clicks. Space during a drag
+moves the shape being drawn (its anchor follows the pointer). The arrow keys nudge the
+selection (`nudge`), a pixel at a time or ten with Shift, one undo step each; while typing they
+are the text view's. In the picker they move the crosshair (`SelectionRule.nudged`) and warp
+the real pointer to match (`OverlayView.warp`, replaced in tests). Arrows and callouts show a dot at
 each end; everything else a dashed box. While dragging, only the extent of what moved is redrawn
 (`Renderer.extent`, converted to the view); a crop dims the whole picture and redraws it all.
 

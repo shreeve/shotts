@@ -30,6 +30,15 @@ import Testing
         #expect(abs(up.x - 100) < 1e-9 && abs(up.y - 20) < 1e-9)
     }
 
+    /// The picker's arrow keys move a whole pixel, landing in its middle, and stop at the edges.
+    @Test func nudgingMovesWholePixels() {
+        let bounds = CGRect(x: 0, y: 0, width: 100, height: 50)
+        #expect(SelectionRule.nudged(CGPoint(x: 10.2, y: 5.9), by: CGPoint(x: 1, y: 0), scale: 2, within: bounds) == CGPoint(x: 10.75, y: 5.75))
+        #expect(SelectionRule.nudged(CGPoint(x: 10.2, y: 5.9), by: CGPoint(x: -10, y: 10), scale: 2, within: bounds) == CGPoint(x: 5.25, y: 10.75))
+        #expect(SelectionRule.nudged(CGPoint(x: 0.1, y: 49.9), by: CGPoint(x: -10, y: 10), scale: 2, within: bounds) == CGPoint(x: 0.25, y: 49.75))
+        #expect(SelectionRule.nudged(CGPoint(x: 3, y: 3), by: CGPoint(x: 1, y: 1), scale: 1, within: bounds) == CGPoint(x: 4.5, y: 4.5))
+    }
+
     @Test func pixelRectSnapsAndClips() {
         let r = SelectionRule.pixelRect(CGRect(x: 10.3, y: 5.6, width: 20.2, height: 4), scale: 2, within: CGRect(x: 0, y: 0, width: 50, height: 50))
         #expect(r == CGRect(x: 20, y: 11, width: 30, height: 9)) // 20.6…61 by 11.2…19.2, snapped outward, clipped at 50

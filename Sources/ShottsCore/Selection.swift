@@ -36,6 +36,17 @@ public enum SelectionRule {
         return CGPoint(x: anchor.x + length * cos(angle), y: anchor.y + length * sin(angle))
     }
 
+    /// The arrow keys in the picker: the point `pixels` whole pixels on from the pixel under `point`
+    /// (both in points, at `scale` pixels a point), at that pixel's middle so the pixel shown
+    /// under the crosshair is the one meant, and never past `bounds`.
+    public static func nudged(_ point: CGPoint, by pixels: CGPoint, scale: Double, within bounds: CGRect) -> CGPoint {
+        func axis(_ v: Double, _ d: Double, _ lo: Double, _ hi: Double) -> Double {
+            let first = (lo * scale).rounded(.up), last = (hi * scale).rounded(.up) - 1
+            return (min(max((v * scale).rounded(.down) + d, first), last) + 0.5) / scale
+        }
+        return CGPoint(x: axis(point.x, pixels.x, bounds.minX, bounds.maxX), y: axis(point.y, pixels.y, bounds.minY, bounds.maxY))
+    }
+
     /// Snaps a rectangle to whole pixels and clips it to the image.
     public static func pixelRect(_ rect: CGRect, scale: Double, within pixelBounds: CGRect) -> CGRect {
         let scaled = CGRect(x: rect.minX * scale, y: rect.minY * scale, width: rect.width * scale, height: rect.height * scale)
