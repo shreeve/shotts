@@ -5,6 +5,16 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.5.1 — 2026-10-01
+
+- Hold Space while drawing a rectangle, ellipse, obscured area, crop, arrow, or line to move it
+  with the pointer, as in the picker.
+- Pressing on an annotation with a drawing tool selects it, and dragging moves it, instead of
+  drawing a new one on top. The pen and highlighter still mark over anything, and an obscured
+  area is drawn over by every tool but Obscure.
+- In the picker, the arrow keys move the crosshair a pixel, or ten with Shift; while dragging,
+  the corner. In the editor they now move the selection a pixel too, not a point.
+
 ## 0.5.0 — 2026-09-30
 
 - Screen recording: hold Command as the drag ends to record the area. A small panel starts it,

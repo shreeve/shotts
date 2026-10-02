@@ -53,6 +53,19 @@ public enum Tool: Int, CaseIterable, Sendable {
         case .crop: "crop"
         }
     }
+
+    /// Whether a press with this tool on an annotation of `shape` selects it, to move or reshape,
+    /// rather than drawing a new one over it: what is already there is usually what was meant.
+    /// The pen and highlighter mark over anything, and crop crops; an obscured area, often large,
+    /// is drawn over by every tool but obscure, so an arrow or a box can start on it.
+    func selects(_ shape: Annotation.Shape) -> Bool {
+        switch self {
+        case .pen, .highlighter, .crop: return false
+        default:
+            if case .obscure = shape { return self == .obscure || self == .select }
+            return true
+        }
+    }
 }
 
 /// The picture being edited, drawn by `Renderer`, with the mouse turning into annotations.
@@ -92,6 +105,11 @@ public final class CanvasView: NSView {
     /// The tool the drag in progress behaves as: the current tool, or select when a tool clicked
     /// something it edits rather than draws over.
     private var dragTool: Tool = .select
+    /// Space is down during a drag: the shape being drawn moves with the pointer instead of
+    /// growing, as the picker's selection does.
+    private var moving = false
+    /// Where the drag was last, for moving by the difference.
+    private var lastDragPoint: CGPoint?
     private(set) var textField: TextEntry?
 
     /// The dark field around the picture, and the room its shadow needs.
@@ -210,6 +228,10 @@ public final class CanvasView: NSView {
     /// text, A arrow, L line, T text, R rectangle, E ellipse, P pen, H highlighter, O obscure,
     /// C crop.
     public override func keyDown(with event: NSEvent) {
+        if event.keyCode == 49, dragAnchor != nil { // Space, mid-drag
+            moving = true
+            return
+        }
         let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
         if plain, let direction = Self.arrowKeys[event.keyCode], selectedID != nil, dragAnchor == nil {
             nudge(direction, far: event.modifierFlags.contains(.shift))
@@ -224,14 +246,19 @@ public final class CanvasView: NSView {
         self.tool = tool
     }
 
+    public override func keyUp(with event: NSEvent) {
+        if event.keyCode == 49 { moving = false } else { super.keyUp(with: event) }
+    }
+
     private static let arrowKeys: [UInt16: CGPoint] = [123: CGPoint(x: -1, y: 0), 124: CGPoint(x: 1, y: 0),
                                                        125: CGPoint(x: 0, y: 1), 126: CGPoint(x: 0, y: -1)]
 
-    /// The arrow keys move the selection a point, or ten with Shift, each press one undo step.
-    /// While typing they move the caret instead: the text view has the keys then.
+    /// The arrow keys move the selection a pixel, or ten with Shift, each press one undo step,
+    /// as they move the picker's crosshair. While typing they move the caret instead: the text
+    /// view has the keys then.
     func nudge(_ direction: CGPoint, far: Bool) {
         guard let id = selectedID, let a = document.annotation(id) else { return }
-        let step = (far ? 10 : 1) * document.scale
+        let step: Double = far ? 10 : 1
         var d = document
         d.replace(a.translated(by: CGPoint(x: direction.x * step, y: direction.y * step)))
         commit(d)
@@ -266,20 +293,22 @@ public final class CanvasView: NSView {
         let p = imagePoint(event)
         let hit = HitTest.annotation(at: p, in: document, tolerance: hitTolerance).flatMap(document.annotation)
         dragAnchor = p
+        lastDragPoint = p
+        moving = false
         dragTool = tool
-        switch (tool, hit?.shape) {
-        case (.callout, .arrow?), (.callout, .callout?), (.arrow, .arrow?), (.arrow, .callout?), (.line, .line?):
-            // The arrow tools select an arrow or callout, and the line tool a line, as the select
-            // tool would, so what was just drawn can be moved or reshaped without changing tools.
-            dragTool = .select
-        case (.text, .text?):
-            // The text tool edits the text it clicks rather than typing over it.
-            selectedID = hit?.id
-            editText(hit!.id)
+        if tool == .text, let hit, hit.isText || HitTest.arrowPart(at: p, of: hit, scale: document.scale, tolerance: hitTolerance) == .text {
+            // The text tool edits the words it clicks rather than typing over them.
+            selectedID = hit.id
+            editText(hit.id)
             dragAnchor = nil
             return
-        default:
-            if tool != .select { selectedID = nil }
+        }
+        if let hit, tool.selects(hit.shape) {
+            // As the select tool would: what is already there can be moved or reshaped without
+            // changing tools.
+            dragTool = .select
+        } else if tool != .select {
+            selectedID = nil
         }
         switch dragTool {
         case .select:
@@ -321,8 +350,14 @@ public final class CanvasView: NSView {
     }
 
     public override func mouseDragged(with event: NSEvent) {
-        guard let anchor = dragAnchor else { return }
+        guard var anchor = dragAnchor else { return }
         let p = imagePoint(event)
+        // With Space down, a shape being drawn moves: its anchor goes where the pointer goes.
+        if moving, let last = lastDragPoint, ![.select, .pen, .highlighter].contains(dragTool) {
+            anchor = anchor + (p - last)
+            dragAnchor = anchor
+        }
+        lastDragPoint = p
         let before = dragExtent
         let shift = event.modifierFlags.contains(.shift)
         // Option while drawing makes a rectangle or ellipse solid; either key may change mid-drag.
@@ -372,7 +407,7 @@ public final class CanvasView: NSView {
 
     public override func mouseUp(with event: NSEvent) {
         guard dragAnchor != nil else { return }
-        defer { dragAnchor = nil; dragOriginal = nil; dragPart = nil; live = nil; liveCrop = nil; needsDisplay = true }
+        defer { dragAnchor = nil; dragOriginal = nil; dragPart = nil; live = nil; liveCrop = nil; lastDragPoint = nil; moving = false; needsDisplay = true }
         switch dragTool {
         case .select:
             // The drag edited the document in place; it becomes one undo step, or none.

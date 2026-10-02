@@ -117,8 +117,9 @@ public struct SelectionOptions: Equatable, Sendable {
 
 /// The area picker: one full-screen window per display showing that display as it was, where
 /// the user drags out a rectangle. Escape cancels, Shift squares the selection, Space moves it
-/// while dragging, Command held as the drag ends records the area instead, and Command-C copies
-/// the color under the crosshair and cancels.
+/// while dragging, the arrow keys move the crosshair (or the corner being dragged) a pixel at a
+/// time or ten with Shift, Command held as the drag ends records the area instead, and Command-C
+/// copies the color under the crosshair and cancels.
 public final class AreaSelection {
     public enum Outcome {
         case cancelled
@@ -238,6 +239,12 @@ final class OverlayView: NSView {
     private var moving = false
     /// Command is down: letting go of the drag records the area rather than capturing it.
     private(set) var records = false
+    /// Whether the drag is squaring the selection, which the arrow keys keep doing.
+    private var squaring = false
+    /// Moves the real pointer to a point in global display coordinates (origin at the primary
+    /// display's top-left), so a click or drag goes on from where the arrow keys put the
+    /// crosshair. Tests replace it: they never move the pointer.
+    var warp: (CGPoint) -> Void = { CGWarpMouseCursorPosition($0) }
     /// Where the drag is, on this display or past its edge.
     private var lastPointer: CGPoint = .zero
     private var hasDragged = false
@@ -359,6 +366,7 @@ final class OverlayView: NSView {
     func dragged(to p: CGPoint, square: Bool) {
         guard let anchor else { return }
         hasDragged = true
+        squaring = square
         if moving, let current = selection {
             let moved = SelectionRule.moved(current, by: p - lastPointer, within: bounds)
             selection = moved
@@ -406,9 +414,22 @@ final class OverlayView: NSView {
             onFinish?(.cancelled)
         case 49: // Space
             if anchor != nil { moving = true }
+        case 123, 124, 125, 126:
+            let far: Double = event.modifierFlags.contains(.shift) ? 10 : 1
+            let direction = [123: CGPoint(x: -far, y: 0), 124: CGPoint(x: far, y: 0), 125: CGPoint(x: 0, y: far), 126: CGPoint(x: 0, y: -far)]
+            nudge(by: direction[Int(event.keyCode)]!)
         default:
             super.keyDown(with: event)
         }
+    }
+
+    /// The crosshair, or the corner being dragged, `pixels` on, and the real pointer with it.
+    func nudge(by pixels: CGPoint) {
+        guard let from = anchor != nil ? lastPointer : pointer else { return }
+        let to = SelectionRule.nudged(from, by: pixels, scale: display.scale, within: bounds)
+        let screen = display.screen.frame, primary = NSScreen.screens.first?.frame.maxY ?? screen.maxY
+        warp(CGPoint(x: screen.minX + to.x, y: primary - (screen.maxY - to.y)))
+        if anchor != nil { dragged(to: to, square: squaring) } else { pointerMoved(to: convert(to, to: nil)) }
     }
 
     override func keyUp(with event: NSEvent) {
@@ -662,6 +683,7 @@ final class OverlayView: NSView {
     static let hints = [
         "Drag an area, or click a window, to capture it",
         "⇧ keeps it square, Space moves it",
+        "Arrow keys move a pixel, ⇧ ten",
         "⌘ as you let go records it instead",
         "⌘C copies the color under the crosshair",
         "Esc cancels",
