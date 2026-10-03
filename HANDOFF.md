@@ -11,7 +11,7 @@ installed copies are offered it through Sparkle. 0.5.1 (shreeve/shotts#66): Spac
 being drawn, drawing tools select what they press, and the arrow keys move by the pixel in the
 picker and the editor. 0.5.0 brought screen recording (shreeve/shotts#64) and a second revamp
 (shreeve/shotts#65). `CHANGELOG.md` has every release. The build has no warnings (warnings are
-errors) and `swift test` passes: 87 Core tests and 89 AppKit tests. Shotts has only ever run on
+errors) and `swift test` passes: 87 Core tests and 90 AppKit tests. Shotts has only ever run on
 macOS 27, and recording has been tried by hand only briefly.
 
 Next, in order:
@@ -435,6 +435,10 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   the text moved there.
 - A zip of a release fetched by clicking a link inside the Claude app gets a quarantine
   Gatekeeper calls "damaged", though the app is fine; test downloads through a browser.
+- A mouse event reaching the picker, a panel of an app kept in the background, may carry no
+  modifier flags though a key is held: Command-release took screenshots while the selection
+  showed red. The picker reads `NSEvent.modifierFlags` (the keyboard) as well, and a release
+  records whenever the selection shows red.
 - Swift Testing interleaves `@MainActor` tests at their `await`s, and a notification one test
   posts is delivered later on the main queue, possibly to the next test's observer. The picker
   tests are `.serialized` for that reason.
