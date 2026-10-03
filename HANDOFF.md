@@ -5,15 +5,16 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.5.2 is the latest release: tag `v0.5.2` on `main` (commit "Shotts 0.5.2"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#30);
-installed copies are offered it through Sparkle. 0.5.2 (shreeve/shotts#67) makes Command-release
-record whenever the selection shows red (it could capture instead). 0.5.1 (shreeve/shotts#66):
-Space moves a shape being drawn, drawing tools select what they press, and arrow keys move by the
-pixel. 0.5.0 brought screen recording (shreeve/shotts#64) and a second revamp
-(shreeve/shotts#65). `CHANGELOG.md` has every release. The build has no warnings (warnings are
-errors) and `swift test` passes: 87 Core tests and 92 AppKit tests. Shotts has only ever run on
-macOS 27, and recording has been tried by hand only briefly.
+0.5.3 is the latest release: tag `v0.5.3` on `main` (commit "Shotts 0.5.3"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#32);
+installed copies are offered it through Sparkle. 0.5.3 (shreeve/shotts#68) makes recording from
+the picker work: a Command press during the drag toggles the red, record state, its release
+does nothing, and the picker's view takes the keys (0.5.2, shreeve/shotts#67, did not fix it).
+0.5.1 (shreeve/shotts#66): Space moves a shape being drawn, drawing tools select what they press,
+and arrow keys move by the pixel. 0.5.0 brought screen recording (shreeve/shotts#64) and a second
+revamp (shreeve/shotts#65). `CHANGELOG.md` has every release. The build has no warnings
+(warnings are errors) and `swift test` passes: 87 Core tests and 92 AppKit tests. Shotts has
+only ever run on macOS 27, and recording has been tried by hand only briefly.
 
 Next, in order:
 
