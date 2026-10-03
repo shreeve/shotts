@@ -293,8 +293,9 @@ extension OverlayView {
         guard case .record? = outcome else { Issue.record("captured instead of recording"); return }
     }
 
-    /// While Command is down the selection reads "Record" and its size, not the color.
-    @Test func commandShowsTheRecordingToBe() throws {
+    /// Pressing Command turns the selection red, reading "Record" and its size, not the color;
+    /// letting go of Command keeps it red; pressing again turns it back.
+    @Test func commandPressesToggleRecording() throws {
         let view = try overlay()
         view.pressed(at: CGPoint(x: 20, y: 20))
         view.dragged(to: CGPoint(x: 120, y: 80), square: false)
@@ -303,7 +304,35 @@ extension OverlayView {
         #expect(view.records)
         #expect(view.magnifier(at: CGPoint(x: 120, y: 80)).text == "Record  200 × 120")
         view.commandChanged(false)
+        #expect(view.records)
+        view.commandChanged(true)
         #expect(!view.records)
+        view.commandChanged(false)
+        #expect(!view.records)
+    }
+
+    /// Command let go a moment before the mouse, as when both are let go together, still records.
+    @Test func commandLetGoJustBeforeTheMouseStillRecords() throws {
+        let view = try overlay()
+        var outcome: AreaSelection.Outcome?
+        view.onFinish = { outcome = $0 }
+        view.pressed(at: CGPoint(x: 20, y: 20))
+        view.dragged(to: CGPoint(x: 120, y: 80), square: false)
+        func flags(_ f: NSEvent.ModifierFlags) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: f, timestamp: 0, windowNumber: view.window!.windowNumber,
+                                          context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 55))
+        }
+        view.flagsChanged(with: try flags(.command))
+        view.flagsChanged(with: try flags([]))
+        view.released(at: CGPoint(x: 120, y: 80), recording: view.records)
+        guard case .record? = outcome else { Issue.record("captured instead of recording"); return }
+    }
+
+    /// The picker's view, not its window, gets the keys and modifier changes.
+    @Test func theViewTakesTheKeys() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let window = OverlayWindow(display: DisplayImage(screen: screen, image: blankImage(40, 30), scale: 2), options: SelectionOptions())
+        #expect(window.initialFirstResponder === window.overlayView)
     }
 
     /// A click, Command or not, still captures the window under it.

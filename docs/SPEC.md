@@ -6,7 +6,7 @@ the code disagree, find out which is wrong and fix that one.
 ## The product
 
 Shotts is a Mac screenshot tool that lives in the menu bar and takes one motion from key press
-to paste: F10, drag out an area, mark it up, Command-C. Holding Command as the drag ends records
+to paste: F10, drag out an area, mark it up, Command-C. Pressing Command while dragging records
 the area instead, to save as an MP4 or an animated GIF. It runs on macOS 14 and later on Apple
 silicon. It captures and records only what the user selects, only when the user asks, and keeps
 nothing on disk that the user did not save or drag out, but for a recording's own files while
@@ -38,7 +38,7 @@ stops a recording under way.
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
 | Arrow keys | Move the crosshair a pixel, or ten with Shift, and the pointer with it; while dragging, the corner being dragged. |
-| Command as the drag ends | Records the area instead (see Recording). While Command is down, the selection's outline is red and its size reads "Record". |
+| Command while dragging | Records the area instead (see Recording): the selection's outline turns red and its size reads "Record". Letting go of Command keeps it so; pressing Command again turns it back. Letting go of the drag records whenever the selection is red. |
 | Release | Captures the area as it is at that moment, at the display's full resolution, puts it on the clipboard (unless Copy to Clipboard is off), and opens the editor. |
 | Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
 | Escape | Cancels, even mid-drag. Nothing is kept. |
@@ -184,7 +184,8 @@ capture came from. A cancelled capture goes back to the app that was in front.
 
 ## Recording
 
-Holding Command as the drag ends records the area rather than capturing it. Letting go leaves
+Pressing Command while dragging, so the selection turns red, records the area rather than
+capturing it. Letting go leaves
 the area outlined in red, with a small panel beside it; nothing records yet.
 
 | Control | Effect |

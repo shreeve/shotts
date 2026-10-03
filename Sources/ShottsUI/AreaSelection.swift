@@ -118,8 +118,8 @@ public struct SelectionOptions: Equatable, Sendable {
 /// The area picker: one full-screen window per display showing that display as it was, where
 /// the user drags out a rectangle. Escape cancels, Shift squares the selection, Space moves it
 /// while dragging, the arrow keys move the crosshair (or the corner being dragged) a pixel at a
-/// time or ten with Shift, Command held as the drag ends records the area instead, and Command-C
-/// copies the color under the crosshair and cancels.
+/// time or ten with Shift, pressing Command during the drag records the area instead (pressing
+/// it again goes back), and Command-C copies the color under the crosshair and cancels.
 public final class AreaSelection {
     public enum Outcome {
         case cancelled
@@ -169,6 +169,7 @@ public final class AreaSelection {
         // non-activating panels, which take keys and clicks while the app in front stays in
         // front. Keys go to the display the pointer is on.
         let mouse = NSEvent.mouseLocation
+        for window in windows { window.makeFirstResponder(window.overlayView) }
         (windows.first { $0.frame.contains(mouse) } ?? windows.first)?.makeKeyAndOrderFront(nil)
         // Start with the crosshair where the pointer already is, not at a corner waiting for
         // the first movement.
@@ -219,6 +220,9 @@ final class OverlayWindow: NSPanel {
         hasShadow = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         contentView = overlayView
+        // The view, not the window, gets the keys and the modifier changes: Command, Space,
+        // Shift, the arrows, and Escape.
+        initialFirstResponder = overlayView
         acceptsMouseMovedEvents = true
     }
 
@@ -237,8 +241,13 @@ final class OverlayView: NSView {
     /// shows no crosshair, magnifier, hints, or window outline: there is one pointer.
     private(set) var pointer: CGPoint?
     private var moving = false
-    /// Command is down: letting go of the drag records the area rather than capturing it.
+    /// The selection is red: letting go of the drag records the area rather than capturing it.
+    /// Pressing Command turns it on, and pressing it again off; letting go of Command does
+    /// neither, so a Command released a moment before the mouse, as happens when both are let
+    /// go together, still records. What the selection shows is what letting go does.
     private(set) var records = false
+    /// Whether Command is down, to tell a press from a key held.
+    private var commandDown = false
     /// Whether the drag is squaring the selection, which the arrow keys keep doing.
     private var squaring = false
     /// Moves the real pointer to a point in global display coordinates (origin at the primary
@@ -338,7 +347,11 @@ final class OverlayView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         window?.makeKey()
+        window?.makeFirstResponder(self)
         pressed(at: convert(event.locationInWindow, from: nil))
+        // Command already down as the drag begins records from the start.
+        commandDown = Self.held(event).contains(.command)
+        records = commandDown
     }
 
     /// `p` in the view's coordinates.
@@ -352,7 +365,9 @@ final class OverlayView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         let held = Self.held(event)
-        commandChanged(held.contains(.command))
+        // A press seen first here, should the modifier change itself not have arrived; this only
+        // ever turns recording on, so a late event cannot undo a second press.
+        if held.contains(.command), !records { commandChanged(true) }
         dragged(to: convert(event.locationInWindow, from: nil), square: held.contains(.shift))
     }
 
@@ -363,10 +378,12 @@ final class OverlayView: NSView {
         event.modifierFlags.union(NSEvent.modifierFlags)
     }
 
-    /// The selection turns red, and reads "Record", while Command is down.
+    /// Command went down or up. Each press flips the selection between capturing and recording
+    /// (red, reading "Record"); letting go of the key changes nothing.
     func commandChanged(_ down: Bool) {
-        guard down != records else { return }
-        records = down
+        defer { commandDown = down }
+        guard down, !commandDown else { return }
+        records.toggle()
         needsDisplay = true
     }
 
@@ -398,7 +415,7 @@ final class OverlayView: NSView {
 
     /// Letting go records whenever the selection shows red: what the picker shows is what it does.
     override func mouseUp(with event: NSEvent) {
-        released(at: convert(event.locationInWindow, from: nil), recording: records || Self.held(event).contains(.command))
+        released(at: convert(event.locationInWindow, from: nil), recording: records)
     }
 
     /// `p` in the view's coordinates; `recording` when Command is down as the drag ends.
@@ -693,7 +710,7 @@ final class OverlayView: NSView {
         "Drag an area, or click a window, to capture it",
         "⇧ keeps it square, Space moves it",
         "Arrow keys move a pixel, ⇧ ten",
-        "⌘ as you let go records it instead",
+        "⌘ while dragging records it instead",
         "⌘C copies the color under the crosshair",
         "Esc cancels",
     ]

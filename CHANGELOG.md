@@ -5,6 +5,13 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.5.3 — 2026-10-03
+
+- Recording from the picker works: press Command while dragging and the selection turns red;
+  letting go records. Letting go of Command no longer turns it back (it often comes a moment
+  before the mouse); press Command again for a screenshot instead. Command presses always reach
+  the picker now.
+
 ## 0.5.2 — 2026-10-03
 
 - Holding Command as you let go of a drag records the area again: the picker could take a

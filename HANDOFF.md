@@ -12,7 +12,7 @@ record whenever the selection shows red (it could capture instead). 0.5.1 (shree
 Space moves a shape being drawn, drawing tools select what they press, and arrow keys move by the
 pixel. 0.5.0 brought screen recording (shreeve/shotts#64) and a second revamp
 (shreeve/shotts#65). `CHANGELOG.md` has every release. The build has no warnings (warnings are
-errors) and `swift test` passes: 87 Core tests and 90 AppKit tests. Shotts has only ever run on
+errors) and `swift test` passes: 87 Core tests and 92 AppKit tests. Shotts has only ever run on
 macOS 27, and recording has been tried by hand only briefly.
 
 Next, in order:
@@ -176,9 +176,10 @@ is signed with the Developer ID rather than ad hoc.
 
 ## Recording
 
-Command held as a drag ends makes the picker report `.record` rather than `.selected`
-(`OverlayView.released(at:recording:)`; the outline turns red and the label reads "Record" while
-Command is down). `CaptureFlow` stops the picker's streams and shows a `RecordingSetup`: a red
+Pressing Command during a drag turns the selection red ("Record"), and letting go of the drag
+then reports `.record` rather than `.selected` (`OverlayView.released(at:recording:)`). Each
+Command press flips it; letting go of Command does not, since Command and the mouse let go
+together often send Command's release first. `CaptureFlow` stops the picker's streams and shows a `RecordingSetup`: a red
 outline window just outside the area and a non-activating panel beside it, like the picker's,
 so nothing on screen moves. Record (Return) asks for the microphone if it is on and not yet
 allowed, then starts a `Recorder`; the panel becomes the recording bar and the outline stays. F10
@@ -436,10 +437,11 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   the text moved there.
 - A zip of a release fetched by clicking a link inside the Claude app gets a quarantine
   Gatekeeper calls "damaged", though the app is fine; test downloads through a browser.
-- A mouse event reaching the picker, a panel of an app kept in the background, may carry no
-  modifier flags though a key is held: Command-release took screenshots while the selection
-  showed red. The picker reads `NSEvent.modifierFlags` (the keyboard) as well, and a release
-  records whenever the selection shows red.
+- Command-release took screenshots (0.5.0-0.5.2): the picker's view was never its window's first
+  responder, so modifier changes could miss it, and letting go of Command (which comes a moment
+  before the mouse when both are let go together) turned recording off. The view is now first
+  responder (`initialFirstResponder`), a Command press toggles recording and its release does
+  nothing, and a release records exactly when the selection shows red.
 - Swift Testing interleaves `@MainActor` tests at their `await`s, and a notification one test
   posts is delivered later on the main queue, possibly to the next test's observer. The picker
   tests are `.serialized` for that reason.
