@@ -351,8 +351,16 @@ final class OverlayView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        commandChanged(event.modifierFlags.contains(.command))
-        dragged(to: convert(event.locationInWindow, from: nil), square: event.modifierFlags.contains(.shift))
+        let held = Self.held(event)
+        commandChanged(held.contains(.command))
+        dragged(to: convert(event.locationInWindow, from: nil), square: held.contains(.shift))
+    }
+
+    /// The modifier keys down at `event`. The picker belongs to an app kept in the background,
+    /// and a mouse event reaching it may carry no modifier flags though a key is held, so the
+    /// keyboard's own state counts too.
+    static func held(_ event: NSEvent) -> NSEvent.ModifierFlags {
+        event.modifierFlags.union(NSEvent.modifierFlags)
     }
 
     /// The selection turns red, and reads "Record", while Command is down.
@@ -388,8 +396,9 @@ final class OverlayView: NSView {
         selection = rect.isNull ? nil : rect
     }
 
+    /// Letting go records whenever the selection shows red: what the picker shows is what it does.
     override func mouseUp(with event: NSEvent) {
-        released(at: convert(event.locationInWindow, from: nil), recording: event.modifierFlags.contains(.command))
+        released(at: convert(event.locationInWindow, from: nil), recording: records || Self.held(event).contains(.command))
     }
 
     /// `p` in the view's coordinates; `recording` when Command is down as the drag ends.

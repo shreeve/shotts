@@ -5,6 +5,11 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## 0.5.2 — 2026-10-03
+
+- Holding Command as you let go of a drag records the area again: the picker could take a
+  screenshot instead, though the selection showed red. Whenever it shows red, letting go records.
+
 ## 0.5.1 — 2026-10-01
 
 - Hold Space while drawing a rectangle, ellipse, obscured area, crop, arrow, or line to move it

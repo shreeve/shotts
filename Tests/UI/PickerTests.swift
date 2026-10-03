@@ -277,6 +277,22 @@ extension OverlayView {
         }
     }
 
+    /// Letting go records whenever the selection shows red, even when the mouse-up itself
+    /// carries no modifier flags, as one reaching an app in the background may not.
+    @Test func redMeansRecordingWhateverTheMouseUpSays() throws {
+        let view = try overlay()
+        var outcome: AreaSelection.Outcome?
+        view.onFinish = { outcome = $0 }
+        view.pressed(at: CGPoint(x: 20, y: 20))
+        view.dragged(to: CGPoint(x: 120, y: 80), square: false)
+        view.commandChanged(true) // flagsChanged saw Command
+        let up = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: view.convert(CGPoint(x: 120, y: 80), to: nil),
+                                                 modifierFlags: [], timestamp: 0, windowNumber: view.window!.windowNumber, context: nil,
+                                                 eventNumber: 0, clickCount: 1, pressure: 0))
+        view.mouseUp(with: up)
+        guard case .record? = outcome else { Issue.record("captured instead of recording"); return }
+    }
+
     /// While Command is down the selection reads "Record" and its size, not the color.
     @Test func commandShowsTheRecordingToBe() throws {
         let view = try overlay()
