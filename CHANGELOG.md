@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.6.2 — 2026-10-04
 
 - `shotts record --audio system`, `mic`, or `system,mic` puts sound in the MP4: the Mac's
   (recording a window, only its app's), the microphone, or both mixed. Without it there is no
