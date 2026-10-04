@@ -5,20 +5,19 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.5.3 is the latest release: tag `v0.5.3` on `main` (commit "Shotts 0.5.3"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#32);
-installed copies are offered it through Sparkle. 0.5.3 (shreeve/shotts#68) makes recording from
-the picker work: a Command press during the drag toggles the red, record state, its release
-does nothing, and the picker's view takes the keys (0.5.2, shreeve/shotts#67, did not fix it).
-0.5.1 (shreeve/shotts#66): Space moves a shape being drawn, drawing tools select what they press,
-and arrow keys move by the pixel. 0.5.0 brought screen recording (shreeve/shotts#64) and a second
+0.6.0 is the latest release: tag `v0.6.0` on `main` (commit "Shotts 0.6.0"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#40),
+which now also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
+(shreeve/shotts#69) adds `shotts`, the command line ("Command line" below; SPEC has the
+language). Only `shotts list` has run against a real screen: `shot`, `record`, `start`, and
+`stop` have not yet captured one, so try them by hand ("Checking by hand") first thing. 0.5.3
+(shreeve/shotts#68) made recording from the picker work: a Command press during the drag toggles
+the red, record state, its release does nothing, and the picker's view takes the keys. 0.5.1
+(shreeve/shotts#66): Space moves a shape being drawn, drawing tools select what they press, and
+arrow keys move by the pixel. 0.5.0 brought screen recording (shreeve/shotts#64) and a second
 revamp (shreeve/shotts#65). `CHANGELOG.md` has every release. The build has no warnings
-(warnings are errors) and `swift test` passes: 87 Core tests and 92 AppKit tests. Shotts has
+(warnings are errors) and `swift test` passes: 103 Core tests and 95 AppKit tests. Shotts has
 only ever run on macOS 27, and recording has been tried by hand only briefly.
-
-The `cli` branch adds `shotts`, the command line ("Command line" below; SPEC has the language).
-It builds and its tests pass, but nothing in it has captured a real screen yet: try it by hand
-as "Checking by hand" says before it lands.
 
 Next, in order:
 
