@@ -95,7 +95,12 @@ do {
     fail(ScriptCommand(rawValue: arguments.first ?? "") ?? .list, ScriptError(.usage, error.message))
 }
 
+#if DEBUG
+// A stand-in Shotts for checking the tool by hand without the screen.
+let socketPath = ProcessInfo.processInfo.environment["SHOTTS_SOCKET"] ?? ScriptSocket.path(home: NSHomeDirectory())
+#else
 let socketPath = ScriptSocket.path(home: NSHomeDirectory())
+#endif
 
 /// A connection to Shotts, or nil when nothing listens.
 func connectOnce() -> Int32? {
@@ -151,9 +156,19 @@ func readLine(_ fd: Int32, _ buffer: inout Data) -> Data? {
     }
 }
 
+/// The line under a recording that says which file is being made, rewritten in place.
+var showingProgress = false
+
+@MainActor func clearProgress() {
+    guard showingProgress else { return }
+    stderr.write("\r\u{1B}[K")
+    showingProgress = false
+}
+
 /// The answer, printed as asked: JSON, or absolute paths one a line (windows and displays for
 /// `list`).
-func finish(_ result: ScriptResult, line: Data) -> Never {
+@MainActor func finish(_ result: ScriptResult, line: Data) -> Never {
+    clearProgress()
     guard result.ok else { fail(result.command, result.error ?? ScriptError(.captureFailed, "Shotts could not do it")) }
     if request.json {
         FileHandle.standardOutput.write(line + Data("\n".utf8))
@@ -172,17 +187,42 @@ func finish(_ result: ScriptResult, line: Data) -> Never {
     exit(0)
 }
 
-// Control-C during `record` stops it and keeps the files; a second one keeps nothing.
+/// A line from Shotts, on the main queue: a recording under way or its files being made are
+/// said on a terminal and waited past; anything else is the answer.
+@MainActor func received(_ line: Data) {
+    guard let result = try? JSONDecoder().decode(ScriptResult.self, from: line) else { return }
+    guard result.ok else { finish(result, line: line) }
+    switch result.state {
+    case "recording" where request.command == .record:
+        stderr.write(stderr.isTerminal
+            ? stderr.styled("●", "31") + " recording" + stderr.styled(" · Control-C or `shotts stop` ends it", "2") + "\n"
+            : "recording\n")
+    case "saving":
+        guard stderr.isTerminal, let saving = result.saving else { return }
+        let percent = Int(((result.progress ?? 0) * 100).rounded(.down))
+        stderr.write("\r\u{1B}[K" + stderr.styled("■", "2") + " making \((saving as NSString).lastPathComponent)"
+            + stderr.styled(" · \(percent)%", "2"))
+        showingProgress = true
+    default:
+        finish(result, line: line)
+    }
+}
+
+// Everything happens on the main queue, which the main thread's run loop runs: Control-C, and each line
+// Shotts sends, read off it and handed over.
+//
+// Control-C during `record` stops it and keeps the files; a second one keeps nothing, even
+// while the files are being made.
 var interrupts = 0
 signal(SIGINT, SIG_IGN)
 signal(SIGTERM, SIG_IGN)
-let interruptions = [SIGINT, SIGTERM].map { DispatchSource.makeSignalSource(signal: $0, queue: .global()) }
+let interruptions = [SIGINT, SIGTERM].map { DispatchSource.makeSignalSource(signal: $0, queue: .main) }
 for source in interruptions {
     source.setEventHandler {
         interrupts += 1
-        guard request.command == .record, let fd = connectOnce() else { exit(130) }
+        guard request.command == .record, let fd = connectOnce() else { clearProgress(); exit(130) }
         send(ScriptRequest(command: interrupts == 1 ? .stop : .abort), to: fd)
-        if interrupts > 1 { exit(130) }
+        if interrupts > 1 { clearProgress(); exit(130) }
     }
     source.resume()
 }
@@ -192,16 +232,13 @@ send(request, to: fd)
 Thread.detachNewThread {
     var buffer = Data()
     while let line = readLine(fd, &buffer) {
-        guard let result = try? JSONDecoder().decode(ScriptResult.self, from: line) else { continue }
-        // A recording under way: say so, and wait for the end.
-        if request.command == .record, result.ok, result.state == "recording" {
-            stderr.write(stderr.isTerminal
-                ? stderr.styled("●", "31") + " recording" + stderr.styled(" · Control-C or `shotts stop` ends it", "2") + "\n"
-                : "recording\n")
-            continue
-        }
-        finish(result, line: line)
+        DispatchQueue.main.async { MainActor.assumeIsolated { received(line) } }
     }
-    fail(request.command, ScriptError(.captureFailed, "Shotts stopped answering"))
+    DispatchQueue.main.async { fail(request.command, ScriptError(.captureFailed, "Shotts stopped answering")) }
 }
-dispatchMain()
+// The main thread's run loop, not `dispatchMain`: after that, the main queue runs on another
+// thread, and the main actor's work would not be on the main thread. A port keeps the loop from
+// returning for want of anything to wait on.
+RunLoop.main.add(Port(), forMode: .default)
+RunLoop.main.run()
+exit(0)

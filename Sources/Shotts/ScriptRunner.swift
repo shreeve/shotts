@@ -41,6 +41,9 @@ final class ScriptRunner {
         /// Stopped (true) or aborted (false) before it began recording.
         var ended: Bool?
         var finishing = false
+        /// The files being made, which `abort` cancels.
+        var saving: Task<Void, Never>?
+        var aborted = false
 
         init(request: ScriptRequest, aim: ScriptAim, outputs: [String], asker: ScriptConnection) {
             self.request = request
@@ -266,7 +269,15 @@ final class ScriptRunner {
     }
 
     private func end(_ session: Session, keeping keep: Bool) {
-        guard self.session === session, !session.finishing else { return }
+        guard self.session === session else { return }
+        if session.finishing {
+            // Already stopped: `abort` gives up the files being made, and those made already.
+            if !keep {
+                session.aborted = true
+                session.saving?.cancel()
+            }
+            return
+        }
         guard let recorder = session.recorder else {
             // Not yet recording: `begin` sees this and gives up.
             if session.ended == nil { session.ended = keep }
@@ -275,7 +286,18 @@ final class ScriptRunner {
         session.finishing = true
         session.limit?.invalidate()
         onRecording?(nil)
-        Task { await finish(session, recorder: recorder, keeping: keep) }
+        session.saving = Task { await finish(session, recorder: recorder, keeping: keep) }
+    }
+
+    /// Tells those waiting which file is being made, and how far through them all it is.
+    private func report(_ session: Session, saving path: String, progress: Double) {
+        guard self.session === session, !session.aborted else { return }
+        var result = ScriptResult(command: session.request.command, state: "saving")
+        result.saving = path
+        result.progress = min(progress, 1)
+        session.asker?.send(result)
+        result.command = .stop
+        for stopper in session.stoppers { stopper.send(result) }
     }
 
     private func finish(_ session: Session, recorder: Recorder, keeping keep: Bool) async {
@@ -287,21 +309,31 @@ final class ScriptRunner {
             return failed(session, ScriptError(.captureFailed, error.localizedDescription))
         }
         defer { Recording.removeFolder(made.folder) }
-        guard keep else {
-            return failed(session, ScriptError(.captureFailed, "Stopped without keeping the recording."), stopped: true)
-        }
+        let notKept = ScriptError(.captureFailed, "Stopped without keeping the recording.")
+        guard keep, !session.aborted else { return failed(session, notKept, stopped: true) }
         var files: [ScriptFile] = []
-        for path in session.outputs {
+        let outputs = session.outputs
+        for (index, path) in outputs.enumerated() {
             guard let format = OutputFormat.of(path), let video = format.recording else { continue }
             let fps = request.fps ?? ScriptRequest.defaultFrameRate(for: video)
-            let settings = RecordingSettings(format: video, percent: 100, frameRate: fps, sound: .none, width: request.width)
+            // Without --width, the size a file from the recording window starts at: an MP4 the
+            // recording's, a GIF the area's on screen.
+            let percent = RecordingRule.defaults(for: video, scale: made.scale, hasMicrophone: false).percent
+            let settings = RecordingSettings(format: video, percent: percent, frameRate: fps, sound: .none, width: request.width)
             let partial = ScriptFiles.partial(for: path)
+            report(session, saving: path, progress: Double(index) / Double(outputs.count))
             do {
-                let written = try await RecordingExport.write(made, settings: settings, to: partial)
+                let written = try await RecordingExport.write(made, settings: settings, to: partial) { [weak self] done in
+                    Task { @MainActor in self?.report(session, saving: path, progress: (Double(index) + done) / Double(outputs.count)) }
+                }
                 files.append(try ScriptFiles.place(partial, at: path, format: format, width: written.width, height: written.height, fps: fps,
                                                    frames: written.frames))
             } catch {
                 try? FileManager.default.removeItem(at: partial)
+                if session.aborted {
+                    for file in files { try? FileManager.default.removeItem(atPath: file.path) }
+                    return failed(session, notKept, stopped: true)
+                }
                 return failed(session, ScriptError(.encodeFailed, "\(path): \(error.localizedDescription)"))
             }
         }

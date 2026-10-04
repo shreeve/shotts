@@ -8,6 +8,12 @@ Unreleased, whose heading becomes the version's when it ships.
 ## Unreleased
 
 - `shotts list` and `shotts --version` show Shotts' version when `shotts` is run from the PATH.
+- `shotts record` says which file it is making and how far along, instead of going quiet after
+  the recording stops.
+- A GIF from `shotts record` is the size the area has on screen unless `--width` says otherwise,
+  as in the recording window: a full-Retina GIF was four times the pixels and slow to make.
+- Control-C in `shotts record` no longer warns of a data race; a second Control-C while the
+  files are being made stops making them and keeps nothing.
 
 ## 0.6.0 — 2026-10-04
 

@@ -271,15 +271,18 @@ shotts list   [--json]
   where the Screenshot app saves, named as Shotts names it. Each is made under a hidden name
   beside it and renamed into place, replacing what was there.
 - **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`. `--delay` counts down in the menu bar first.
-- `--width` makes files narrower in proportion, never wider. `--fps`: MP4 takes 60, 30, 20, 10,
+- `--width` makes files narrower in proportion, never wider. Without it, a still and an MP4 are
+  their full pixel size, and a GIF the size the area has on screen (half, from a Retina
+  display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
   5, or 1 (30 unless asked); GIF 30, 20, 10, 5, or 1 (20).
 - **A window recorded follows the window**, wherever it goes and whatever covers it. A region,
   even of a window, stays where it is. Fixed, not options: no window shadow, the pointer in
   recordings and not in stills, no sound, a GIF dithered with blue noise and looping.
 - **`record`** says `recording` on stderr once the first frame is in, and ends at `--duration`,
   at Control-C, at `shotts stop`, at F10 or the menu bar timer (it shows like any recording), or
-  when its terminal closes; then it makes the files, prints them, and exits. A second Control-C
-  stops it and keeps nothing (exit 130).
+  when its terminal closes; then it makes the files, saying on a terminal which and how far
+  along, prints them, and exits. A second Control-C, even while the files are being made, stops
+  it and keeps nothing: no file it was making or had made (exit 130).
 - **`start`** returns once recording; it ends as `record` does, and after ten minutes unless
   `--duration` says otherwise. **`stop`** ends it and waits for the files; with nothing
   recording, it prints the last recording's answer. One recording at a time.

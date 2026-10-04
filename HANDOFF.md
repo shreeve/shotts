@@ -280,6 +280,17 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
   window sends none). The menu bar timer shows it, and F10, the timer, and quitting stop it
   through `AppDelegate`, which asks `ScriptRunner` before `CaptureFlow`. One recording at a time,
   from either: each asks whether the other is busy.
+- **The tool's threads.** Everything in `main.swift` happens on the main queue: Control-C
+  arrives there, and each line read from Shotts is handed there. The main thread runs its run
+  loop rather than `dispatchMain()`, which parks the main thread and drains the main queue on
+  another, where the main actor's runtime checks stop the tool. Debug builds of the tool take
+  `SHOTTS_SOCKET` to talk to a stand-in Shotts (a few lines of Python on a Unix socket, which
+  must answer each connection on its own thread, as Shotts does), so its output and Control-C
+  can be checked without the screen; `HOME` does not move `NSHomeDirectory()`.
+- **Saving.** Once stopped, a recording sends "saving" lines (the file being made, and how far
+  through them all) to the tool and to anyone waiting in `stop`; `abort` then cancels the export
+  and removes the files that run made. A GIF without `--width` starts at the recording window's
+  size (`RecordingRule.defaults`): on screen, not full Retina.
 - **Files.** `RecordingExport.write` with `RecordingSettings.width` (never wider than the
   recording), returning size and frame count; stills scaled by `ScriptRequest.stillSize` and
   encoded by `Export.encode`, so they carry the capture's resolution. Each is made as

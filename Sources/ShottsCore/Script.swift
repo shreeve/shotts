@@ -126,7 +126,8 @@ public enum ScriptParser {
           --duration <t>     Record this long.
           --fps <n>          Frames a second: 1, 5, 10, 20, 30, or for MP4 60.
                              Unless asked, MP4 makes 30 and GIF 20.
-          --width <px>       Make files narrower, in proportion; never wider.
+          --width <px>       Make files narrower, in proportion; never wider. A GIF
+                             is the size the area has on screen unless asked.
           --json             Answer with one line of JSON.
           -h, --help         Show this.
 
@@ -528,8 +529,11 @@ public struct ScriptTargetInfo: Codable, Equatable, Sendable {
 public struct ScriptResult: Codable, Equatable, Sendable {
     public var ok: Bool
     public var command: ScriptCommand
-    /// "recording" or "done".
+    /// "recording", "saving" (files being made, `progress` of the way through, `saving` the one
+    /// being made now; sent along the way, never the answer), or "done".
     public var state: String?
+    public var progress: Double?
+    public var saving: String?
     public var target: ScriptTargetInfo?
     /// When capturing began, ISO 8601.
     public var started: String?
