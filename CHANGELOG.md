@@ -5,6 +5,14 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- `shotts`, a command line: `shotts shot`, `record`, `start`, `stop`, and `list` capture a
+  window, a display, or part of either as PNG, JPEG, HEIC, MP4, or GIF, with a delay, a
+  duration, a frame rate, a width, and JSON answers for scripts. A recorded window is followed
+  wherever it goes. Turn on Allow Command-Line Capture in the menu first; Install Command-Line
+  Tool… puts `shotts` in `/usr/local/bin`, and the Homebrew cask installs it.
+
 ## 0.5.3 — 2026-10-03
 
 - Recording from the picker works: press Command while dragging and the selection turns red;

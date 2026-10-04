@@ -29,13 +29,23 @@ public struct RecordingSettings: Equatable, Sendable {
     public var sound: Sound
     /// The part of the recording kept; nil keeps all of it.
     public var trim: Trim?
+    /// A width in pixels in place of `percent`, as `shotts --width` asks: never wider than the
+    /// recording.
+    public var width: Int?
 
-    public init(format: Format, percent: Int, frameRate: Int, sound: Sound, trim: Trim? = nil) {
+    public init(format: Format, percent: Int, frameRate: Int, sound: Sound, trim: Trim? = nil, width: Int? = nil) {
         self.format = format
         self.percent = percent
         self.frameRate = frameRate
         self.sound = sound
         self.trim = trim
+        self.width = width
+    }
+
+    /// The file's size in pixels from a recording of `recorded` pixels.
+    public func size(recorded: (width: Int, height: Int)) -> (width: Int, height: Int) {
+        guard let width else { return RecordingRule.size(percent: percent, format: format, recorded: recorded) }
+        return RecordingRule.size(width: min(width, recorded.width), format: format, recorded: recorded)
     }
 }
 

@@ -16,6 +16,10 @@ revamp (shreeve/shotts#65). `CHANGELOG.md` has every release. The build has no w
 (warnings are errors) and `swift test` passes: 87 Core tests and 92 AppKit tests. Shotts has
 only ever run on macOS 27, and recording has been tried by hand only briefly.
 
+The `cli` branch adds `shotts`, the command line ("Command line" below; SPEC has the language).
+It builds and its tests pass, but nothing in it has captured a real screen yet: try it by hand
+as "Checking by hand" says before it lands.
+
 Next, in order:
 
 1. Use `main` by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
@@ -87,6 +91,7 @@ Deferred, with the reason each waits:
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
+| | `Script.swift` | The command line's language: `ScriptParser` (arguments, times, what each command takes), `ScriptRequest` and `ScriptResult` (the JSON lines), `WindowMatch`, `ScriptAim` (what a target comes to), the error codes and exit codes, the socket's path. |
 | | `GIF.swift` | The GIF encoder: `BlueNoise` (void-and-cluster), `PaletteBuilder` (exact prominent colors, median cut for the rest), `Quantizer` (blue-noise dithering), `GIFWriter` (GIF89a, changed rectangles only), `GIFTiming`, `LZW`. |
 | ShottsUI | `AreaSelection.swift` | The picker: `DisplayImage` (a display's latest picture, its windows, and `cut`), one overlay window per display, the crosshair, magnifier, hints, window outlines, `PixelSampler`. |
 | | `EditorWindow.swift` | `EditorWindowController`: the bar, copy, save, print, closing, resizing, the drag grip, remembered tool and style. |
@@ -100,18 +105,22 @@ Deferred, with the reason each waits:
 | | `Timeline.swift` | The recording window's timeline: play, the playhead, and the trim brackets. |
 | | `RecordingWindow.swift` | `RecordingWindowController`: the player, the export settings, the file made in the background, Copy, Save, the drag grip, deleting it all on close. |
 | | `RecordingExport.swift` | `Recording` (the kept files) and `RecordingExport`: MP4 and GIF files from it, off the main thread. |
+| | `ScriptServer.swift` | The socket `shotts` talks to: the user's own folder, the peer's uid, a request line in, result lines out, and a tool hanging up first. |
+| | `ScriptFiles.swift` | Where `shotts`' files go when none are named, stills written at a width, and every file made under a hidden name and renamed into place. |
 | Shotts | `ShottsApp.swift` | `AppDelegate`: menu bar item and menu, main menu, Sparkle. |
 | | `CaptureFlow.swift` | One capture from hot key to editor, which app gets focus back, and the capture closed last. |
-| | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list. |
+| | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list; for `shotts`, the numbered displays, the windows it lists, and an area of a display. |
+| | `ScriptRunner.swift` | What `shotts` asks, done: list, shot, and a recording from its request to its files, the countdown, Allow Command-Line Capture. |
 | | `LiveDisplay.swift` | A display streamed while the picker is up: its latest frame and windows. |
 | | `Recorder.swift` | Records an area through ScreenCaptureKit, the Mac's sound with it, and the microphone through AVFoundation. |
 | | `HotKey.swift` | The Carbon hot keys: F10 captures (or stops a recording), Option-F10 brings the last capture back. |
 | | `MoveToApplications.swift` | A release launched outside Applications offers to move itself there. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
+| ShottsCLI | `main.swift` | `shotts`: parses, connects (starting Shotts with `open -g -b` when nothing listens), prints, exits with the answer's code, and turns Control-C into `stop`, then `abort`. |
 
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
-`capture.askedPermission` once the system's permission prompt has been shown, `editor.newWindows`,
+`capture.askedPermission` once the system's permission prompt has been shown, `commandLine.allowed` (Allow Command-Line Capture), `editor.newWindows`,
 `recording.microphone`, `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
 editor's last style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 
@@ -246,6 +255,37 @@ stores only the rectangle whose indices changed, with the unchanged inside it tr
 frame that changes nothing only lengthens the one before. Delays are whole hundredths measured
 between rounded times, so they never drift.
 
+## Command line
+
+`shotts` (ShottsCLI, on Core alone, shipped as `Contents/Helpers/shotts`) parses its arguments
+into a `ScriptRequest` and sends it as one JSON line to `~/Library/Caches/com.github.shreeve.shotts/cli.sock`;
+Shotts answers with `ScriptResult` lines and closes. Every decision (the parse, the window
+match, what a target comes to, the codes) is in Core's `Script.swift`, with tests; the tool and
+`ScriptRunner` only move bytes and capture.
+
+- **Who may ask.** `ScriptServer` makes the folder 0700 and refuses to listen in one it does not
+  own, makes the socket 0600, and drops a peer whose `getpeereid` uid is not its own. It always
+  listens, so that with Allow Command-Line Capture off it can answer `not_allowed` at once; a
+  Shotts that never answers is older than the command line. A second Shotts finds the socket
+  answering and leaves it to the first.
+- **The connection is the recording's life.** `record` keeps its connection until the files are
+  made; when the tool goes first (Control-C sends `stop` on a new connection, but a closed
+  terminal just goes), `onClose` ends the recording and keeps the files. `start` is answered
+  once recording and closed by Shotts, which `onClose` does not count as hanging up. A second
+  Control-C sends `abort`. `stop` with nothing recording gives `last`, the latest answer.
+- **Recording.** A window target is `Recorder.start(window:)`, a `desktopIndependentWindow`
+  filter that follows the window and scales a grown one to fit; anything else is the area
+  recorder with no exclusions but Shotts' own above-normal windows. Neither records sound. The
+  "recording" answer waits for the first frame (`firstFrame(within:)`, five seconds: a minimized
+  window sends none). The menu bar timer shows it, and F10, the timer, and quitting stop it
+  through `AppDelegate`, which asks `ScriptRunner` before `CaptureFlow`. One recording at a time,
+  from either: each asks whether the other is busy.
+- **Files.** `RecordingExport.write` with `RecordingSettings.width` (never wider than the
+  recording), returning size and frame count; stills scaled by `ScriptRequest.stillSize` and
+  encoded by `Export.encode`, so they carry the capture's resolution. Each is made as
+  `.<name>.<pid>.partial` beside its place and renamed over it; the recording's folder goes once
+  they are made, as a closed window's does.
+
 ## The editor
 
 `EditorWindowController` builds its bar by hand: a segmented control of `Tool`s (single-key
@@ -373,7 +413,7 @@ typing, restyling, closing, and resizing; the renderer (extent, text box, canvas
 export (resolution, color space, obscure, the background copy, file names, the drag file); and
 the picker (the cut, the pointer per display, clipping, cancelling, Command-release); and
 recording (the setup panel, the window's settings and files, and MP4 and GIF export from a
-recording the tests write themselves, with no screen). `Tests/UI/Support.swift`
+recording the tests write themselves, with no screen). `ScriptServerTests` round-trips the socket with a stand-in handler. `Tests/UI/Support.swift`
 has the helpers, and `EditorTests.swift`'s `Mouse` posts events to a view, never to the screen.
 
 ## Checking by hand
@@ -392,6 +432,14 @@ build ignores its arguments.
 | `--capture-window <id> out.png [--no-shadow]` | Captures one window through ScreenCaptureKit (needs Screen Recording). |
 | `--preview-recording out.png [--recording]` | Draws the recording frame and the setup panel, or with `--recording` the recording bar, off screen over a light page. |
 | `--export-recording in.mov out.(mp4\|gif) [--size percent] [--fps N] [--sound none\|system\|microphone\|both] [--microphone file]` | Makes the file a recording window would from any movie standing in for a recording, and prints its settings and time. |
+
+`shotts` needs a packaged app (`open "$(Scripts/package-app.sh)"`, quitting the installed Shotts
+first, since both want F10) and Allow Command-Line Capture on; run `.build/Shotts.app/Contents/Helpers/shotts`.
+Try `list`; `shot` of a window, a display, and a region, in each format, with `--width` and
+`--delay` (the countdown in the menu bar); `record` of a window while moving and covering it,
+stopped by `--duration`, Control-C, F10, the timer, and closing the terminal; two Control-Cs;
+`start` then `stop`, and `stop` again; a second `start` while one records (exit 5); and the
+toggle off (exit 3).
 
 From a shell that macOS trusts for Accessibility, `CGEvent` posts reach a real editor: launch
 `Shotts.app --args --edit sample.png`, find the window with `CGWindowListCopyWindowInfo` (owner

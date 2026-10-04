@@ -22,8 +22,12 @@ bin_dir="$(swift build -c "$config" --scratch-path "$scratch" --show-bin-path)"
 app="$scratch/Shotts.app"
 
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks" "$app/Contents/Helpers"
 cp "$bin_dir/Shotts" "$app/Contents/MacOS/Shotts"
+# `shotts`, the command line, which asks the running Shotts to capture. Built as ShottsCLI:
+# beside Shotts in the build folder, a file named shotts would be Shotts on a disk that
+# ignores case.
+cp "$bin_dir/ShottsCLI" "$app/Contents/Helpers/shotts"
 cp "$root/Support/Info.plist" "$app/Contents/Info.plist"
 cp "$root/Support/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 # Open Sans and its license; ATSApplicationFontsPath in Info.plist makes it Shotts' own font.
@@ -52,6 +56,7 @@ rm -rf "$framework/Headers" "$framework/PrivateHeaders" "$framework/Modules" \
 if [ "$config" = release ]; then
     dsymutil "$app/Contents/MacOS/Shotts" -o "$scratch/Shotts.app.dSYM" >&2
     strip -x "$app/Contents/MacOS/Shotts"
+    strip -x "$app/Contents/Helpers/shotts"
 fi
 
 # Every piece is signed with the same identity, inner components first, with the hardened
@@ -67,6 +72,7 @@ resign --preserve-metadata=entitlements "$framework/Versions/B/XPCServices/Downl
 resign "$framework/Versions/B/Autoupdate"
 resign "$framework/Versions/B/Updater.app"
 resign "$framework"
+resign --identifier com.github.shreeve.shotts.cli "$app/Contents/Helpers/shotts"
 # The hardened runtime keeps the microphone from an app that does not claim it; the
 # entitlement is the claim, and macOS still asks the user the first time.
 resign --entitlements "$root/Support/Shotts.entitlements" "$app"

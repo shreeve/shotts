@@ -65,6 +65,21 @@ Options in the menu bar menu: show the magnifier, dim outside the selection, inc
 shadow, copy to the clipboard the moment a capture is taken, and open each capture in a new
 window.
 
+## Command line
+
+Turn on **Allow Command-Line Capture** in the menu bar menu, and `shotts` captures from scripts
+and terminals (the Homebrew cask installs it; otherwise choose **Install Command-Line Tool…**):
+
+```bash
+shotts list                                        # windows and displays
+shotts shot shot.png --window Safari               # a window, without its shadow
+shotts shot a.png b.jpg --display 1 --delay 3
+shotts record demo.mp4 demo.gif --window 4211 --duration 10s --width 800
+shotts start --region 0,0,800,600 --json; …; shotts stop --json
+```
+
+`docs/SPEC.md` has every option, the JSON, and the exit codes.
+
 ## Building
 
 ```bash

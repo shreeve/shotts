@@ -61,7 +61,8 @@ func connect(_ command: ScriptCommand) -> Int32 {
         if let fd = connectOnce() { return fd }
         usleep(100_000)
     }
-    fail(command, ScriptError(.notAllowed, "Shotts is not answering: turn on Allow Command-Line Capture in its menu"))
+    // A Shotts that takes no requests still answers, to say so: one that never answers is older.
+    fail(command, ScriptError(.notAllowed, "Shotts did not answer: update it (Check for Updates… in its menu) and try again"))
 }
 
 func send(_ request: ScriptRequest, to fd: Int32) {

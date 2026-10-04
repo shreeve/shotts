@@ -14,7 +14,7 @@ read it before changing capture, the selection overlay, the editor, or export.
 
 - `ShottsCore`: values and decisions. The annotation model, styles and their pixel metrics,
   geometry, hit testing, the selection rules, the editor's sizing rules, undo, a recording's
-  export rules, and the GIF encoder. No AppKit, no
+  export rules, the GIF encoder, and the command line's language (requests, answers, targets). No AppKit, no
   CoreGraphics drawing, no `FileManager`. Anything with a decision in it belongs here, with a
   test.
 - `ShottsUI`: AppKit. The selection overlay, the editor window and its canvas, the renderer that
@@ -22,6 +22,8 @@ read it before changing capture, the selection overlay, the editor, or export.
   recording's setup panel, its window, and the MP4 and GIF files made from it.
 - `Shotts`: `@main`, the menu bar item, the hot key, and capture and recording through
   ScreenCaptureKit. The only target that touches the screen or the microphone.
+- `ShottsCLI`: `shotts`, the command line, on ShottsCore alone. It captures nothing: it asks the
+  running Shotts over a socket and prints the answer.
 
 ## Rules
 
@@ -62,6 +64,10 @@ read it before changing capture, the selection overlay, the editor, or export.
   other, asked the first time a recording uses it.
 - Developer switches (`--edit`, `--render`, …) exist only in debug builds. A release build must
   not act on command-line arguments: one could make it capture under its Screen Recording grant.
+  The one way in from outside is `shotts`, and only while Allow Command-Line Capture is on, which
+  the user turns on in the menu and is off until then: its socket is in a folder only the user
+  can open, and answers only the user's own processes. Nothing else (no URL scheme, no Apple
+  events) captures on request.
 - Fix a bug with a test in the lowest layer that can host it: Core first, then the AppKit tests
   in `Tests/UI`, which drive views in windows that are never shown. Never weaken a test to make
   it pass. Never post synthetic events to the screen from a test.

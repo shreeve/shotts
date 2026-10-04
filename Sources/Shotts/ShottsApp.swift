@@ -14,6 +14,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private var recorder: Recorder?
     private var ticker: Timer?
     private let flow = CaptureFlow()
+    /// What `shotts` asks for, while Allow Command-Line Capture is on.
+    private let script = ScriptRunner()
+    /// Install Command-Line Tool…, shown only until `shotts` is found on the PATH's usual places.
+    private var installItem: NSMenuItem?
     /// Reads SUFeedURL and SUPublicEDKey from Info.plist and checks daily, silently
     /// (SUEnableAutomaticChecks), so it never asks a question of its own. The plist always has
     /// the key: the release script refuses to build without one.
@@ -33,11 +37,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         #endif
         NSApp.mainMenu = makeMainMenu()
         flow.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
+        script.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
+        script.onCountdown = { [weak self] seconds in self?.showCountdown(seconds) }
+        script.isRecordingElsewhere = { [weak self] in self?.flow.isBusyRecording ?? false }
         powerOffObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil,
                                                                              queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.poweringOff = true }
         }
-        let capture = HotKey.registerF10 { [weak self] in self?.flow.begin() }
+        let capture = HotKey.registerF10 { [weak self] in self?.captureArea() }
         let showLast = HotKey.registerF10(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
         makeStatusItem(hasHotKey: capture, hasShowLastKey: showLast)
         #if DEBUG
@@ -50,7 +57,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         // Recordings live only while their windows are open: what no running Shotts holds is
         // from a crash. Not under a developer switch, which another Shotts may be running beside.
         Recording.removeLeftovers()
+        script.start()
         updater.startUpdater()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        script.stopListening()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
@@ -59,8 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     /// window, and quitting again quits. Logging out or shutting down is not held up: macOS
     /// says so first (`willPowerOffNotification`), and then Shotts quits as asked.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard flow.isRecording, !poweringOff else { return .terminateNow }
-        flow.stopRecording()
+        guard flow.isRecording || script.isRecording, !poweringOff else { return .terminateNow }
+        stopRecording()
         return .terminateCancel
     }
 
@@ -71,8 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         flow.showLast()
     }
 
+    /// F10: a capture, or while `shotts` is recording, the end of that recording.
     @objc private func captureArea() {
-        flow.begin()
+        if script.isRecording { script.stopRecording() } else { flow.begin() }
     }
 
     /// Open Image…: the editor, or a cancelled panel, gives focus back to the app in front when
@@ -127,6 +140,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menu.addItem(optionItem("New Window per Capture", \.newWindows))
         menu.delegate = self
         menu.addItem(.separator())
+        let allow = NSMenuItem(title: "Allow Command-Line Capture", action: #selector(allowCommandLineToggled), keyEquivalent: "")
+        allow.target = self
+        allow.toolTip = "Lets the shotts command, and any program you run, take screenshots and recordings through Shotts"
+        menu.addItem(allow)
+        let install = NSMenuItem(title: "Install Command-Line Tool…", action: #selector(installCommandLineTool), keyEquivalent: "")
+        install.target = self
+        menu.addItem(install)
+        installItem = install
+        menu.addItem(.separator())
         menu.addItem(checkForUpdatesItem())
         menu.addItem(NSMenuItem(title: "Quit Shotts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
@@ -177,7 +199,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     @objc private func stopRecording() {
-        flow.stopRecording()
+        if script.isRecording { script.stopRecording() } else { flow.stopRecording() }
+    }
+
+    /// The seconds before a delayed `shotts` capture, in place of the icon.
+    private func showCountdown(_ seconds: Int?) {
+        guard recorder == nil, let button = statusItem?.button else { return }
+        guard let seconds else {
+            button.attributedTitle = NSAttributedString()
+            button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Shotts")
+            statusItem?.length = NSStatusItem.squareLength
+            return
+        }
+        statusItem?.length = NSStatusItem.variableLength
+        button.image = NSImage(systemSymbolName: "timer", accessibilityDescription: nil)
+        button.imagePosition = .imageLeading
+        button.attributedTitle = NSAttributedString(string: " \(seconds)", attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+        ])
+        button.setAccessibilityLabel("Capturing in \(seconds) seconds")
+    }
+
+    // MARK: - The command line
+
+    @objc private func allowCommandLineToggled() {
+        ScriptRunner.isAllowed.toggle()
+    }
+
+    /// Where `shotts` is looked for: Homebrew's cask puts it in its own bin, this menu in /usr/local/bin.
+    private static let toolPlaces = ["/usr/local/bin/shotts", "/opt/homebrew/bin/shotts"]
+
+    private static var toolIsInstalled: Bool {
+        toolPlaces.contains { (try? FileManager.default.destinationOfSymbolicLink(atPath: $0)) != nil || FileManager.default.fileExists(atPath: $0) }
+    }
+
+    /// Links /usr/local/bin/shotts to the tool inside Shotts, asking for an administrator's
+    /// password in the system's own dialog, since that folder belongs to the system.
+    @objc private func installCommandLineTool() {
+        let tool = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/shotts").path
+        guard FileManager.default.isExecutableFile(atPath: tool) else { NSSound.beep(); return }
+        func quoted(_ s: String) -> String { "'" + s.replacing("'", with: "'\\''") + "'" }
+        let command = "mkdir -p /usr/local/bin && ln -sf \(quoted(tool)) /usr/local/bin/shotts"
+        let source = "do shell script \"\(command.replacing("\\", with: "\\\\").replacing("\"", with: "\\\""))\" with administrator privileges"
+        Front.bringShotts()
+        var error: NSDictionary?
+        NSAppleScript(source: source)?.executeAndReturnError(&error)
+        // Cancelled in the password dialog: nothing to say.
+        if let error, (error[NSAppleScript.errorNumber] as? Int) != -128 {
+            let alert = NSAlert()
+            alert.messageText = "The command-line tool could not be installed"
+            alert.informativeText = error[NSAppleScript.errorMessage] as? String ?? ""
+            alert.runModal()
+        } else if error == nil, !ScriptRunner.isAllowed {
+            let alert = NSAlert()
+            alert.messageText = "shotts is installed"
+            alert.informativeText = "Turn on Allow Command-Line Capture in the Shotts menu for it to work. Try `shotts list` in Terminal."
+            alert.addButton(withTitle: "Turn It On")
+            alert.addButton(withTitle: "Not Now")
+            if alert.runModal() == .alertFirstButtonReturn { ScriptRunner.isAllowed = true }
+        }
     }
 
     private func aboutItem() -> NSMenuItem {
@@ -288,7 +368,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             if let key = item.representedObject as? OptionKey {
                 item.state = options[keyPath: key.path] ? .on : .off
             }
+            if item.action == #selector(allowCommandLineToggled) { item.state = ScriptRunner.isAllowed ? .on : .off }
         }
+        installItem?.isHidden = Self.toolIsInstalled
     }
 
     private func functionKey(_ key: Int) -> String {

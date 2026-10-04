@@ -54,6 +54,7 @@ cask "shotts" do
   depends_on macos: :sonoma
 
   app "Shotts.app"
+  binary "#{appdir}/Shotts.app/Contents/Helpers/shotts"
 
   zap trash: [
     "~/Library/Application Support/Shotts",

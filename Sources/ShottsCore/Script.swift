@@ -79,6 +79,15 @@ public struct ScriptRequest: Codable, Equatable, Sendable {
 
     /// Each video format's frame rate when none is asked for: smooth video, a lighter GIF.
     public static func defaultFrameRate(for format: RecordingSettings.Format) -> Int { format == .gif ? 20 : 30 }
+
+    /// The file made when none is named: a PNG from `shot`, an MP4 from a recording.
+    public var defaultFormat: OutputFormat { command == .shot ? .png : .mp4 }
+
+    /// A still's size for `--width`: narrower in proportion, never wider than it was captured.
+    public static func stillSize(width: Int, height: Int, requested: Int?) -> (width: Int, height: Int) {
+        guard let requested, requested < width else { return (width, height) }
+        return (requested, max(1, Int((Double(height) * Double(requested) / Double(width)).rounded())))
+    }
 }
 
 /// A usage mistake, with what to say.
@@ -257,6 +266,65 @@ public enum WindowMatch: Equatable, Sendable {
 }
 
 /// What went wrong, as a program reads it.
+/// What a target comes to: a window on its own, which a recording follows wherever it goes, or
+/// a fixed area of one display, in points from its top-left corner.
+public struct ScriptAim: Equatable, Sendable {
+    public enum Source: Equatable, Sendable {
+        case window(UInt32)
+        case area(display: Int, rect: CGRect)
+    }
+
+    public var source: Source
+    /// What the answer says was captured.
+    public var info: ScriptTargetInfo
+
+    /// `--window` alone is the window; with `--region`, that part of the screen where the window
+    /// is now. `--display` is the whole display, or with `--region` part of it; `--region` alone
+    /// is part of the main display. A region is cut to its display, and one off it is a mistake.
+    public static func of(_ target: ScriptTarget, windows: [ScriptWindow], displays: [ScriptDisplay]) -> Result<ScriptAim, ScriptError> {
+        func rect(_ f: [Double]) -> CGRect { CGRect(x: f[0], y: f[1], width: f[2], height: f[3]) }
+        func frame(_ r: CGRect) -> [Double] { [r.minX, r.minY, r.width, r.height] }
+        var origin = CGPoint.zero
+        let display: ScriptDisplay
+        if let query = target.window {
+            let window: ScriptWindow
+            switch WindowMatch.find(query, in: windows) {
+            case let .one(w): window = w
+            case .none: return .failure(ScriptError(.notFound, "no window matches '\(query)' (`shotts list` shows them)"))
+            case let .ambiguous(found):
+                return .failure(ScriptError(.ambiguousWindow, "\(found.count) windows match '\(query)': give its id or more of its title",
+                                            candidates: found))
+            }
+            guard let d = displays.first(where: { $0.number == window.display }) ?? displays.first else {
+                return .failure(ScriptError(.notFound, "no display"))
+            }
+            guard target.region != nil else {
+                return .success(ScriptAim(source: .window(window.id), info: ScriptTargetInfo(
+                    kind: "window", id: window.id, app: window.app, bundle: window.bundle, title: window.title, frame: window.frame,
+                    scale: d.scale, display: d.number)))
+            }
+            display = d
+            origin = CGPoint(x: window.frame[0], y: window.frame[1])
+        } else {
+            let number = target.display ?? 1
+            guard let d = displays.first(where: { $0.number == number }) else {
+                return .failure(ScriptError(.notFound, "no display \(number); there \(displays.count == 1 ? "is 1" : "are \(displays.count)")"))
+            }
+            display = d
+            origin = CGPoint(x: d.frame[0], y: d.frame[1])
+        }
+        let bounds = rect(display.frame)
+        let wanted = target.region.map { $0.offsetBy(dx: origin.x, dy: origin.y) } ?? bounds
+        let area = wanted.intersection(bounds)
+        guard !area.isNull, area.width >= 1, area.height >= 1 else {
+            return .failure(ScriptError(.usage, "the region is not on display \(display.number)"))
+        }
+        return .success(ScriptAim(source: .area(display: display.number, rect: area.offsetBy(dx: -bounds.minX, dy: -bounds.minY)),
+                                  info: ScriptTargetInfo(kind: target.region == nil ? "display" : "region", frame: frame(area),
+                                                         scale: display.scale, display: display.number)))
+    }
+}
+
 public enum ScriptErrorCode: String, Codable, Sendable {
     case usage, permission, notAllowed = "not_allowed", notFound = "not_found", ambiguousWindow = "ambiguous_window", busy
     case captureFailed = "capture_failed", encodeFailed = "encode_failed"
@@ -273,7 +341,7 @@ public enum ScriptErrorCode: String, Codable, Sendable {
     }
 }
 
-public struct ScriptError: Codable, Equatable, Sendable {
+public struct ScriptError: Error, Codable, Equatable, Sendable {
     public var code: ScriptErrorCode
     public var message: String
     public var candidates: [ScriptWindow]?

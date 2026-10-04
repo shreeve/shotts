@@ -83,3 +83,68 @@ import Testing
         #expect(try JSONDecoder().decode(ScriptRequest.self, from: request.line()) == request)
     }
 }
+
+@Suite struct ScriptSizeTests {
+    /// `--width` makes a file narrower in proportion, never wider than what was captured.
+    @Test func widthNeverUpscales() {
+        #expect(ScriptRequest.stillSize(width: 2000, height: 1000, requested: 800) == (800, 400))
+        #expect(ScriptRequest.stillSize(width: 2000, height: 1001, requested: 999) == (999, 500))
+        #expect(ScriptRequest.stillSize(width: 600, height: 400, requested: 1200) == (600, 400))
+        #expect(ScriptRequest.stillSize(width: 600, height: 400, requested: nil) == (600, 400))
+        var settings = RecordingSettings(format: .gif, percent: 50, frameRate: 20, sound: .none, width: 640)
+        #expect(settings.size(recorded: (1280, 720)) == (640, 360))
+        settings.width = 4000
+        #expect(settings.size(recorded: (1280, 720)) == (1280, 720))
+        settings.width = nil
+        #expect(settings.size(recorded: (1280, 720)) == (640, 360))
+        // An MP4 still keeps within H.264's limit.
+        let mp4 = RecordingSettings(format: .mp4, percent: 100, frameRate: 30, sound: .none, width: 6000)
+        #expect(mp4.size(recorded: (6016, 3384)).width <= 4096)
+    }
+
+    @Test func filesWhenNoneAreNamed() {
+        #expect(ScriptRequest(command: .shot).defaultFormat == .png)
+        #expect(ScriptRequest(command: .record).defaultFormat == .mp4)
+        #expect(ScriptRequest(command: .start).defaultFormat == .mp4)
+    }
+}
+
+@Suite struct ScriptAimTests {
+    // A main display, and a second to its right; a window on each.
+    let displays = [ScriptDisplay(number: 1, frame: [0, 0, 1512, 982], scale: 2), ScriptDisplay(number: 2, frame: [1512, 0, 1920, 1080], scale: 1)]
+    let windows = [
+        ScriptWindow(id: 7, app: "Safari", bundle: "com.apple.Safari", title: "Docs", frame: [100, 50, 800, 600], display: 1),
+        ScriptWindow(id: 9, app: "Notes", bundle: "com.apple.Notes", title: "List", frame: [1600, 100, 400, 300], display: 2),
+    ]
+
+    func aim(_ target: ScriptTarget) -> Result<ScriptAim, ScriptError> { ScriptAim.of(target, windows: windows, displays: displays) }
+
+    @Test func windowsAndDisplays() throws {
+        let window = try aim(ScriptTarget(window: "notes")).get()
+        #expect(window.source == .window(9))
+        #expect(window.info.kind == "window" && window.info.scale == 1 && window.info.display == 2)
+        let whole = try aim(ScriptTarget(display: 2)).get()
+        #expect(whole.source == .area(display: 2, rect: CGRect(x: 0, y: 0, width: 1920, height: 1080)))
+        #expect(whole.info.frame == [1512, 0, 1920, 1080])
+    }
+
+    /// A region is measured from the window or display, and cut to the display.
+    @Test func regions() throws {
+        let inWindow = try aim(ScriptTarget(window: "7", region: CGRect(x: 10, y: 20, width: 100, height: 50))).get()
+        #expect(inWindow.source == .area(display: 1, rect: CGRect(x: 110, y: 70, width: 100, height: 50)))
+        #expect(inWindow.info.kind == "region" && inWindow.info.frame == [110, 70, 100, 50])
+        let onSecond = try aim(ScriptTarget(display: 2, region: CGRect(x: 1800, y: 1000, width: 400, height: 400))).get()
+        #expect(onSecond.source == .area(display: 2, rect: CGRect(x: 1800, y: 1000, width: 120, height: 80)))
+        #expect(onSecond.info.frame == [3312, 1000, 120, 80])
+        let onMain = try aim(ScriptTarget(region: CGRect(x: 0, y: 0, width: 10, height: 10))).get()
+        #expect(onMain.source == .area(display: 1, rect: CGRect(x: 0, y: 0, width: 10, height: 10)))
+    }
+
+    @Test func mistakes() {
+        func code(_ t: ScriptTarget) -> ScriptErrorCode? { if case let .failure(e) = aim(t) { e.code } else { nil } }
+        #expect(code(ScriptTarget(window: "Xcode")) == .notFound)
+        #expect(code(ScriptTarget(window: "s")) == .ambiguousWindow)
+        #expect(code(ScriptTarget(display: 3)) == .notFound)
+        #expect(code(ScriptTarget(display: 1, region: CGRect(x: 2000, y: 0, width: 10, height: 10))) == .usage)
+    }
+}
