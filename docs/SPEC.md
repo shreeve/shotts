@@ -283,7 +283,9 @@ shotts list   [--json]
 - **`start`** returns once recording; it ends as `record` does, and after ten minutes unless
   `--duration` says otherwise. **`stop`** ends it and waits for the files; with nothing
   recording, it prints the last recording's answer. One recording at a time.
-- **Answers**: paths, one a line, or with `--json` one line of JSON: `ok`, `command`, `state`,
+- **Answers**: on a terminal, tables in rounded boxes (the files made, their size, frames, and
+  bytes; for `list`, the displays and windows), in color unless `NO_COLOR` is set; piped or
+  redirected, the paths alone, one a line, and `list` as plain columns. With `--json`, one line of JSON: `ok`, `command`, `state`,
   `target` (`kind`, `id`, `app`, `bundle`, `title`, `frame`, `scale`, `display`), `started`,
   `duration`, and `files` (`path`, `format`, `width`, `height`, `fps`, `frames`, `bytes`); `list`
   gives `windows` and `displays`. A failure gives `error` (`code`, `message`, and for several

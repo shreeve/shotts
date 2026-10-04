@@ -311,23 +311,76 @@ public enum WindowMatch: Equatable, Sendable {
 }
 
 /// What went wrong, as a program reads it.
-/// `shotts list` as a person reads it: the displays, then the windows front to back, in
-/// columns, each title cut to fit a terminal `width` columns wide when there is one.
+/// What `shotts` shows a person: the displays and windows `list` finds, the windows that match
+/// too many, and the files made, as tables (`TextTable` boxes them on a terminal).
 public enum ScriptListing {
-    public static func text(windows: [ScriptWindow], displays: [ScriptDisplay], width: Int? = nil) -> String {
-        var out = table(["DISPLAY", "SIZE", "SCALE", "AT"], displays.map { d in
-            ["\(d.number)\(d.number == 1 ? " (main)" : "")", size(d.frame), "\(number(d.scale))x", "\(number(d.frame[0])),\(number(d.frame[1]))"]
-        }, width: width)
-        out += "\n" + Self.windows(windows, width: width)
-        return out
+    /// The displays, under a tab naming the tool, then the windows front to back.
+    public static func tables(windows: [ScriptWindow], displays: [ScriptDisplay], version: String? = nil) -> [TextTable] {
+        let shown = TextTable(
+            title: version.map { "shotts \($0)" } ?? "shotts",
+            columns: [.init("DISPLAY", tint: .accent), .init("SIZE", align: .right), .init("SCALE", align: .right), .init("AT", tint: .dim)],
+            rows: displays.map { d in
+                ["\(d.number)\(d.number == 1 && displays.count > 1 ? " main" : "")", size(d.frame), "\(number(d.scale))x",
+                 "\(number(d.frame[0])),\(number(d.frame[1]))"]
+            })
+        var list = self.windows(windows, showingDisplay: displays.count > 1)
+        let count = { (n: Int, one: String) in "\(n) \(one)\(n == 1 ? "" : "s")" }
+        list.notes = ["\(count(displays.count, "display")) · \(count(windows.count, "window")) · capture one with --window <ID>"]
+        return [shown, list]
     }
 
-    /// The windows alone, as for several that match.
-    public static func windows(_ windows: [ScriptWindow], width: Int? = nil) -> String {
-        guard !windows.isEmpty else { return "No windows on screen.\n" }
-        return table(["ID", "APP", "SIZE", "DISPLAY", "TITLE"], windows.map { w in
-            ["\(w.id)", cut(w.app, to: 24), size(w.frame), "\(w.display)", w.title]
-        }, width: width)
+    /// Windows, as listed or as the candidates when several match.
+    public static func windows(_ windows: [ScriptWindow], showingDisplay: Bool = true) -> TextTable {
+        var columns: [TextTable.Column] = [.init("ID", align: .right, tint: .accent), .init("APP", tint: .bold), .init("SIZE", align: .right)]
+        if showingDisplay { columns.append(.init("DISPLAY", align: .right)) }
+        columns.append(.init("TITLE", flexible: true))
+        return TextTable(columns: columns, rows: windows.map { w in
+            var row = ["\(w.id)", cut(w.app, to: 24), size(w.frame)]
+            if showingDisplay { row.append("\(w.display)") }
+            row.append(w.title)
+            return row
+        })
+    }
+
+    /// The files a capture made, paths from `home` written with a tilde, under a tab saying
+    /// what was captured.
+    public static func files(_ result: ScriptResult, home: String) -> TextTable {
+        let files = result.files ?? []
+        let moving = files.contains { $0.fps != nil }
+        var columns: [TextTable.Column] = [.init("FILE", tint: .path, flexible: true), .init("SIZE", align: .right)]
+        if moving { columns += [.init("FPS", align: .right), .init("FRAMES", align: .right)] }
+        columns.append(.init("BYTES", align: .right))
+        let rows = files.map { f in
+            var row = [tilde(f.path, home: home), "\(f.width)×\(f.height)"]
+            if moving { row += [f.fps.map(String.init) ?? "", f.frames.map(String.init) ?? ""] }
+            row.append(bytes(f.bytes))
+            return row
+        }
+        var notes: [String] = []
+        if let duration = result.duration { notes.append("recorded \(String(format: "%.1f", duration))s") }
+        return TextTable(title: result.target.map(describe), columns: columns, rows: rows, notes: notes)
+    }
+
+    /// `window 3340 · Ghostty`, `display 1`, or `region 0,0 800×600 · display 1`.
+    static func describe(_ target: ScriptTargetInfo) -> String {
+        switch target.kind {
+        case "window": (["window \(target.id.map(String.init) ?? "")"] + [target.app].compactMap { $0 }).joined(separator: " · ")
+        case "display": "display \(target.display)"
+        default: "region \(number(target.frame[0])),\(number(target.frame[1])) \(size(target.frame)) · display \(target.display)"
+        }
+    }
+
+    static func tilde(_ path: String, home: String) -> String {
+        guard !home.isEmpty, path.hasPrefix(home + "/") else { return path }
+        return "~" + path.dropFirst(home.count)
+    }
+
+    /// Bytes as Finder counts them, by thousands.
+    static func bytes(_ n: Int) -> String {
+        let units = ["bytes", "KB", "MB", "GB"]
+        var value = Double(n), unit = 0
+        while value >= 1000, unit < units.count - 1 { value /= 1000; unit += 1 }
+        return unit == 0 ? "\(n) bytes" : String(format: value < 10 ? "%.1f %@" : "%.0f %@", value, units[unit])
     }
 
     private static func number(_ v: Double) -> String { v == v.rounded() ? String(Int(v)) : String(v) }
@@ -335,21 +388,7 @@ public enum ScriptListing {
 
     private static func cut(_ text: String, to length: Int) -> String {
         guard text.count > length else { return text }
-        return length < 1 ? "" : String(text.prefix(length - 1)) + "…"
-    }
-
-    /// Columns two spaces apart; the last cut to `width`.
-    private static func table(_ heads: [String], _ rows: [[String]], width: Int?) -> String {
-        let all = [heads] + rows
-        let widths = heads.indices.map { i in all.map { $0[i].count }.max() ?? 0 }
-        let lead = widths.dropLast().reduce(0) { $0 + $1 + 2 }
-        return all.map { row in
-            var line = ""
-            for (i, cell) in row.enumerated().dropLast() { line += cell + String(repeating: " ", count: widths[i] - cell.count + 2) }
-            let last = row[row.count - 1]
-            line += width.map { cut(last, to: max($0 - lead, 8)) } ?? last
-            return line.replacing(/\ +$/, with: "") + "\n"
-        }.joined()
+        return String(text.prefix(length - 1)) + "…"
     }
 }
 

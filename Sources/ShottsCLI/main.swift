@@ -11,33 +11,75 @@ import ShottsCore
 let arguments = Array(CommandLine.arguments.dropFirst())
 let wantsJSON = arguments.contains("--json")
 
-/// The terminal's width when output goes to one, to cut long titles to.
-func terminalWidth(_ fd: Int32) -> Int? {
-    var size = winsize()
-    guard isatty(fd) != 0, ioctl(fd, TIOCGWINSZ, &size) == 0, size.ws_col > 0 else { return nil }
-    return Int(size.ws_col)
+/// Where output goes: a terminal gets boxes and, unless NO_COLOR says otherwise, color; a pipe
+/// or a file gets plain text for scripts.
+struct Terminal {
+    let fd: Int32
+    var isTerminal: Bool { isatty(fd) != 0 }
+    var hasColor: Bool {
+        let env = ProcessInfo.processInfo.environment
+        return isTerminal && env["NO_COLOR"] == nil && env["TERM"] != "dumb"
+    }
+
+    /// Its width in columns, when it is a terminal.
+    var width: Int? {
+        var size = winsize()
+        guard isTerminal, ioctl(fd, TIOCGWINSZ, &size) == 0, size.ws_col > 0 else { return nil }
+        return Int(size.ws_col)
+    }
+
+    var handle: FileHandle { fd == STDERR_FILENO ? .standardError : .standardOutput }
+
+    func write(_ text: String) { handle.write(Data(text.utf8)) }
+
+    func write(_ tables: [TextTable]) {
+        write(tables.map { isTerminal ? $0.boxed(width: width, color: hasColor) : $0.plain(width: width) }.joined(separator: "\n"))
+    }
+
+    /// `text` in an ANSI style, if this terminal shows color.
+    func styled(_ text: String, _ code: String) -> String { hasColor ? "\u{1B}[\(code)m\(text)\u{1B}[0m" : text }
 }
 
-func print(_ text: String, to handle: FileHandle) { handle.write(Data(text.utf8)) }
+let stdout = Terminal(fd: STDOUT_FILENO), stderr = Terminal(fd: STDERR_FILENO)
+
+/// The version of the Shotts this tool is inside (Contents/Helpers/shotts, beside
+/// Contents/Info.plist), wherever it is linked from.
+let version: String? = {
+    guard let path = CommandLine.arguments.first.flatMap({ realpath($0, nil) }) else { return nil }
+    defer { free(path) }
+    let plist = URL(fileURLWithPath: String(cString: path)).deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Info.plist")
+    return (NSDictionary(contentsOf: plist)?["CFBundleShortVersionString"] as? String)
+}()
 
 /// Prints the failure as the request asked (JSON on stdout, a line on stderr, and the windows
 /// that matched or how to get help) and exits with its code.
 func fail(_ command: ScriptCommand, _ error: ScriptError) -> Never {
     if wantsJSON { FileHandle.standardOutput.write(ScriptResult.failure(command, error).line()) }
-    var text = "shotts: \(error.message)\n"
+    stderr.write(stderr.styled("shotts:", "1;31") + " \(error.message)\n")
     if let candidates = error.candidates, !candidates.isEmpty {
-        text += "\n" + ScriptListing.windows(candidates, width: terminalWidth(STDERR_FILENO))
+        stderr.write("\n")
+        stderr.write([ScriptListing.windows(candidates, showingDisplay: Set(candidates.map(\.display)).count > 1)])
     } else if error.code == .usage {
-        text += ScriptParser.helpHint + "\n"
+        stderr.write(stderr.styled(ScriptParser.helpHint, "2") + "\n")
     }
-    print(text, to: .standardError)
     exit(error.code.exitCode)
+}
+
+if arguments == ["--version"] || arguments == ["-v"] {
+    stdout.write("shotts \(version ?? "(not inside Shotts)")\n")
+    exit(0)
 }
 
 if ScriptParser.wantsHelp(arguments) {
     // Asked for, help is the answer; with nothing asked, it is a mistake, and says so by its status.
     let asked = !arguments.isEmpty
-    print(ScriptParser.help, to: asked ? .standardOutput : .standardError)
+    let out = asked ? stdout : stderr
+    // Headings bold: the lines that start at the margin and end in a colon.
+    let help = ScriptParser.help.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+        !line.hasPrefix(" ") && line.hasSuffix(":") ? out.styled(String(line), "1") : String(line)
+    }.joined(separator: "\n")
+    out.write(help)
     exit(asked ? 0 : ScriptErrorCode.usage.exitCode)
 }
 
@@ -111,11 +153,16 @@ func finish(_ result: ScriptResult, line: Data) -> Never {
     if request.json {
         FileHandle.standardOutput.write(line + Data("\n".utf8))
     } else if result.command == .list {
-        print(ScriptListing.text(windows: result.windows ?? [], displays: result.displays ?? [], width: terminalWidth(STDOUT_FILENO)),
-              to: .standardOutput)
-    } else {
-        let paths = (result.files ?? []).map(\.path).joined(separator: "\n")
-        if !paths.isEmpty { FileHandle.standardOutput.write(Data((paths + "\n").utf8)) }
+        stdout.write(ScriptListing.tables(windows: result.windows ?? [], displays: result.displays ?? [], version: version))
+    } else if let files = result.files, !files.isEmpty {
+        // A person sees what was made; a script gets the paths, one a line.
+        if stdout.isTerminal {
+            stdout.write([ScriptListing.files(result, home: NSHomeDirectory())])
+        } else {
+            stdout.write(files.map { $0.path + "\n" }.joined())
+        }
+    } else if result.command == .start, stdout.isTerminal {
+        stdout.write(stdout.styled("●", "31") + " recording" + stdout.styled(" · `shotts stop` ends it and makes the files", "2") + "\n")
     }
     exit(0)
 }
@@ -143,7 +190,9 @@ Thread.detachNewThread {
         guard let result = try? JSONDecoder().decode(ScriptResult.self, from: line) else { continue }
         // A recording under way: say so, and wait for the end.
         if request.command == .record, result.ok, result.state == "recording" {
-            FileHandle.standardError.write(Data("recording\n".utf8))
+            stderr.write(stderr.isTerminal
+                ? stderr.styled("●", "31") + " recording" + stderr.styled(" · Control-C or `shotts stop` ends it", "2") + "\n"
+                : "recording\n")
             continue
         }
         finish(result, line: line)

@@ -164,23 +164,73 @@ import Testing
 }
 
 @Suite struct ScriptListingTests {
-    @Test func columnsLineUp() {
-        let displays = [ScriptDisplay(number: 1, frame: [0, 0, 1512, 982], scale: 2), ScriptDisplay(number: 2, frame: [1512, 0, 1920, 1080], scale: 1)]
-        let windows = [
-            ScriptWindow(id: 4211, app: "Safari", bundle: "com.apple.Safari", title: "GitHub - shreeve/shotts: a screenshot tool", frame: [0, 30, 1200, 800], display: 1),
-            ScriptWindow(id: 87, app: "Terminal", bundle: "com.apple.Terminal", title: "", frame: [1600, 100, 640, 480.5], display: 2),
-        ]
-        let text = ScriptListing.text(windows: windows, displays: displays, width: 60)
-        #expect(text == """
-            DISPLAY   SIZE       SCALE  AT
-            1 (main)  1512×982   2x     0,0
-            2         1920×1080  1x     1512,0
+    let displays = [ScriptDisplay(number: 1, frame: [0, 0, 1512, 982], scale: 2), ScriptDisplay(number: 2, frame: [1512, 0, 1920, 1080], scale: 1)]
+    let windows = [
+        ScriptWindow(id: 4211, app: "Safari", bundle: "com.apple.Safari", title: "GitHub - shreeve/shotts: a screenshot tool", frame: [0, 30, 1200, 800], display: 1),
+        ScriptWindow(id: 87, app: "Terminal", bundle: "com.apple.Terminal", title: "", frame: [1600, 100, 640, 480.5], display: 2),
+    ]
+
+    /// For scripts: columns, no boxes, no notes, the title cut to the width.
+    @Test func plainColumns() {
+        let tables = ScriptListing.tables(windows: windows, displays: displays, version: "0.6.0")
+        #expect(tables.map { $0.plain(width: 60) }.joined(separator: "\n") == """
+            DISPLAY  SIZE       SCALE  AT
+            1 main    1512×982     2x  0,0
+            2        1920×1080     1x  1512,0
 
             ID    APP       SIZE       DISPLAY  TITLE
-            4211  Safari    1200×800   1        GitHub - shreeve/shotts…
-            87    Terminal  640×480.5  2
+            4211  Safari     1200×800        1  GitHub - shreeve/shotts…
+              87  Terminal  640×480.5        2
 
             """)
-        #expect(ScriptListing.windows([]) == "No windows on screen.\n")
+    }
+
+    /// For a person: a tab with the title, joined to the box, the notes under it.
+    @Test func boxes() {
+        let table = TextTable(title: "shotts 0.6.0", columns: [.init("ID", align: .right), .init("TITLE", flexible: true)],
+                              rows: [["7", "Docs"], ["1234", "A long title that will not fit"]], notes: ["2 windows"])
+        #expect(table.boxed(width: 30, color: false) == """
+            ╭──────────────╮
+            │ shotts 0.6.0 │
+            ├──────┬───────┴─────────────╮
+            │ ID   │ TITLE               │
+            │    7 │ Docs                │
+            │ 1234 │ A long title that … │
+            ╰──────┴─────────────────────╯
+
+              2 windows
+
+            """)
+        // A tab wider than the table widens it; an edge on a column's is a cross.
+        let narrow = TextTable(title: "a", columns: [.init("A"), .init("B")], rows: [["1", "2"]])
+        #expect(narrow.boxed(color: false).split(separator: "\n")[2] == "├───┼───╮")
+        #expect(TextTable(title: "a much longer tab", columns: [.init("A")], rows: [["1"]]).boxed(color: false)
+            .split(separator: "\n").map { TextTable.columns(String($0)) }.allSatisfy { $0 == 21 })
+        // Color is on the text, never on the padding, so columns still line up.
+        let colored = table.boxed(width: 30, color: true)
+        #expect(colored.contains("\u{1B}[1mTITLE\u{1B}[0m               │") && colored.contains("\u{1B}[2m2 windows\u{1B}[0m"))
+    }
+
+    /// Wide characters take two columns, and are never split.
+    @Test func wideCharacters() {
+        #expect(TextTable.columns("日本語") == 6 && TextTable.columns("a🎉b") == 4)
+        #expect(TextTable.cut("日本語のタイトル", to: 7) == "日本語…")
+        let table = TextTable(columns: [.init("T"), .init("X")], rows: [["日本", "1"], ["abcd", "2"]])
+        #expect(table.plain() == "T     X\n日本  1\nabcd  2\n")
+    }
+
+    @Test func files() {
+        var result = ScriptResult(command: .record, state: "done", target: ScriptTargetInfo(kind: "window", id: 4211, app: "Safari", frame: [0, 0, 10, 10], scale: 2, display: 1),
+                                  duration: 4.96, files: [
+            ScriptFile(path: "/Users/me/Desktop/demo.mp4", format: .mp4, width: 1600, height: 1000, fps: 30, frames: 149, bytes: 1_234_567),
+            ScriptFile(path: "/tmp/demo.gif", format: .gif, width: 800, height: 500, fps: 20, frames: 99, bytes: 999),
+        ])
+        let table = ScriptListing.files(result, home: "/Users/me")
+        #expect(table.title == "window 4211 · Safari")
+        #expect(table.rows == [["~/Desktop/demo.mp4", "1600×1000", "30", "149", "1.2 MB"], ["/tmp/demo.gif", "800×500", "20", "99", "999 bytes"]])
+        #expect(table.notes == ["recorded 5.0s"])
+        result.target = ScriptTargetInfo(kind: "region", frame: [10, 20, 300, 200], scale: 1, display: 2)
+        #expect(ScriptListing.files(result, home: "/Users/me").title == "region 10,20 300×200 · display 2")
+        #expect(ScriptListing.bytes(12_345_678) == "12 MB")
     }
 }
