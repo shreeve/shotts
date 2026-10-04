@@ -190,6 +190,13 @@ final class ScriptRunner {
 
     private func begin(_ session: Session, displays: [ScreenCapture.NumberedDisplay]) async {
         let request = session.request
+        let audio = request.audio ?? .none
+        // The microphone's permission is asked before any countdown, so that macOS's prompt comes
+        // while the person who typed the command is there; refused, the recording does not start.
+        if audio.includesMicrophone, !(await CaptureFlow.microphoneAllowed()) {
+            return failed(session, ScriptError(.permission,
+                "Shotts may not use the microphone: turn it on under System Settings › Privacy & Security › Microphone"))
+        }
         guard await wait(request, while: { session.ended == nil }) else { return gaveUp(session) }
         let recorder = Recorder()
         recorder.onInterrupted = { [weak self, weak session] in
@@ -199,11 +206,11 @@ final class ScriptRunner {
         do {
             switch session.aim.source {
             case let .window(id):
-                try await recorder.start(window: id)
+                try await recorder.start(window: id, microphone: audio.includesMicrophone, sound: audio.includesSystem)
             case let .area(number, rect):
                 guard let display = displays.first(where: { $0.number == number }) else { throw ScreenCapture.Failure.noDisplay }
                 try await recorder.start(display: display.id, scale: display.scale, rect: rect, excluding: [], keeping: [],
-                                         microphone: false, sound: false)
+                                         microphone: audio.includesMicrophone, sound: audio.includesSystem)
             }
             guard await recorder.firstFrame(within: 5) else { throw Failure.noFrame }
         } catch {
@@ -319,7 +326,9 @@ final class ScriptRunner {
             // Without --width, the size a file from the recording window starts at: an MP4 the
             // recording's, a GIF the area's on screen.
             let percent = RecordingRule.defaults(for: video, scale: made.scale, hasMicrophone: false).percent
-            let settings = RecordingSettings(format: video, percent: percent, frameRate: fps, sound: .none, width: request.width)
+            // Sound only in an MP4, and only what --audio asked for.
+            let sound = video == .mp4 ? request.audio ?? .none : .none
+            let settings = RecordingSettings(format: video, percent: percent, frameRate: fps, sound: sound, width: request.width)
             let partial = ScriptFiles.partial(for: path)
             report(session, saving: path, progress: Double(index) / Double(outputs.count))
             do {

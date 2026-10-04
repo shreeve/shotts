@@ -248,15 +248,17 @@ first, so a preview in Messages or Mail plays at once.
 still or a recording, and prints the files it made. It asks the running Shotts, which does the
 capturing under its own Screen Recording permission, and starts Shotts in the background when it
 is not running. Shotts answers only while **Allow Command-Line Capture** is on in its menu, off
-until the user turns it on, since any program the user runs could then capture the screen.
+until the user turns it on, since any program the user runs could then capture the screen, and
+with `--audio mic` record the microphone (macOS still shows its microphone light, and Shotts its
+timer).
 **Install Command-Line Tool…** in the menu links `/usr/local/bin/shotts` (asking for an
 administrator's password); it is not shown once `shotts` is installed, as the Homebrew cask
 installs it. `shotts --help` sums up what follows; a mistake is one line saying what is wrong.
 
 ```
 shotts shot   [file…] <target> [--delay t] [--width px] [--json]
-shotts record [file…] <target> [--delay t] [--duration t] [--fps n] [--width px] [--json]
-shotts start  [file…] <target> [--delay t] [--duration t] [--fps n] [--width px] [--json]
+shotts record [file…] <target> [--delay t] [--duration t] [--fps n] [--audio a] [--width px] [--json]
+shotts start  [file…] <target> [--delay t] [--duration t] [--fps n] [--audio a] [--width px] [--json]
 shotts stop   [--json]
 shotts list   [--json]
 ```
@@ -275,9 +277,13 @@ shotts list   [--json]
   their full pixel size, and a GIF the size the area has on screen (half, from a Retina
   display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
   5, or 1 (30 unless asked); GIF 30, 20, 10, 5, or 1 (20).
+- **Sound** goes only in an MP4, and only with `--audio`: `system` (the Mac's sound; recording a
+  window, only its app's), `mic` (the microphone), or `system,mic`, mixed into one track. A GIF
+  never has sound; `--audio` with only GIFs named is a mistake. The first `mic` asks macOS for
+  the microphone; refused, the recording does not start (exit 3).
 - **A window recorded follows the window**, wherever it goes and whatever covers it. A region,
   even of a window, stays where it is. Fixed, not options: no window shadow, the pointer in
-  recordings and not in stills, no sound, a GIF dithered with blue noise and looping.
+  recordings and not in stills, a GIF dithered with blue noise and looping.
 - **`record`** says `recording` on stderr once the first frame is in, and ends at `--duration`,
   at Control-C, at `shotts stop`, at F10 or the menu bar timer (it shows like any recording), or
   when its terminal closes; then it makes the files, saying on a terminal which and how far

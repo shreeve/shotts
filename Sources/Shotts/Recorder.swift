@@ -58,9 +58,9 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
     }
 
     /// Starts recording one window on its own, wherever it goes and whatever covers it, without
-    /// its shadow or the Mac's sound, at the scale of the display holding most of it. A window
-    /// made bigger than it started is scaled down to fit.
-    func start(window id: CGWindowID) async throws {
+    /// its shadow, at the scale of the display holding most of it; with `sound`, the sound
+    /// ScreenCaptureKit gives for it. A window made bigger than it started is scaled down to fit.
+    func start(window id: CGWindowID, microphone: Bool = false, sound: Bool = false) async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let window = content.windows.first(where: { $0.windowID == id }) else { throw ScreenCapture.Failure.noWindow }
         let filter = SCContentFilter(desktopIndependentWindow: window)
@@ -70,7 +70,7 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         configuration.preservesAspectRatio = true
         configuration.ignoreShadowsSingleWindow = true
         try await begin(filter, configuration, size: RecordingRule.recordedSize(points: filter.contentRect.size, scale: scale), scale: scale,
-                        microphone: false, sound: false)
+                        microphone: microphone, sound: sound)
     }
 
     private func begin(_ filter: SCContentFilter, _ configuration: SCStreamConfiguration, size: (width: Int, height: Int), scale: CGFloat,

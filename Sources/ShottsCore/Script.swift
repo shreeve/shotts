@@ -70,9 +70,23 @@ public struct ScriptRequest: Codable, Equatable, Sendable {
     public var fps: Int?
     /// Width in pixels for every file; the height follows, and nothing is enlarged.
     public var width: Int?
+    /// The sound an MP4 gets: the Mac's, the microphone's, or both mixed; nil for none, and a
+    /// GIF never has any.
+    public var audio: RecordingSettings.Sound?
     public var json = false
 
     public init(command: ScriptCommand) { self.command = command }
+
+    /// `system`, `mic`, or both, comma-separated in either order.
+    public static func audio(_ text: String) -> RecordingSettings.Sound? {
+        let parts = Set(text.lowercased().split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+        guard !parts.isEmpty, parts.isSubset(of: ["system", "mic"]) else { return nil }
+        switch (parts.contains("system"), parts.contains("mic")) {
+        case (true, true): return .both
+        case (true, false): return .system
+        default: return .microphone
+        }
+    }
 
     /// A recording started with `start` stops itself after this long, should `stop` never come.
     public static let startCap: Double = 600
@@ -126,6 +140,8 @@ public enum ScriptParser {
           --duration <t>     Record this long.
           --fps <n>          Frames a second: 1, 5, 10, 20, 30, or for MP4 60.
                              Unless asked, MP4 makes 30 and GIF 20.
+          --audio <a>        Sound in the MP4: system, mic, or system,mic. None
+                             unless asked; a GIF never has any.
           --width <px>       Make files narrower, in proportion; never wider. A GIF
                              is the size the area has on screen unless asked.
           --json             Answer with one line of JSON.
@@ -140,6 +156,7 @@ public enum ScriptParser {
           shotts shot safari.png --window Safari
           shotts shot screen.png --display 1 --delay 3
           shotts record demo.mp4 demo.gif --window 4211 --duration 10s --width 800
+          shotts record talk.mp4 --display 1 --audio system,mic
           shotts start --region 0,0,800,600 && sleep 5 && shotts stop
 
         Turn on Allow Command-Line Capture in the Shotts menu first.
@@ -185,6 +202,9 @@ public enum ScriptParser {
             case "--fps":
                 guard let n = Int(try value(argument)), n > 0 else { throw ScriptUsageError("--fps takes a whole number") }
                 request.fps = n
+            case "--audio":
+                guard let a = ScriptRequest.audio(try value(argument)) else { throw ScriptUsageError("--audio takes system, mic, or system,mic") }
+                request.audio = a
             case "--width":
                 guard let n = Int(try value(argument)), n >= RecordingRule.minWidth else { throw ScriptUsageError("--width takes pixels, \(RecordingRule.minWidth) or more") }
                 request.width = n
@@ -202,14 +222,17 @@ public enum ScriptParser {
     static func check(_ r: ScriptRequest) throws(ScriptUsageError) {
         switch r.command {
         case .stop, .list, .abort:
-            guard r.outputs.isEmpty, r.target.isEmpty, r.delay == 0, r.duration == nil, r.fps == nil, r.width == nil else {
+            guard r.outputs.isEmpty, r.target.isEmpty, r.delay == 0, r.duration == nil, r.fps == nil, r.width == nil, r.audio == nil else {
                 throw ScriptUsageError("\(r.command.rawValue) takes only --json")
             }
             return
         case .shot:
-            if r.fps != nil || r.duration != nil { throw ScriptUsageError("shot takes neither --fps nor --duration") }
+            if r.fps != nil || r.duration != nil || r.audio != nil { throw ScriptUsageError("shot takes no --fps, --duration, or --audio") }
         case .record, .start:
-            break
+            // Sound goes only in an MP4: named, or the one made when none is.
+            if r.audio != nil, !r.outputs.isEmpty, !r.outputs.contains(where: { OutputFormat.of($0) == .mp4 }) {
+                throw ScriptUsageError("a GIF has no sound: --audio needs an .mp4")
+            }
         }
         guard !r.target.isEmpty else {
             throw ScriptUsageError("say what to capture with --window, --display, or --region; `shotts list` shows what there is")

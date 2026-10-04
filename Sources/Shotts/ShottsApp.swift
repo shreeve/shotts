@@ -142,7 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menu.addItem(.separator())
         let allow = NSMenuItem(title: "Allow Command-Line Capture", action: #selector(allowCommandLineToggled), keyEquivalent: "")
         allow.target = self
-        allow.toolTip = "Lets the shotts command, and any program you run, take screenshots and recordings through Shotts"
+        allow.toolTip = "Lets the shotts command, and any program you run, take screenshots and recordings through Shotts, with the Mac's sound or the microphone when asked"
         menu.addItem(allow)
         let install = NSMenuItem(title: "Install Command-Line Tool…", action: #selector(installCommandLineTool), keyEquivalent: "")
         install.target = self

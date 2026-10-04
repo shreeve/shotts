@@ -14,7 +14,7 @@ public struct RecordingSettings: Equatable, Sendable {
         public var fileExtension: String { rawValue }
     }
 
-    public enum Sound: String, CaseIterable, Sendable {
+    public enum Sound: String, CaseIterable, Codable, Sendable {
         case none, system, microphone, both
 
         public var includesSystem: Bool { self == .system || self == .both }

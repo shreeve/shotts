@@ -277,7 +277,11 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
   Control-C sends `abort`. `stop` with nothing recording gives `last`, the latest answer.
 - **Recording.** A window target is `Recorder.start(window:)`, a `desktopIndependentWindow`
   filter that follows the window and scales a grown one to fit; anything else is the area
-  recorder with no exclusions but Shotts' own above-normal windows. Neither records sound. The
+  recorder with no exclusions but Shotts' own above-normal windows. Sound only with `--audio`:
+  the recorder takes the Mac's sound (`sound`) and the microphone as the picker's recordings do,
+  and only an MP4 gets it. A window's filter gives only its app's sound (checked: a chime from
+  `afplay` is in a display's recording and not in a window's). The microphone's permission is
+  asked before the countdown, and refused, it is a `permission` failure, never an alert. The
   "recording" answer waits for the first frame (`firstFrame(within:)`, five seconds: a minimized
   window sends none). The menu bar timer shows it, and F10, the timer, and quitting stop it
   through `AppDelegate`, which asks `ScriptRunner` before `CaptureFlow`. One recording at a time,

@@ -275,7 +275,8 @@ final class CaptureFlow {
         window.present()
     }
 
-    private static func microphoneAllowed() async -> Bool {
+    /// Whether Shotts may use the microphone, asking macOS the first time.
+    static func microphoneAllowed() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: true
         case .notDetermined: await AVCaptureDevice.requestAccess(for: .audio)

@@ -234,3 +234,29 @@ import Testing
         #expect(ScriptListing.bytes(12_345_678) == "12 MB")
     }
 }
+
+@Suite struct ScriptAudioTests {
+    func parse(_ args: String) throws(ScriptUsageError) -> ScriptRequest {
+        try ScriptParser.parse(args.split(separator: " ").map(String.init), workingDirectory: "/w")
+    }
+
+    /// System, mic, or both, in either order; none unless asked.
+    @Test func values() throws {
+        #expect(ScriptRequest.audio("system") == .system)
+        #expect(ScriptRequest.audio("mic") == .microphone)
+        #expect(ScriptRequest.audio("system,mic") == .both && ScriptRequest.audio("MIC, system") == .both)
+        #expect(ScriptRequest.audio("both") == nil && ScriptRequest.audio("system,speakers") == nil && ScriptRequest.audio("") == nil)
+        #expect(try parse("record a.mp4 --window 1").audio == nil)
+        #expect(try parse("record a.mp4 a.gif --window 1 --audio mic").audio == .microphone)
+        // No file named makes an MP4, which can have sound.
+        #expect(try parse("start --display 1 --audio system").audio == .system)
+    }
+
+    /// Sound goes only in an MP4, and only recordings have it.
+    @Test func onlyInAnMP4() {
+        #expect(throws: ScriptUsageError("a GIF has no sound: --audio needs an .mp4")) { try parse("record a.gif --window 1 --audio system") }
+        #expect(throws: ScriptUsageError("shot takes no --fps, --duration, or --audio")) { try parse("shot a.png --window 1 --audio system") }
+        #expect(throws: ScriptUsageError("stop takes only --json")) { try parse("stop --audio mic") }
+        #expect(throws: ScriptUsageError("--audio takes system, mic, or system,mic")) { try parse("record a.mp4 --window 1 --audio both") }
+    }
+}
