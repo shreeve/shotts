@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.6.4 — 2026-10-04
 
 - `--audio both` puts the Mac's sound and the microphone in the MP4; `system,mic` still works.
 
