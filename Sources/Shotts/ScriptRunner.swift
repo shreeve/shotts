@@ -337,6 +337,11 @@ final class ScriptRunner {
                 return failed(session, ScriptError(.encodeFailed, "\(path): \(error.localizedDescription)"))
             }
         }
+        // Aborted as the last file was finished: nothing is kept then either.
+        if session.aborted {
+            for file in files { try? FileManager.default.removeItem(atPath: file.path) }
+            return failed(session, notKept, stopped: true)
+        }
         let duration = (try? await RecordingExport.contents(of: made))?.duration
         let result = ScriptResult(command: request.command, state: "done", target: session.aim.info, started: session.started.map(Self.timestamp),
                                   duration: duration, files: files)
