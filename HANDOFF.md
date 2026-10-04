@@ -5,15 +5,15 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.6.3 is the latest release: tag `v0.6.3` on `main` (commit "Shotts 0.6.3"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#43),
+0.6.4 is the latest release: tag `v0.6.4` on `main` (commit "Shotts 0.6.4"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#44),
 which also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
 (shreeve/shotts#69) added `shotts`, the command line ("Command line" below; SPEC has the
 language). 0.6.1 made `record` show progress while saving and GIFs on-screen size, and took
 Control-C onto the main thread. 0.6.2 added `--audio system|mic|both` (MP4 only; `both` was `system,mic`, still taken), and the
 version atop the help and under `version`/`-V`. 0.6.3 labels recordings sRGB, not BT.709 (players
 had lifted the darks into a gray film), and puts back the level macOS takes off the Mac's sound
-("Sound level" under Command line). Checked on a real screen for 0.6.2: `list`;
+("Sound level" under Command line). 0.6.4 names `--audio both`. Checked on a real screen for 0.6.2: `list`;
 stills of a window, a display at a width, a region, and after a delay, in PNG, JPEG, and HEIC;
 recordings of a window and a region with system sound, the microphone, both, and none (a
 window's recording carries only its app's sound); and a second Control-C while saving, which
