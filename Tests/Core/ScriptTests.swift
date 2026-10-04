@@ -148,3 +148,39 @@ import Testing
         #expect(code(ScriptTarget(display: 1, region: CGRect(x: 2000, y: 0, width: 10, height: 10))) == .usage)
     }
 }
+
+@Suite struct ScriptHelpTests {
+    /// Help fits a standard terminal, and is what no arguments, `help`, -h, or --help ask for.
+    @Test func helpFitsAndIsAskedFor() {
+        let widest = ScriptParser.help.split(separator: "\n").map(\.count).max() ?? 0
+        #expect(widest <= 80)
+        #expect(ScriptParser.wantsHelp([]) && ScriptParser.wantsHelp(["help"]) && ScriptParser.wantsHelp(["shot", "--help"]))
+        #expect(ScriptParser.wantsHelp(["-h"]) && !ScriptParser.wantsHelp(["list"]))
+        // A mistake says what is wrong in a line, not the whole help.
+        #expect(throws: ScriptUsageError("unknown option '--colour'")) {
+            try ScriptParser.parse(["shot", "--colour"], workingDirectory: "/")
+        }
+    }
+}
+
+@Suite struct ScriptListingTests {
+    @Test func columnsLineUp() {
+        let displays = [ScriptDisplay(number: 1, frame: [0, 0, 1512, 982], scale: 2), ScriptDisplay(number: 2, frame: [1512, 0, 1920, 1080], scale: 1)]
+        let windows = [
+            ScriptWindow(id: 4211, app: "Safari", bundle: "com.apple.Safari", title: "GitHub - shreeve/shotts: a screenshot tool", frame: [0, 30, 1200, 800], display: 1),
+            ScriptWindow(id: 87, app: "Terminal", bundle: "com.apple.Terminal", title: "", frame: [1600, 100, 640, 480.5], display: 2),
+        ]
+        let text = ScriptListing.text(windows: windows, displays: displays, width: 60)
+        #expect(text == """
+            DISPLAY   SIZE       SCALE  AT
+            1 (main)  1512×982   2x     0,0
+            2         1920×1080  1x     1512,0
+
+            ID    APP       SIZE       DISPLAY  TITLE
+            4211  Safari    1200×800   1        GitHub - shreeve/shotts…
+            87    Terminal  640×480.5  2
+
+            """)
+        #expect(ScriptListing.windows([]) == "No windows on screen.\n")
+    }
+}

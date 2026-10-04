@@ -97,21 +97,67 @@ public struct ScriptUsageError: Error, Equatable, Sendable {
 }
 
 public enum ScriptParser {
-    public static let usage = """
-        usage: shotts shot   [file…] (--window <q> | --display <n> | --region x,y,w,h) [--delay t] [--width px] [--json]
-               shotts record [file…] <target> [--delay t] [--duration t] [--fps n] [--width px] [--json]
-               shotts start  [file…] <target> [--delay t] [--duration t] [--fps n] [--width px] [--json]
-               shotts stop   [--json]
-               shotts list   [--json]
-        Files: .png .jpg .heic for shot; .mp4 .gif for record and start (each listed is made).
-        Times: 5, 500ms, 1.5s, 2m, 1m30s. Turn on Allow Command-Line Capture in the Shotts menu first.
+    /// What `shotts --help` prints: under 80 columns, as a terminal shows it.
+    public static let help = """
+        shotts: screenshots and screen recordings from the command line, by Shotts
+
+        Usage:
+          shotts shot   [file…] <target> [--delay t] [--width px] [--json]
+          shotts record [file…] <target> [options] [--json]
+          shotts start  [file…] <target> [options] [--json]
+          shotts stop   [--json]
+          shotts list   [--json]
+
+        Commands:
+          shot      Take a screenshot.
+          record    Record until --duration, Control-C, `shotts stop`, or F10.
+          start     Start recording and return; stops after 10m unless --duration.
+          stop      Stop the recording and wait for its files.
+          list      Show the windows and displays there are to capture.
+
+        Targets (one is required):
+          --window <q>       A window: its id, app, or bundle id, or part of its title.
+          --display <n>      A display: 1 is the main one.
+          --region x,y,w,h   Part of the window or display, in points from its top-left;
+                             alone, part of the main display.
+
+        Options:
+          --delay <t>        Wait first, counting down in the menu bar.
+          --duration <t>     Record this long.
+          --fps <n>          Frames a second: 1, 5, 10, 20, 30, or for MP4 60.
+                             Unless asked, MP4 makes 30 and GIF 20.
+          --width <px>       Make files narrower, in proportion; never wider.
+          --json             Answer with one line of JSON.
+          -h, --help         Show this.
+
+        Files are made in the format their names end in: .png .jpg .heic from shot,
+        .mp4 .gif from record and start, as many as are named. With none, a .png or
+        .mp4 goes where the Screenshot app saves. Times: 5, 500ms, 1.5s, 2m, 1m30s.
+
+        Examples:
+          shotts list
+          shotts shot safari.png --window Safari
+          shotts shot screen.png --display 1 --delay 3
+          shotts record demo.mp4 demo.gif --window 4211 --duration 10s --width 800
+          shotts start --region 0,0,800,600 && sleep 5 && shotts stop
+
+        Turn on Allow Command-Line Capture in the Shotts menu first.
+
         """
+
+    /// Said under a mistake.
+    public static let helpHint = "Run 'shotts --help' to see what it takes."
+
+    /// Whether the arguments ask for help: none at all, `help`, or -h or --help anywhere.
+    public static func wantsHelp(_ arguments: [String]) -> Bool {
+        arguments.isEmpty || arguments.first == "help" || arguments.contains("-h") || arguments.contains("--help")
+    }
 
     /// The arguments after the tool's name, with relative paths taken from `workingDirectory`.
     public static func parse(_ arguments: [String], workingDirectory: String) throws(ScriptUsageError) -> ScriptRequest {
-        guard let name = arguments.first else { throw ScriptUsageError(usage) }
+        guard let name = arguments.first else { throw ScriptUsageError("say what to do: shot, record, start, stop, or list") }
         guard let command = ScriptCommand(rawValue: name), command != .abort else {
-            throw ScriptUsageError("unknown command '\(name)'\n\(usage)")
+            throw ScriptUsageError("unknown command '\(name)': use shot, record, start, stop, or list")
         }
         var request = ScriptRequest(command: command)
         var rest = arguments.dropFirst()
@@ -141,9 +187,8 @@ public enum ScriptParser {
             case "--width":
                 guard let n = Int(try value(argument)), n >= RecordingRule.minWidth else { throw ScriptUsageError("--width takes pixels, \(RecordingRule.minWidth) or more") }
                 request.width = n
-            case "-h", "--help": throw ScriptUsageError(usage)
             default:
-                guard !argument.hasPrefix("-") else { throw ScriptUsageError("unknown option '\(argument)'\n\(usage)") }
+                guard !argument.hasPrefix("-") else { throw ScriptUsageError("unknown option '\(argument)'") }
                 let path = (argument as NSString).isAbsolutePath ? argument : (workingDirectory as NSString).appendingPathComponent(argument)
                 request.outputs.append((path as NSString).standardizingPath)
             }
@@ -166,7 +211,7 @@ public enum ScriptParser {
             break
         }
         guard !r.target.isEmpty else {
-            throw ScriptUsageError("say what to capture: --window, --display, or --region (`shotts list` shows windows and displays)")
+            throw ScriptUsageError("say what to capture with --window, --display, or --region; `shotts list` shows what there is")
         }
         if r.target.window != nil, r.target.display != nil { throw ScriptUsageError("--window and --display: choose one") }
         for path in r.outputs {
@@ -266,6 +311,48 @@ public enum WindowMatch: Equatable, Sendable {
 }
 
 /// What went wrong, as a program reads it.
+/// `shotts list` as a person reads it: the displays, then the windows front to back, in
+/// columns, each title cut to fit a terminal `width` columns wide when there is one.
+public enum ScriptListing {
+    public static func text(windows: [ScriptWindow], displays: [ScriptDisplay], width: Int? = nil) -> String {
+        var out = table(["DISPLAY", "SIZE", "SCALE", "AT"], displays.map { d in
+            ["\(d.number)\(d.number == 1 ? " (main)" : "")", size(d.frame), "\(number(d.scale))x", "\(number(d.frame[0])),\(number(d.frame[1]))"]
+        }, width: width)
+        out += "\n" + Self.windows(windows, width: width)
+        return out
+    }
+
+    /// The windows alone, as for several that match.
+    public static func windows(_ windows: [ScriptWindow], width: Int? = nil) -> String {
+        guard !windows.isEmpty else { return "No windows on screen.\n" }
+        return table(["ID", "APP", "SIZE", "DISPLAY", "TITLE"], windows.map { w in
+            ["\(w.id)", cut(w.app, to: 24), size(w.frame), "\(w.display)", w.title]
+        }, width: width)
+    }
+
+    private static func number(_ v: Double) -> String { v == v.rounded() ? String(Int(v)) : String(v) }
+    private static func size(_ frame: [Double]) -> String { "\(number(frame[2]))×\(number(frame[3]))" }
+
+    private static func cut(_ text: String, to length: Int) -> String {
+        guard text.count > length else { return text }
+        return length < 1 ? "" : String(text.prefix(length - 1)) + "…"
+    }
+
+    /// Columns two spaces apart; the last cut to `width`.
+    private static func table(_ heads: [String], _ rows: [[String]], width: Int?) -> String {
+        let all = [heads] + rows
+        let widths = heads.indices.map { i in all.map { $0[i].count }.max() ?? 0 }
+        let lead = widths.dropLast().reduce(0) { $0 + $1 + 2 }
+        return all.map { row in
+            var line = ""
+            for (i, cell) in row.enumerated().dropLast() { line += cell + String(repeating: " ", count: widths[i] - cell.count + 2) }
+            let last = row[row.count - 1]
+            line += width.map { cut(last, to: max($0 - lead, 8)) } ?? last
+            return line.replacing(/\ +$/, with: "") + "\n"
+        }.joined()
+    }
+}
+
 /// What a target comes to: a window on its own, which a recording follows wherever it goes, or
 /// a fixed area of one display, in points from its top-left corner.
 public struct ScriptAim: Equatable, Sendable {

@@ -251,7 +251,7 @@ is not running. Shotts answers only while **Allow Command-Line Capture** is on i
 until the user turns it on, since any program the user runs could then capture the screen.
 **Install Command-Line Tool…** in the menu links `/usr/local/bin/shotts` (asking for an
 administrator's password); it is not shown once `shotts` is installed, as the Homebrew cask
-installs it.
+installs it. `shotts --help` sums up what follows; a mistake is one line saying what is wrong.
 
 ```
 shotts shot   [file…] <target> [--delay t] [--width px] [--json]

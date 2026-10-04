@@ -11,15 +11,34 @@ import ShottsCore
 let arguments = Array(CommandLine.arguments.dropFirst())
 let wantsJSON = arguments.contains("--json")
 
-/// Prints the failure as the request asked (JSON on stdout, a line on stderr) and exits with
-/// its code.
+/// The terminal's width when output goes to one, to cut long titles to.
+func terminalWidth(_ fd: Int32) -> Int? {
+    var size = winsize()
+    guard isatty(fd) != 0, ioctl(fd, TIOCGWINSZ, &size) == 0, size.ws_col > 0 else { return nil }
+    return Int(size.ws_col)
+}
+
+func print(_ text: String, to handle: FileHandle) { handle.write(Data(text.utf8)) }
+
+/// Prints the failure as the request asked (JSON on stdout, a line on stderr, and the windows
+/// that matched or how to get help) and exits with its code.
 func fail(_ command: ScriptCommand, _ error: ScriptError) -> Never {
     if wantsJSON { FileHandle.standardOutput.write(ScriptResult.failure(command, error).line()) }
-    FileHandle.standardError.write(Data("shotts: \(error.message)\n".utf8))
-    for c in error.candidates ?? [] {
-        FileHandle.standardError.write(Data("  \(c.id)\t\(c.app)\t\(c.title)\n".utf8))
+    var text = "shotts: \(error.message)\n"
+    if let candidates = error.candidates, !candidates.isEmpty {
+        text += "\n" + ScriptListing.windows(candidates, width: terminalWidth(STDERR_FILENO))
+    } else if error.code == .usage {
+        text += ScriptParser.helpHint + "\n"
     }
+    print(text, to: .standardError)
     exit(error.code.exitCode)
+}
+
+if ScriptParser.wantsHelp(arguments) {
+    // Asked for, help is the answer; with nothing asked, it is a mistake, and says so by its status.
+    let asked = !arguments.isEmpty
+    print(ScriptParser.help, to: asked ? .standardOutput : .standardError)
+    exit(asked ? 0 : ScriptErrorCode.usage.exitCode)
 }
 
 let request: ScriptRequest
@@ -92,14 +111,8 @@ func finish(_ result: ScriptResult, line: Data) -> Never {
     if request.json {
         FileHandle.standardOutput.write(line + Data("\n".utf8))
     } else if result.command == .list {
-        var text = ""
-        for d in result.displays ?? [] {
-            text += "display \(d.number)\t\(Int(d.frame[2]))x\(Int(d.frame[3])) @\(Int(d.scale))x\n"
-        }
-        for w in result.windows ?? [] {
-            text += "\(w.id)\t\(w.app)\t\(w.title)\t(display \(w.display))\n"
-        }
-        FileHandle.standardOutput.write(Data(text.utf8))
+        print(ScriptListing.text(windows: result.windows ?? [], displays: result.displays ?? [], width: terminalWidth(STDOUT_FILENO)),
+              to: .standardOutput)
     } else {
         let paths = (result.files ?? []).map(\.path).joined(separator: "\n")
         if !paths.isEmpty { FileHandle.standardOutput.write(Data((paths + "\n").utf8)) }
