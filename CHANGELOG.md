@@ -5,6 +5,13 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Recordings no longer look washed out in QuickTime and Safari. They were labeled with the TV
+  standard's brightness curve (BT.709) while holding the screen's sRGB colors, so players
+  lifted the darks and mid-tones into a faint gray film. They are now captured and labeled as
+  sRGB, in the recording window's files and `shotts`' alike.
+
 ## 0.6.2 — 2026-10-04
 
 - `shotts record --audio system`, `mic`, or `system,mic` puts sound in the MP4: the Mac's

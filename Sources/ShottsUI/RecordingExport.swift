@@ -90,6 +90,22 @@ public nonisolated struct Recording: Sendable {
 
 /// Makes the files a recording is saved, copied, and dragged as: H.264 MP4 or animated GIF, at
 /// the size, frame rate, and sound the settings say, from the recording kept at full quality.
+/// The colors a recording's video is labeled with: the screen's, sRGB, whose primaries and
+/// matrix are BT.709's but whose brightness curve is its own. Labeled with BT.709's curve, as it
+/// was, QuickTime and Safari lifted the darks and mid-tones, a faint gray film over the video.
+/// AVFoundation names the sRGB curve from macOS 15; before that the writer is given no labels
+/// and takes those on the frames, which the capture and the scaler set.
+public nonisolated enum VideoColor {
+    public static var writerSettings: [String: String]? {
+        guard #available(macOS 15, *) else { return nil }
+        return [
+            AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+            AVVideoTransferFunctionKey: AVVideoTransferFunction_IEC_sRGB,
+            AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
+        ]
+    }
+}
+
 public nonisolated enum RecordingExport {
     /// What a recording holds.
     public nonisolated struct Contents: Sendable, Equatable {
@@ -275,16 +291,10 @@ public nonisolated enum RecordingExport {
             // The file's index goes first, so a preview in Messages or Mail plays before the
             // whole file has come.
             writer.shouldOptimizeForNetworkUse = true
-            let colors = [
-                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
-            ]
-            let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            var videoSettings: [String: Any] = [
                 AVVideoCodecKey: AVVideoCodecType.h264,
                 AVVideoWidthKey: size.width,
                 AVVideoHeightKey: size.height,
-                AVVideoColorPropertiesKey: colors,
                 AVVideoCompressionPropertiesKey: [
                     AVVideoAverageBitRateKey: RecordingRule.h264BitRate(width: size.width, height: size.height, frameRate: rate),
                     AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
@@ -292,7 +302,9 @@ public nonisolated enum RecordingExport {
                     AVVideoExpectedSourceFrameRateKey: rate,
                     AVVideoMaxKeyFrameIntervalKey: rate * 2,
                 ],
-            ])
+            ]
+            if let colors = VideoColor.writerSettings { videoSettings[AVVideoColorPropertiesKey] = colors }
+            let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
             videoInput.expectsMediaDataInRealTime = false
             let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput, sourcePixelBufferAttributes: nil)
             writer.add(videoInput)
@@ -440,7 +452,7 @@ public nonisolated enum RecordingExport {
             VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_ScalingMode, value: kVTScalingMode_Normal)
             VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_DownsamplingMode, value: kVTDownsamplingMode_Average)
             VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_DestinationColorPrimaries, value: kCVImageBufferColorPrimaries_ITU_R_709_2)
-            VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_DestinationTransferFunction, value: kCVImageBufferTransferFunction_ITU_R_709_2)
+            VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_DestinationTransferFunction, value: kCVImageBufferTransferFunction_sRGB)
             VTSessionSetProperty(session, key: kVTPixelTransferPropertyKey_DestinationYCbCrMatrix, value: kCVImageBufferYCbCrMatrix_ITU_R_709_2)
             var pool: CVPixelBufferPool?
             let attributes: [String: Any] = [

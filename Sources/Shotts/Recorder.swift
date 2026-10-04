@@ -85,15 +85,10 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         // Written in fragments, so what was recorded before a full disk still plays and is kept.
         // (After a crash the next launch removes it as a leftover; offering it back is not built.)
         movie.movieFragmentInterval = CMTime(seconds: 10, preferredTimescale: 600)
-        let video = AVAssetWriterInput(mediaType: .video, outputSettings: [
+        var videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.hevc,
             AVVideoWidthKey: size.width,
             AVVideoHeightKey: size.height,
-            AVVideoColorPropertiesKey: [
-                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
-            ],
             AVVideoCompressionPropertiesKey: [
                 // Near-lossless: every file made later starts from this.
                 AVVideoQualityKey: 0.9,
@@ -103,7 +98,9 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
                 // the window's playhead and trim find a frame at once.
                 AVVideoMaxKeyFrameIntervalDurationKey: 2,
             ],
-        ])
+        ]
+        if let colors = VideoColor.writerSettings { videoSettings[AVVideoColorPropertiesKey] = colors }
+        let video = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         video.expectsMediaDataInRealTime = true
         movie.add(video)
         var sound: AVAssetWriterInput?
@@ -129,8 +126,8 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         configuration.captureResolution = .best
         configuration.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         configuration.colorMatrix = CGDisplayStream.yCbCrMatrix_ITU_R_709_2
-        // The color space the files are tagged with, so players show what was on screen.
-        configuration.colorSpaceName = CGColorSpace.itur_709
+        // sRGB, which the files are labeled with (`VideoColor`), so players show what was on screen.
+        configuration.colorSpaceName = CGColorSpace.sRGB
         configuration.showsCursor = true
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(RecordingRule.recordedFrameRate))
         configuration.queueDepth = 8
