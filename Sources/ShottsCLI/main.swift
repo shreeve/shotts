@@ -45,7 +45,12 @@ let stdout = Terminal(fd: STDOUT_FILENO), stderr = Terminal(fd: STDERR_FILENO)
 /// The version of the Shotts this tool is inside (Contents/Helpers/shotts, beside
 /// Contents/Info.plist), wherever it is linked from.
 let version: String? = {
-    guard let path = CommandLine.arguments.first.flatMap({ realpath($0, nil) }) else { return nil }
+    // Where this executable really is: run by name from the PATH, the first argument is only
+    // "shotts", and Homebrew's or the menu's link stands in front of it.
+    var size: UInt32 = 0
+    _NSGetExecutablePath(nil, &size)
+    var executable = [CChar](repeating: 0, count: Int(size))
+    guard _NSGetExecutablePath(&executable, &size) == 0, let path = realpath(executable, nil) else { return nil }
     defer { free(path) }
     let plist = URL(fileURLWithPath: String(cString: path)).deletingLastPathComponent().deletingLastPathComponent()
         .appendingPathComponent("Info.plist")
