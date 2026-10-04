@@ -31,6 +31,8 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
     /// and at the stop: the screen sends no frame until it changes again.
     private var unwritten: (buffer: CMSampleBuffer, place: Double)?
     private var recording: Recording?
+    /// The measurement of what macOS takes off the Mac's sound, running beside the recording.
+    private var calibration: Task<Double?, Never>?
     /// Called on the main thread when the stream stops by itself, as when its display goes. Set
     /// before `start`, like everything outside `queue`: `start`, `pause`, `resume`, and `stop`
     /// are called one at a time, from the main actor.
@@ -120,6 +122,7 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         }
 
         if let voiceURL { try startMicrophone(to: voiceURL) }
+        if wantsSound { calibration = Task { await SoundCalibrator.gain() } }
 
         configuration.width = size.width
         configuration.height = size.height
@@ -250,6 +253,7 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
             return (self.movie, self.voice?.writer, end)
         }
         guard var recording else { throw Failure.nothingRecorded }
+        if let gain = await calibration?.value { recording.systemGain = gain }
         guard let movie, let end, end > .zero else {
             movie?.cancelWriting()
             voice?.cancelWriting()

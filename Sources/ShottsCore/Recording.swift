@@ -305,3 +305,62 @@ public enum FrameSampler {
         return t < next - 1e-9 ? t : nil
     }
 }
+
+/// How much louder a recording's system sound is made, to undo what macOS takes off it.
+/// ScreenCaptureKit hands over the Mac's sound quieter than it played, by an amount fixed for
+/// each output device (none on a MacBook's speakers, 6 to 14 dB on some USB interfaces) and
+/// whatever the volume. Shotts plays a tone too quiet to hear, captures it, and compares what
+/// came back with what it played; the files made then put back what was taken.
+public enum SoundCalibration {
+    /// The tone's level: far below hearing at any ordinary volume, far above the capture's floor.
+    public static let toneDecibels = -60.0
+    /// More taken off than this is not believed: something else went wrong.
+    public static let largestLoss = 30.0
+
+    /// The tone's peak amplitude, from `toneDecibels`.
+    public static var toneAmplitude: Double { pow(10, toneDecibels / 20) }
+
+    /// The tone's frequency: whole cycles in each measuring window, low enough to hear least.
+    public static let toneFrequency = 200.0
+
+    /// The tone's level in `samples` (at `sampleRate`), as a root mean square: its strength at
+    /// `toneFrequency` alone (Goertzel's algorithm), in tenth-of-a-second windows. The tone holds
+    /// steady for longer than four of them, so the four loudest must agree within a decibel, and
+    /// their median is the level; when they do not, something else sounded at its pitch (the
+    /// start of another sound splashes across every pitch) and nil says not to believe it.
+    public static func level(of samples: [Float], sampleRate: Double = 48_000) -> Double? {
+        let window = Int(sampleRate / 10)
+        guard window > 0 else { return nil }
+        let coefficient = 2 * cos(2 * .pi * toneFrequency / sampleRate)
+        var levels: [Double] = []
+        var start = 0
+        while start + window <= samples.count {
+            var s1 = 0.0, s2 = 0.0
+            for x in samples[start..<start + window] {
+                let s0 = Double(x) + coefficient * s1 - s2
+                s2 = s1
+                s1 = s0
+            }
+            let power = max(s1 * s1 + s2 * s2 - coefficient * s1 * s2, 0)
+            // A sine of amplitude A gives power (A·N/2)²; its root mean square is A/√2.
+            levels.append(2 * power.squareRoot() / Double(window) / 2.squareRoot())
+            start += window
+        }
+        let loudest = levels.sorted(by: >).prefix(4)
+        guard loudest.count == 4, let top = loudest.first, let fourth = loudest.last, fourth > 0,
+              20 * log10(top / fourth) <= 1 else { return nil }
+        let middle = Array(loudest)
+        return (middle[1] + middle[2]) / 2
+    }
+
+    /// The factor that makes what was `heard` as loud as what was `played` (levels as root mean
+    /// squares): at least 1, so nothing is made quieter; nil when nothing came back or the loss
+    /// is past believing.
+    public static func gain(played: Double, heard: Double) -> Double? {
+        guard played > 0, heard > 0 else { return nil }
+        let loss = 20 * log10(played / heard)
+        guard loss <= largestLoss else { return nil }
+        // Within half a decibel is no loss at all: the measurement's own wobble.
+        return loss < 0.5 ? 1 : played / heard
+    }
+}

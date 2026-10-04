@@ -242,6 +242,12 @@ a fixed blue-noise pattern, so gradients do not band and what stays still in the
 still in the GIF, which stores only the part of each frame that changed. An MP4 puts its index
 first, so a preview in Messages or Mail plays at once.
 
+The Mac's sound in a file is as loud as it played. macOS hands it over quieter, by an amount
+fixed for each output device (none from a MacBook's speakers; 6 to 14 dB through some USB
+interfaces and displays), so as each recording with it starts, Shotts plays a tone too quiet to
+hear, measures how much quieter it comes back, remembers that for the device, and puts it back
+in the files it makes. The microphone is left at the level the Mac's input volume gives it.
+
 ## Command line
 
 `shotts` captures from a script or a terminal: a window, a display, or part of either, as a
@@ -280,7 +286,8 @@ shotts list   [--json]
   5, or 1 (30 unless asked); GIF 30, 20, 10, 5, or 1 (20).
 - **Sound** goes only in an MP4, and only with `--audio`: `system` (the Mac's sound; recording a
   window, only its app's), `mic` (the microphone), or `system,mic`, mixed into one track. A GIF
-  never has sound; `--audio` with only GIFs named is a mistake. The first `mic` asks macOS for
+  never has sound; `--audio` with only GIFs named is a mistake. The Mac's sound comes out as
+  loud as it played (see Recording). The first `mic` asks macOS for
   the microphone; refused, the recording does not start (exit 3).
 - **A window recorded follows the window**, wherever it goes and whatever covers it. A region,
   even of a window, stays where it is. Fixed, not options: no window shadow, the pointer in

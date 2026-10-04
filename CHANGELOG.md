@@ -11,6 +11,9 @@ Unreleased, whose heading becomes the version's when it ships.
   standard's brightness curve (BT.709) while holding the screen's sRGB colors, so players
   lifted the darks and mid-tones into a faint gray film. They are now captured and labeled as
   sRGB, in the recording window's files and `shotts`' alike.
+- The Mac's sound comes out as loud as it played. macOS hands it over quieter through some
+  output devices (12 dB through a Studio Display); each recording now measures that with a
+  tone too quiet to hear and puts it back in the files. The microphone is left as it was.
 
 ## 0.6.2 — 2026-10-04
 

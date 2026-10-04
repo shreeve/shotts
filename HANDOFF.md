@@ -297,6 +297,19 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
   `SHOTTS_SOCKET` to talk to a stand-in Shotts (a few lines of Python on a Unix socket, which
   must answer each connection on its own thread, as Shotts does), so its output and Control-C
   can be checked without the screen; `HOME` does not move `NSHomeDirectory()`.
+- **Sound level.** ScreenCaptureKit hands over the Mac's sound quieter than it played, by an
+  amount fixed per output device and whatever the volume (12 dB through a Studio Display; none
+  from MacBook speakers; Apple's forums, since macOS 14.2). `SoundCalibrator` runs beside each
+  recording with system sound: it plays a 200 Hz tone at -60 dB and captures the display's sound
+  with every listed app left out, since ScreenCaptureKit lists every app but the one asking and
+  so cannot pick Shotts. Background processes (`afplay`, say) are not apps and stay in, so Core's
+  `SoundCalibration.level` measures at the tone's pitch alone and believes only four steady
+  windows; a spoiled reading falls back to the device's saved one
+  (`recording.soundCalibration`, by device UID). The gain rides on `Recording.systemGain` and is
+  applied when a file is made: the mix turns the microphone down by it and the whole up by it,
+  clamped at full scale, which leaves the microphone as it was. The recording, and so the
+  window's player, keeps the level as captured. Checked on a real screen: a chime and a tone
+  came out within 0.2 dB of their files.
 - **Saving.** Once stopped, a recording sends "saving" lines (the file being made, and how far
   through them all) to the tool and to anyone waiting in `stop`; `abort` then cancels the export
   and removes the files that run made. A GIF without `--width` starts at the recording window's

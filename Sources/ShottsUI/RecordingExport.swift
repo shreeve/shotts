@@ -20,6 +20,9 @@ public nonisolated struct Recording: Sendable {
     /// Pixels per point on the display it was recorded from.
     public let scale: Double
     public let started: Date
+    /// How much louder the Mac's sound is made in a file, to undo what macOS took off it on the
+    /// way in (`SoundCalibration`); 1 when it took nothing, or nothing was measured.
+    public var systemGain: Double = 1
 
     public init(folder: URL, movie: URL, microphone: URL?, width: Int, height: Int, scale: Double, started: Date) {
         self.folder = folder
@@ -33,7 +36,9 @@ public nonisolated struct Recording: Sendable {
 
     /// The same recording with no microphone, for when its file could not be finished.
     public func withoutMicrophone() -> Recording {
-        Recording(folder: folder, movie: movie, microphone: nil, width: width, height: height, scale: scale, started: started)
+        var recording = Recording(folder: folder, movie: movie, microphone: nil, width: width, height: height, scale: scale, started: started)
+        recording.systemGain = systemGain
+        return recording
     }
 
     /// Where recordings are kept, each in a folder of its own. Nothing in it outlives its
@@ -158,22 +163,23 @@ public nonisolated enum RecordingExport {
         } ?? CMTimeRange(start: .zero, duration: whole)
         // A track does not keep its asset: the job holds them while it reads.
         var assets: [AVAsset] = [movie]
-        var sounds: [(track: AVAssetTrack, range: CMTimeRange)] = []
+        var sounds: [(track: AVAssetTrack, range: CMTimeRange, isSystem: Bool)] = []
         if settings.format == .mp4 {
             if settings.sound.includesSystem, let track = try await movie.loadTracks(withMediaType: .audio).first {
-                sounds.append((track, try await track.load(.timeRange)))
+                sounds.append((track, try await track.load(.timeRange), true))
             }
             if settings.sound.includesMicrophone, let url = recording.microphone {
                 let microphone = AVURLAsset(url: url)
                 assets.append(microphone)
                 if let track = try await microphone.loadTracks(withMediaType: .audio).first {
-                    sounds.append((track, try await track.load(.timeRange)))
+                    sounds.append((track, try await track.load(.timeRange), false))
                 }
             }
         }
         let videoRange = try await video.load(.timeRange)
         let size = settings.size(recorded: (recording.width, recording.height))
         let job = Job(assets: assets, video: (video, videoRange), sounds: sounds, kept: kept, size: size, rate: settings.frameRate, to: url, progress: progress)
+        job.boost = settings.sound.includesSystem ? max(recording.systemGain, 1) : 1
         try? FileManager.default.removeItem(at: url)
         do {
             return try await withTaskCancellationHandler {
@@ -207,7 +213,10 @@ public nonisolated enum RecordingExport {
     private nonisolated final class Job: @unchecked Sendable {
         let assets: [AVAsset]
         let video: (track: AVAssetTrack, range: CMTimeRange)
-        let sounds: [(track: AVAssetTrack, range: CMTimeRange)]
+        let sounds: [(track: AVAssetTrack, range: CMTimeRange, isSystem: Bool)]
+        /// How much louder the Mac's sound is made (`Recording.systemGain`); the microphone is
+        /// left as it was.
+        var boost = 1.0
         /// The part of the recording kept, and so the file's length.
         let kept: CMTimeRange
         var duration: CMTime { kept.duration }
@@ -218,7 +227,7 @@ public nonisolated enum RecordingExport {
         private let lock = NSLock()
         private var cancelled = false
 
-        init(assets: [AVAsset], video: (track: AVAssetTrack, range: CMTimeRange), sounds: [(track: AVAssetTrack, range: CMTimeRange)], kept: CMTimeRange, size: (width: Int, height: Int), rate: Int, to url: URL,
+        init(assets: [AVAsset], video: (track: AVAssetTrack, range: CMTimeRange), sounds: [(track: AVAssetTrack, range: CMTimeRange, isSystem: Bool)], kept: CMTimeRange, size: (width: Int, height: Int), rate: Int, to url: URL,
              progress: @escaping @Sendable (Double) -> Void) {
             self.assets = assets
             self.video = video
@@ -314,10 +323,19 @@ public nonisolated enum RecordingExport {
             if sounds.contains(where: { part(of: $0.range).duration > .zero }) {
                 let composition = AVMutableComposition()
                 var tracks: [AVAssetTrack] = []
+                // The Mac's sound is made `boost` times louder by turning the whole mix up after,
+                // and the microphone down by as much before, which leaves it as it was: a mix
+                // turns a track down but never up.
+                var levels: [AVAudioMixInputParameters] = []
                 for source in sounds where part(of: source.range).duration > .zero {
                     guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
                     try track.insertTimeRange(part(of: source.range), of: source.track, at: .zero)
                     tracks.append(track)
+                    if !source.isSystem, boost > 1 {
+                        let level = AVMutableAudioMixInputParameters(track: track)
+                        level.setVolume(Float(1 / boost), at: .zero)
+                        levels.append(level)
+                    }
                 }
                 let reader = try AVAssetReader(asset: composition)
                 let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [
@@ -329,6 +347,11 @@ public nonisolated enum RecordingExport {
                     AVLinearPCMIsNonInterleaved: false,
                     AVLinearPCMIsBigEndianKey: false,
                 ])
+                if !levels.isEmpty {
+                    let mix = AVMutableAudioMix()
+                    mix.inputParameters = levels
+                    output.audioMix = mix
+                }
                 reader.add(output)
                 let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
                     AVFormatIDKey: kAudioFormatMPEG4AAC,
@@ -354,7 +377,10 @@ public nonisolated enum RecordingExport {
             func pumpSound() -> Bool {
                 guard !soundDone, let sound, sound.input.isReadyForMoreMediaData else { return false }
                 if let buffer = sound.output.copyNextSampleBuffer() {
-                    if buffer.presentationTimeStamp < end { sound.input.append(buffer) }
+                    if buffer.presentationTimeStamp < end {
+                        if boost > 1 { Self.amplify(buffer, by: Float(boost)) }
+                        sound.input.append(buffer)
+                    }
                 } else {
                     soundDone = true
                     sound.input.markAsFinished()
@@ -390,6 +416,19 @@ public nonisolated enum RecordingExport {
             guard writer.status == .completed else { throw writer.error ?? Failure.failed("The file could not be written.") }
             progress(1)
             return count
+        }
+
+        /// Makes 32-bit float sound `gain` times louder in place, never past full scale: the
+        /// reader's buffers are its own copies.
+        private static func amplify(_ buffer: CMSampleBuffer, by gain: Float) {
+            guard let block = buffer.dataBuffer, CMBlockBufferIsRangeContiguous(block, atOffset: 0, length: 0) else { return }
+            var length = 0
+            var pointer: UnsafeMutablePointer<CChar>?
+            guard CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &pointer) == noErr,
+                  let pointer else { return }
+            pointer.withMemoryRebound(to: Float.self, capacity: length / 4) { samples in
+                for i in 0..<length / 4 { samples[i] = min(max(samples[i] * gain, -1), 1) }
+            }
         }
 
         // MARK: GIF
