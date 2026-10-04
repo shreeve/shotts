@@ -30,6 +30,9 @@ final class CaptureFlow {
     /// stopping again would do nothing, and refusing to quit then could leave Shotts unquittable.
     var isRecording: Bool { recording?.recorder != nil }
 
+    /// Whether a recording is being set up, made, or finished: `shotts` waits its turn.
+    var isBusyRecording: Bool { recording != nil || finishing }
+
     private struct RecordingSession {
         var setup: RecordingSetup
         /// Set once recording has started.

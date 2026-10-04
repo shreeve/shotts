@@ -128,9 +128,11 @@ public nonisolated enum RecordingExport {
     }
 
     /// Writes the recording to `url` as the settings say. `progress` runs off the main thread,
-    /// from 0 to 1. Cancelling the task stops the work and leaves no file.
+    /// from 0 to 1. Cancelling the task stops the work and leaves no file. Returns what was
+    /// written: its size and how many frames.
+    @discardableResult
     public static func write(_ recording: Recording, settings: RecordingSettings, to url: URL,
-                             progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
+                             progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> Written {
         let movie = AVURLAsset(url: recording.movie)
         guard let video = try await movie.loadTracks(withMediaType: .video).first else { throw Failure.noVideo }
         let whole = try await movie.load(.duration)
@@ -154,16 +156,16 @@ public nonisolated enum RecordingExport {
             }
         }
         let videoRange = try await video.load(.timeRange)
-        let size = RecordingRule.size(percent: settings.percent, format: settings.format, recorded: (recording.width, recording.height))
+        let size = settings.size(recorded: (recording.width, recording.height))
         let job = Job(assets: assets, video: (video, videoRange), sounds: sounds, kept: kept, size: size, rate: settings.frameRate, to: url, progress: progress)
         try? FileManager.default.removeItem(at: url)
         do {
-            try await withTaskCancellationHandler {
-                try await withCheckedThrowingContinuation { (done: CheckedContinuation<Void, Error>) in
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { (done: CheckedContinuation<Written, Error>) in
                     DispatchQueue.global(qos: .userInitiated).async {
                         do {
-                            try settings.format == .mp4 ? job.writeMP4() : job.writeGIF()
-                            done.resume()
+                            let frames = try settings.format == .mp4 ? job.writeMP4() : job.writeGIF()
+                            done.resume(returning: Written(width: size.width, height: size.height, frames: frames))
                         } catch {
                             done.resume(throwing: error)
                         }
@@ -176,6 +178,12 @@ public nonisolated enum RecordingExport {
             try? FileManager.default.removeItem(at: url)
             throw error
         }
+    }
+
+    public nonisolated struct Written: Sendable, Equatable {
+        public var width: Int
+        public var height: Int
+        public var frames: Int
     }
 
     /// One file being made, on a thread of its own: it reads the recording in order and writes
@@ -261,7 +269,8 @@ public nonisolated enum RecordingExport {
 
         // MARK: MP4
 
-        func writeMP4() throws {
+        /// Returns how many frames it wrote.
+        func writeMP4() throws -> Int {
             let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
             // The file's index goes first, so a preview in Messages or Mail plays before the
             // whole file has come.
@@ -348,7 +357,9 @@ public nonisolated enum RecordingExport {
                 }
             }
 
+            var count = 0
             try frames(in: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, progress: 0...0.98) { image, tick in
+                count += 1
                 try waitForWriter(videoInput)
                 let time = CMTime(value: CMTimeValue((tick * Double(rate)).rounded()), timescale: CMTimeScale(rate))
                 guard adaptor.append(image, withPresentationTime: time) else {
@@ -366,13 +377,14 @@ public nonisolated enum RecordingExport {
             finished.wait()
             guard writer.status == .completed else { throw writer.error ?? Failure.failed("The file could not be written.") }
             progress(1)
+            return count
         }
 
         // MARK: GIF
 
         /// Two passes: the first gathers the whole clip's colors for its one palette, the second
         /// writes the frames with it.
-        func writeGIF() throws {
+        func writeGIF() throws -> Int {
             var colors = PaletteBuilder()
             try frames(in: kCVPixelFormatType_32BGRA, progress: 0...0.3) { image, _ in
                 try Self.read(image) { colors.add($0) }
@@ -390,7 +402,9 @@ public nonisolated enum RecordingExport {
                 pending.removeAll(keepingCapacity: true)
             }
             var gif = GIFWriter(width: size.width, height: size.height, palette: colors.palette(), write: write)
+            var count = 0
             try frames(in: kCVPixelFormatType_32BGRA, progress: 0.3...0.99) { image, tick in
+                count += 1
                 try Self.read(image) { gif.add($0, at: tick) }
                 if let failure { throw failure }
             }
@@ -398,6 +412,7 @@ public nonisolated enum RecordingExport {
             try file.write(contentsOf: pending)
             if let failure { throw failure }
             progress(1)
+            return count
         }
 
         /// A BGRA buffer's pixels, for the length of `body`.

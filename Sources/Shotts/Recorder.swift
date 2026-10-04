@@ -39,9 +39,9 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
     /// Starts recording `rect` (points from the top-left of the display `id`, which has `scale`
     /// pixels a point), leaving out Shotts' windows above ordinary ones (the outline, the panel,
     /// the menu bar item) and those numbered `excluded`, but for those numbered `kept` (what is
-    /// drawn on the area).
+    /// drawn on the area). Without `sound`, the Mac's sound is not recorded.
     func start(display id: CGDirectDisplayID, scale: CGFloat, rect: CGRect, excluding excluded: Set<Int>, keeping kept: Set<Int>,
-               microphone: Bool) async throws {
+               microphone: Bool, sound: Bool = true) async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         guard let display = content.displays.first(where: { $0.displayID == id }) else { throw ScreenCapture.Failure.noDisplay }
         let me = ProcessInfo.processInfo.processIdentifier
@@ -49,8 +49,32 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
             let number = Int($0.windowID)
             return !kept.contains(number) && (excluded.contains(number) || ($0.owningApplication?.processID == me && $0.windowLayer != 0))
         }
-        let size = RecordingRule.recordedSize(points: rect.size, scale: scale)
+        let configuration = SCStreamConfiguration()
+        configuration.sourceRect = rect
+        configuration.scalesToFit = false
+        configuration.ignoreShadowsDisplay = false
+        try await begin(SCContentFilter(display: display, excludingWindows: left), configuration,
+                        size: RecordingRule.recordedSize(points: rect.size, scale: scale), scale: scale, microphone: microphone, sound: sound)
+    }
 
+    /// Starts recording one window on its own, wherever it goes and whatever covers it, without
+    /// its shadow or the Mac's sound, at the scale of the display holding most of it. A window
+    /// made bigger than it started is scaled down to fit.
+    func start(window id: CGWindowID) async throws {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard let window = content.windows.first(where: { $0.windowID == id }) else { throw ScreenCapture.Failure.noWindow }
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        let scale = CGFloat(filter.pointPixelScale)
+        let configuration = SCStreamConfiguration()
+        configuration.scalesToFit = true
+        configuration.preservesAspectRatio = true
+        configuration.ignoreShadowsSingleWindow = true
+        try await begin(filter, configuration, size: RecordingRule.recordedSize(points: filter.contentRect.size, scale: scale), scale: scale,
+                        microphone: false, sound: false)
+    }
+
+    private func begin(_ filter: SCContentFilter, _ configuration: SCStreamConfiguration, size: (width: Int, height: Int), scale: CGFloat,
+                       microphone: Bool, sound wantsSound: Bool) async throws {
         let folder = try Recording.makeFolder()
         let movieURL = folder.appendingPathComponent("Recording.mov")
         let voiceURL = microphone ? folder.appendingPathComponent("Microphone.m4a") : nil
@@ -82,11 +106,15 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         ])
         video.expectsMediaDataInRealTime = true
         movie.add(video)
-        let sound = AVAssetWriterInput(mediaType: .audio, outputSettings: [
-            AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 256_000,
-        ])
-        sound.expectsMediaDataInRealTime = true
-        movie.add(sound)
+        var sound: AVAssetWriterInput?
+        if wantsSound {
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 256_000,
+            ])
+            input.expectsMediaDataInRealTime = true
+            movie.add(input)
+            sound = input
+        }
         guard movie.startWriting() else { throw movie.error ?? Failure.notWritten }
         queue.sync {
             self.movie = movie
@@ -96,29 +124,36 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
 
         if let voiceURL { try startMicrophone(to: voiceURL) }
 
-        let configuration = SCStreamConfiguration()
-        configuration.sourceRect = rect
         configuration.width = size.width
         configuration.height = size.height
-        configuration.scalesToFit = false
         configuration.captureResolution = .best
         configuration.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         configuration.colorMatrix = CGDisplayStream.yCbCrMatrix_ITU_R_709_2
         // The color space the files are tagged with, so players show what was on screen.
         configuration.colorSpaceName = CGColorSpace.itur_709
         configuration.showsCursor = true
-        configuration.ignoreShadowsDisplay = false
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(RecordingRule.recordedFrameRate))
         configuration.queueDepth = 8
-        configuration.capturesAudio = true
+        configuration.capturesAudio = wantsSound
         configuration.excludesCurrentProcessAudio = true
         configuration.sampleRate = 48_000
         configuration.channelCount = 2
-        let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: left), configuration: configuration, delegate: self)
+        let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
-        try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
+        if wantsSound { try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue) }
         self.stream = stream
         try await stream.startCapture()
+    }
+
+    /// Waits for the first frame, which starts the recording; false if none comes in `seconds`,
+    /// as from a window that is hidden or minimized.
+    func firstFrame(within seconds: Double) async -> Bool {
+        let deadline = Date.now.addingTimeInterval(seconds)
+        while Date.now < deadline {
+            if queue.sync(execute: { firstFrame != nil }) { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
     }
 
     private func startMicrophone(to url: URL) throws {

@@ -20,6 +20,8 @@ let package = Package(
     targets: [
         .target(name: "ShottsCore", swiftSettings: strict),
         .target(name: "ShottsUI", dependencies: ["ShottsCore"], swiftSettings: app),
+        // `shotts`, the command line: it sends requests to the running app, which captures.
+        .executableTarget(name: "ShottsCLI", dependencies: ["ShottsCore"], swiftSettings: strict),
         .executableTarget(
             name: "Shotts",
             dependencies: ["ShottsUI", "ShottsCore", .product(name: "Sparkle", package: "Sparkle")],

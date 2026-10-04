@@ -242,7 +242,61 @@ a fixed blue-noise pattern, so gradients do not band and what stays still in the
 still in the GIF, which stores only the part of each frame that changed. An MP4 puts its index
 first, so a preview in Messages or Mail plays at once.
 
+## Command line
+
+`shotts` captures from a script or a terminal: a window, a display, or part of either, as a
+still or a recording, and prints the files it made. It asks the running Shotts, which does the
+capturing under its own Screen Recording permission, and starts Shotts in the background when it
+is not running. Shotts answers only while **Allow Command-Line Capture** is on in its menu, off
+until the user turns it on, since any program the user runs could then capture the screen.
+**Install Command-Line Tool…** in the menu links `/usr/local/bin/shotts` (asking for an
+administrator's password); it is not shown once `shotts` is installed, as the Homebrew cask
+installs it. `shotts --help` sums up what follows; a mistake is one line saying what is wrong.
+
+```
+shotts shot   [file…] <target> [--delay t] [--width px] [--json]
+shotts record [file…] <target> [--delay t] [--duration t] [--fps n] [--width px] [--json]
+shotts start  [file…] <target> [--delay t] [--duration t] [--fps n] [--width px] [--json]
+shotts stop   [--json]
+shotts list   [--json]
+```
+
+- **A target is required.** `--window <q>`: a window's id, or else its app's name or bundle id
+  exactly (that app's frontmost window), or else part of its app, bundle id, or title, which must
+  match one window. `--display <n>`: 1 is the main display. `--region x,y,w,h`: points from the
+  window's or display's top-left corner (the main display's alone), cut to the display. `shotts
+  list` shows the windows, front to back, and the displays.
+- **Files** are as many as listed, each in the format its extension names: `.png`, `.jpg`, or
+  `.heic` from `shot`; `.mp4` or `.gif` from `record` and `start`. With none, one PNG or MP4 goes
+  where the Screenshot app saves, named as Shotts names it. Each is made under a hidden name
+  beside it and renamed into place, replacing what was there.
+- **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`. `--delay` counts down in the menu bar first.
+- `--width` makes files narrower in proportion, never wider. `--fps`: MP4 takes 60, 30, 20, 10,
+  5, or 1 (30 unless asked); GIF 30, 20, 10, 5, or 1 (20).
+- **A window recorded follows the window**, wherever it goes and whatever covers it. A region,
+  even of a window, stays where it is. Fixed, not options: no window shadow, the pointer in
+  recordings and not in stills, no sound, a GIF dithered with blue noise and looping.
+- **`record`** says `recording` on stderr once the first frame is in, and ends at `--duration`,
+  at Control-C, at `shotts stop`, at F10 or the menu bar timer (it shows like any recording), or
+  when its terminal closes; then it makes the files, prints them, and exits. A second Control-C
+  stops it and keeps nothing (exit 130).
+- **`start`** returns once recording; it ends as `record` does, and after ten minutes unless
+  `--duration` says otherwise. **`stop`** ends it and waits for the files; with nothing
+  recording, it prints the last recording's answer. One recording at a time.
+- **Answers**: on a terminal, tables in rounded boxes (the files made, their size, frames, and
+  bytes; for `list`, the displays and windows), in color unless `NO_COLOR` is set; piped or
+  redirected, the paths alone, one a line, and `list` as plain columns. With `--json`, one line of JSON: `ok`, `command`, `state`,
+  `target` (`kind`, `id`, `app`, `bundle`, `title`, `frame`, `scale`, `display`), `started`,
+  `duration`, and `files` (`path`, `format`, `width`, `height`, `fps`, `frames`, `bytes`); `list`
+  gives `windows` and `displays`. A failure gives `error` (`code`, `message`, and for several
+  matching windows `candidates`) and a line on stderr.
+- **Exit status**: 0 done; 1 the capture or a file failed (`capture_failed`, `encode_failed`); 2
+  a mistake in the command (`usage`); 3 no permission, or Allow Command-Line Capture is off
+  (`permission`, `not_allowed`); 4 no such window or display, or several windows match
+  (`not_found`, `ambiguous_window`); 5 already recording (`busy`).
+
 ## Not built
 
-Full-screen capture, repeating the previous area, delayed capture, recording a single window,
-clicks shown in a recording, uploads, cloud storage, and OCR.
+Full-screen capture, repeating the previous area, and delayed capture from the picker (`shotts`
+does these), recording a single window from the picker, clicks shown in a recording, uploads,
+cloud storage, and OCR.

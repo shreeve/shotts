@@ -1,5 +1,6 @@
 import AppKit
 import ScreenCaptureKit
+import ShottsCore
 import ShottsUI
 
 /// The one place Shotts reads the screen, through ScreenCaptureKit: each display live while the
@@ -75,5 +76,78 @@ enum ScreenCapture {
             guard !visible.isEmpty else { return nil }
             return WindowInfo(id: id, frame: visible.offsetBy(dx: -bounds.minX, dy: -bounds.minY))
         }
+    }
+
+    // MARK: - For `shotts`
+
+    /// A display as `shotts` numbers it: 1 is the main display, the rest in the system's order;
+    /// `bounds` in points in the window server's space.
+    struct NumberedDisplay {
+        var number: Int
+        var id: CGDirectDisplayID
+        var bounds: CGRect
+        var scale: Double
+    }
+
+    static func numberedDisplays() -> [NumberedDisplay] {
+        var count: UInt32 = 0
+        CGGetActiveDisplayList(0, nil, &count)
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        CGGetActiveDisplayList(count, &ids, &count)
+        let main = CGMainDisplayID()
+        let ordered = ids.filter { $0 == main } + ids.filter { $0 != main }
+        return ordered.enumerated().map { i, id in
+            let bounds = CGDisplayBounds(id)
+            let mode = CGDisplayCopyDisplayMode(id)
+            let scale = mode.map { Double($0.pixelWidth) / Double(max($0.width, 1)) } ?? 1
+            return NumberedDisplay(number: i + 1, id: id, bounds: bounds, scale: scale)
+        }
+    }
+
+    /// The ordinary windows on screen, front to back, as `shotts list` shows them, each on the
+    /// display holding most of it.
+    static func scriptWindows(on displays: [NumberedDisplay]) -> [ScriptWindow] {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return [] }
+        var bundles: [pid_t: String] = [:]
+        return list.compactMap { w in
+            guard (w[kCGWindowLayer as String] as? Int) == 0,
+                  (w[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  (w[kCGWindowSharingState as String] as? Int) != 0,
+                  let id = w[kCGWindowNumber as String] as? CGWindowID,
+                  let bounds = w[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds),
+                  frame.width >= 40, frame.height >= 40
+            else { return nil }
+            let pid = w[kCGWindowOwnerPID as String] as? pid_t ?? 0
+            if bundles[pid] == nil { bundles[pid] = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? "" }
+            let display = displays.max { a, b in
+                let x = a.bounds.intersection(frame), y = b.bounds.intersection(frame)
+                return (x.isNull ? 0 : x.width * x.height) < (y.isNull ? 0 : y.width * y.height)
+            }
+            return ScriptWindow(id: id, app: w[kCGWindowOwnerName as String] as? String ?? "", bundle: bundles[pid] ?? "",
+                                title: w[kCGWindowName as String] as? String ?? "",
+                                frame: [frame.minX, frame.minY, frame.width, frame.height], display: display?.number ?? 1)
+        }
+    }
+
+    /// An area of a display as it is now: `rect` in points from the display's top-left, at the
+    /// display's `scale`, without the pointer, leaving out Shotts' windows above ordinary ones
+    /// (its menu bar item).
+    static func captureArea(display id: CGDirectDisplayID, rect: CGRect, scale: Double) async throws -> CGImage {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard let display = content.displays.first(where: { $0.displayID == id }) else { throw Failure.noDisplay }
+        let me = ProcessInfo.processInfo.processIdentifier
+        let left = content.windows.filter { $0.owningApplication?.processID == me && $0.windowLayer != 0 }
+        let configuration = SCStreamConfiguration()
+        configuration.sourceRect = rect
+        configuration.width = Int((rect.width * scale).rounded())
+        configuration.height = Int((rect.height * scale).rounded())
+        configuration.scalesToFit = false
+        configuration.captureResolution = .best
+        configuration.showsCursor = false
+        configuration.ignoreShadowsDisplay = false
+        return try await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(display: display, excludingWindows: left),
+                                                          configuration: configuration)
     }
 }
