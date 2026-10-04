@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.6.0 — 2026-10-04
 
 - `shotts`, a command line: `shotts shot`, `record`, `start`, `stop`, and `list` capture a
   window, a display, or part of either as PNG, JPEG, HEIC, MP4, or GIF, with a delay, a
