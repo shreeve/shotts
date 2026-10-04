@@ -151,6 +151,7 @@ public enum ScriptParser {
                              is the size the area has on screen unless asked.
           --json             Answer with one line of JSON.
           -h, --help         Show this.
+          -V, --version      Show the version (or: shotts version).
 
         Files are made in the format their names end in: .png .jpg .heic from shot,
         .mp4 .gif from record and start, as many as are named. With none, a .png or
@@ -170,6 +171,11 @@ public enum ScriptParser {
 
     /// Said under a mistake.
     public static let helpHint = "Run 'shotts --help' to see what it takes."
+
+    /// Whether the arguments ask only for the version: `version`, -V, -v, or --version.
+    public static func wantsVersion(_ arguments: [String]) -> Bool {
+        arguments.count == 1 && ["version", "-V", "-v", "--version"].contains(arguments[0])
+    }
 
     /// Whether the arguments ask for help: none at all, `help`, or -h or --help anywhere.
     public static func wantsHelp(_ arguments: [String]) -> Bool {

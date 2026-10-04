@@ -71,7 +71,7 @@ func fail(_ command: ScriptCommand, _ error: ScriptError) -> Never {
     exit(error.code.exitCode)
 }
 
-if arguments == ["--version"] || arguments == ["-v"] {
+if ScriptParser.wantsVersion(arguments) {
     stdout.write("shotts \(version ?? "(not inside Shotts)")\n")
     exit(0)
 }

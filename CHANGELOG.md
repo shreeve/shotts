@@ -10,7 +10,8 @@ Unreleased, whose heading becomes the version's when it ships.
 - `shotts record --audio system`, `mic`, or `system,mic` puts sound in the MP4: the Mac's
   (recording a window, only its app's), the microphone, or both mixed. Without it there is no
   sound, and a GIF never has any.
-- `shotts` alone shows its help, with the version at the top.
+- `shotts` alone shows its help, with the version at the top; `shotts version`, `-V`, `-v`, and
+  `--version` show the version.
 
 ## 0.6.1 — 2026-10-04
 

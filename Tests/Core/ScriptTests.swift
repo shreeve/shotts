@@ -159,6 +159,8 @@ import Testing
         #expect(ScriptParser.help(version: nil).hasPrefix("shotts\nScreenshots"))
         #expect(ScriptParser.wantsHelp([]) && ScriptParser.wantsHelp(["help"]) && ScriptParser.wantsHelp(["shot", "--help"]))
         #expect(ScriptParser.wantsHelp(["-h"]) && !ScriptParser.wantsHelp(["list"]))
+        #expect(["version", "-V", "-v", "--version"].allSatisfy { ScriptParser.wantsVersion([$0]) })
+        #expect(!ScriptParser.wantsVersion(["list", "-v"]) && !ScriptParser.wantsVersion([]))
         // A mistake says what is wrong in a line, not the whole help.
         #expect(throws: ScriptUsageError("unknown option '--colour'")) {
             try ScriptParser.parse(["shot", "--colour"], workingDirectory: "/")
