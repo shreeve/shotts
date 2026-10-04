@@ -75,7 +75,7 @@ shotts list                                        # windows and displays
 shotts shot shot.png --window Safari               # a window, without its shadow
 shotts shot a.png b.jpg --display 1 --delay 3
 shotts record demo.mp4 demo.gif --window 4211 --duration 10s --width 800
-shotts record talk.mp4 --display 1 --audio system,mic  # the Mac's sound and your voice
+shotts record talk.mp4 --display 1 --audio both  # the Mac's sound and your voice
 shotts start --region 0,0,800,600 --json; …; shotts stop --json
 ```
 

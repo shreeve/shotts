@@ -285,7 +285,7 @@ shotts list   [--json]
   display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
   5, or 1 (30 unless asked); GIF 30, 20, 10, 5, or 1 (20).
 - **Sound** goes only in an MP4, and only with `--audio`: `system` (the Mac's sound; recording a
-  window, only its app's), `mic` (the microphone), or `system,mic`, mixed into one track. A GIF
+  window, only its app's), `mic` (the microphone), or `both`, mixed into one track. A GIF
   never has sound; `--audio` with only GIFs named is a mistake. The Mac's sound comes out as
   loud as it played (see Recording). The first `mic` asks macOS for
   the microphone; refused, the recording does not start (exit 3).

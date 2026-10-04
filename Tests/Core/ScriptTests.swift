@@ -249,8 +249,10 @@ import Testing
     @Test func values() throws {
         #expect(ScriptRequest.audio("system") == .system)
         #expect(ScriptRequest.audio("mic") == .microphone)
+        #expect(ScriptRequest.audio("both") == .both && ScriptRequest.audio("Both") == .both)
+        // What 0.6.2 took still works.
         #expect(ScriptRequest.audio("system,mic") == .both && ScriptRequest.audio("MIC, system") == .both)
-        #expect(ScriptRequest.audio("both") == nil && ScriptRequest.audio("system,speakers") == nil && ScriptRequest.audio("") == nil)
+        #expect(ScriptRequest.audio("system,speakers") == nil && ScriptRequest.audio("all") == nil && ScriptRequest.audio("") == nil)
         #expect(try parse("record a.mp4 --window 1").audio == nil)
         #expect(try parse("record a.mp4 a.gif --window 1 --audio mic").audio == .microphone)
         // No file named makes an MP4, which can have sound.
@@ -262,7 +264,7 @@ import Testing
         #expect(throws: ScriptUsageError("a GIF has no sound: --audio needs an .mp4")) { try parse("record a.gif --window 1 --audio system") }
         #expect(throws: ScriptUsageError("shot takes no --fps, --duration, or --audio")) { try parse("shot a.png --window 1 --audio system") }
         #expect(throws: ScriptUsageError("stop takes only --json")) { try parse("stop --audio mic") }
-        #expect(throws: ScriptUsageError("--audio takes system, mic, or system,mic")) { try parse("record a.mp4 --window 1 --audio both") }
+        #expect(throws: ScriptUsageError("--audio takes system, mic, or both")) { try parse("record a.mp4 --window 1 --audio all") }
     }
 }
 

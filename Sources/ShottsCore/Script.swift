@@ -77,8 +77,9 @@ public struct ScriptRequest: Codable, Equatable, Sendable {
 
     public init(command: ScriptCommand) { self.command = command }
 
-    /// `system`, `mic`, or both, comma-separated in either order.
+    /// `system`, `mic`, or `both`; `system,mic` (in either order), which 0.6.2 took, still means both.
     public static func audio(_ text: String) -> RecordingSettings.Sound? {
+        if text.lowercased() == "both" { return .both }
         let parts = Set(text.lowercased().split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
         guard !parts.isEmpty, parts.isSubset(of: ["system", "mic"]) else { return nil }
         switch (parts.contains("system"), parts.contains("mic")) {
@@ -145,7 +146,7 @@ public enum ScriptParser {
           --duration <t>     Record this long.
           --fps <n>          Frames a second: 1, 5, 10, 20, 30, or for MP4 60.
                              Unless asked, MP4 makes 30 and GIF 20.
-          --audio <a>        Sound in the MP4: system, mic, or system,mic. None
+          --audio <a>        Sound in the MP4: system, mic, or both. None
                              unless asked; a GIF never has any.
           --width <px>       Make files narrower, in proportion; never wider. A GIF
                              is the size the area has on screen unless asked.
@@ -162,7 +163,7 @@ public enum ScriptParser {
           shotts shot safari.png --window Safari
           shotts shot screen.png --display 1 --delay 3
           shotts record demo.mp4 demo.gif --window 4211 --duration 10s --width 800
-          shotts record talk.mp4 --display 1 --audio system,mic
+          shotts record talk.mp4 --display 1 --audio both
           shotts start --region 0,0,800,600 && sleep 5 && shotts stop
 
         Turn on Allow Command-Line Capture in the Shotts menu first.
@@ -214,7 +215,7 @@ public enum ScriptParser {
                 guard let n = Int(try value(argument)), n > 0 else { throw ScriptUsageError("--fps takes a whole number") }
                 request.fps = n
             case "--audio":
-                guard let a = ScriptRequest.audio(try value(argument)) else { throw ScriptUsageError("--audio takes system, mic, or system,mic") }
+                guard let a = ScriptRequest.audio(try value(argument)) else { throw ScriptUsageError("--audio takes system, mic, or both") }
                 request.audio = a
             case "--width":
                 guard let n = Int(try value(argument)), n >= RecordingRule.minWidth else { throw ScriptUsageError("--width takes pixels, \(RecordingRule.minWidth) or more") }
