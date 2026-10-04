@@ -111,9 +111,14 @@ public struct ScriptUsageError: Error, Equatable, Sendable {
 }
 
 public enum ScriptParser {
-    /// What `shotts --help` prints: under 80 columns, as a terminal shows it.
-    public static let help = """
-        shotts: screenshots and screen recordings from the command line, by Shotts
+    /// What `shotts --help` prints, under 80 columns, as a terminal shows it: the name and the
+    /// version of the Shotts it is in, then the rest.
+    public static func help(version: String?) -> String {
+        "shotts \(version ?? "")".trimmingCharacters(in: .whitespaces) + "\n" + helpBody
+    }
+
+    static let helpBody = """
+        Screenshots and screen recordings from the command line, by Shotts.
 
         Usage:
           shotts shot   [file…] <target> [--delay t] [--width px] [--json]

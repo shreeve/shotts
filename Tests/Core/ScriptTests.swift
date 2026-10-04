@@ -152,8 +152,11 @@ import Testing
 @Suite struct ScriptHelpTests {
     /// Help fits a standard terminal, and is what no arguments, `help`, -h, or --help ask for.
     @Test func helpFitsAndIsAskedFor() {
-        let widest = ScriptParser.help.split(separator: "\n").map(\.count).max() ?? 0
+        let help = ScriptParser.help(version: "10.20.30")
+        let widest = help.split(separator: "\n").map(\.count).max() ?? 0
         #expect(widest <= 80)
+        #expect(help.hasPrefix("shotts 10.20.30\nScreenshots and screen recordings"))
+        #expect(ScriptParser.help(version: nil).hasPrefix("shotts\nScreenshots"))
         #expect(ScriptParser.wantsHelp([]) && ScriptParser.wantsHelp(["help"]) && ScriptParser.wantsHelp(["shot", "--help"]))
         #expect(ScriptParser.wantsHelp(["-h"]) && !ScriptParser.wantsHelp(["list"]))
         // A mistake says what is wrong in a line, not the whole help.

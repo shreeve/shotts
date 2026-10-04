@@ -253,7 +253,8 @@ with `--audio mic` record the microphone (macOS still shows its microphone light
 timer).
 **Install Command-Line Tool…** in the menu links `/usr/local/bin/shotts` (asking for an
 administrator's password); it is not shown once `shotts` is installed, as the Homebrew cask
-installs it. `shotts --help` sums up what follows; a mistake is one line saying what is wrong.
+installs it. `shotts` alone or `shotts --help` sums up what follows under the version; a mistake is one line
+saying what is wrong.
 
 ```
 shotts shot   [file…] <target> [--delay t] [--width px] [--json]

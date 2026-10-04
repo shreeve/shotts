@@ -77,15 +77,14 @@ if arguments == ["--version"] || arguments == ["-v"] {
 }
 
 if ScriptParser.wantsHelp(arguments) {
-    // Asked for, help is the answer; with nothing asked, it is a mistake, and says so by its status.
-    let asked = !arguments.isEmpty
-    let out = asked ? stdout : stderr
-    // Headings bold: the lines that start at the margin and end in a colon.
-    let help = ScriptParser.help.split(separator: "\n", omittingEmptySubsequences: false).map { line in
-        !line.hasPrefix(" ") && line.hasSuffix(":") ? out.styled(String(line), "1") : String(line)
+    // `shotts` alone, `help`, -h, or --help: the help, with the version on top.
+    let lines = ScriptParser.help(version: version).split(separator: "\n", omittingEmptySubsequences: false)
+    // The name and version bold, and the headings: the lines that start at the margin and end in a colon.
+    let help = lines.enumerated().map { n, line in
+        n == 0 || (!line.hasPrefix(" ") && line.hasSuffix(":")) ? stdout.styled(String(line), "1") : String(line)
     }.joined(separator: "\n")
-    out.write(help)
-    exit(asked ? 0 : ScriptErrorCode.usage.exitCode)
+    stdout.write(help)
+    exit(0)
 }
 
 let request: ScriptRequest
