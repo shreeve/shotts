@@ -5,12 +5,14 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.6.0 is the latest release: tag `v0.6.0` on `main` (commit "Shotts 0.6.0"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#40),
-which now also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
-(shreeve/shotts#69) adds `shotts`, the command line ("Command line" below; SPEC has the
-language). Only `shotts list` has run against a real screen: `shot`, `record`, `start`, and
-`stop` have not yet captured one, so try them by hand ("Checking by hand") first thing. 0.5.3
+0.6.1 is the latest release: tag `v0.6.1` on `main` (commit "Shotts 0.6.1"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#41),
+which also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
+(shreeve/shotts#69) added `shotts`, the command line ("Command line" below; SPEC has the
+language). 0.6.1 fixes what the first real `shotts record` showed: it went quiet for minutes
+making a full-Retina GIF (now on-screen size, with progress shown), and Control-C ran off the
+main thread. `list` and one `record` have run on a real screen; check by hand that a second
+Control-C while saving keeps nothing, and `shot` of a window, a display, and a region. 0.5.3
 (shreeve/shotts#68) made recording from the picker work: a Command press during the drag toggles
 the red, record state, its release does nothing, and the picker's view takes the keys. 0.5.1
 (shreeve/shotts#66): Space moves a shape being drawn, drawing tools select what they press, and
