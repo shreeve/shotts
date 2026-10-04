@@ -5,20 +5,24 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.6.1 is the latest release: tag `v0.6.1` on `main` (commit "Shotts 0.6.1"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#41),
+0.6.2 is the latest release: tag `v0.6.2` on `main` (commit "Shotts 0.6.2"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#42),
 which also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
 (shreeve/shotts#69) added `shotts`, the command line ("Command line" below; SPEC has the
-language). 0.6.1 fixes what the first real `shotts record` showed: it went quiet for minutes
-making a full-Retina GIF (now on-screen size, with progress shown), and Control-C ran off the
-main thread. `list` and one `record` have run on a real screen; check by hand that a second
-Control-C while saving keeps nothing, and `shot` of a window, a display, and a region. 0.5.3
+language). 0.6.1 made `record` show progress while saving and GIFs on-screen size, and took
+Control-C onto the main thread. 0.6.2 adds `--audio system|mic|system,mic` (MP4 only), and the
+version atop the help and under `version`/`-V`. Checked on a real screen for 0.6.2: `list`;
+stills of a window, a display at a width, a region, and after a delay, in PNG, JPEG, and HEIC;
+recordings of a window and a region with system sound, the microphone, both, and none (a
+window's recording carries only its app's sound); and a second Control-C while saving, which
+left nothing. Not yet by hand: `start`/`stop`, F10 or the timer stopping a scripted recording,
+and the Install Command-Line Tool menu item. 0.5.3
 (shreeve/shotts#68) made recording from the picker work: a Command press during the drag toggles
 the red, record state, its release does nothing, and the picker's view takes the keys. 0.5.1
 (shreeve/shotts#66): Space moves a shape being drawn, drawing tools select what they press, and
 arrow keys move by the pixel. 0.5.0 brought screen recording (shreeve/shotts#64) and a second
 revamp (shreeve/shotts#65). `CHANGELOG.md` has every release. The build has no warnings
-(warnings are errors) and `swift test` passes: 103 Core tests and 95 AppKit tests. Shotts has
+(warnings are errors) and `swift test` passes: 105 Core tests and 95 AppKit tests. Shotts has
 only ever run on macOS 27, and recording has been tried by hand only briefly.
 
 Next, in order:
