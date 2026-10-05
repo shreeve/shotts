@@ -12,11 +12,19 @@ import Testing
         return folder.appendingPathComponent("cli.sock").path
     }
 
+    /// Gives up reading after five seconds, so a server that never answers fails the test rather
+    /// than hanging the run.
+    private nonisolated static func waitAtMost5Seconds(_ fd: Int32) {
+        var limit = timeval(tv_sec: 5, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &limit, socklen_t(MemoryLayout<timeval>.size))
+    }
+
     /// Sends `request` as the tool does, and reads every line until Shotts closes.
     private nonisolated static func ask(_ path: String, _ request: ScriptRequest) async -> [ScriptResult] {
         await Task.detached {
             guard let fd = ScriptServer.connect(to: path) else { return [] }
             defer { close(fd) }
+            waitAtMost5Seconds(fd)
             let line = request.line()
             _ = line.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
             var data = Data()
@@ -40,8 +48,11 @@ import Testing
         // The folder and the socket are its user's alone.
         let folder = try FileManager.default.attributesOfItem(atPath: (path as NSString).deletingLastPathComponent)
         #expect((folder[.posixPermissions] as? Int) == 0o700)
-        // A second Shotts leaves the socket to the first.
-        #expect(throws: ScriptServer.Failure.self) { try ScriptServer(path: path) { _, _ in }.start() }
+        // A second Shotts leaves the socket to the first. Should it take it instead, it is
+        // stopped, so what follows fails rather than waiting on a server that never answers.
+        let second = ScriptServer(path: path) { _, _ in }
+        #expect(throws: ScriptServer.Failure.self) { try second.start() }
+        second.stop()
 
         var request = ScriptRequest(command: .record)
         request.target.window = "Safari"
@@ -62,6 +73,7 @@ import Testing
         try server.start()
         defer { server.stop() }
         let fd = try #require(ScriptServer.connect(to: path))
+        Self.waitAtMost5Seconds(fd)
         let line = ScriptRequest(command: .record).line()
         _ = line.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
         var byte: UInt8 = 0
