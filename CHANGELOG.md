@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.6.5 — 2026-10-05
 
 - Start at Login, in the menu bar menu: Shotts starts when you log in, so it is in the menu bar
   after every restart. It is off until you turn it on, and System Settings › General › Login
