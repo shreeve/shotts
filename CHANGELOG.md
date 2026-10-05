@@ -5,6 +5,11 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Shift snaps a line to 45° while you drag one of its ends to reshape it, as it does while you
+  draw it.
+
 ## 0.6.5 — 2026-10-05
 
 - Start at Login, in the menu bar menu: Shotts starts when you log in, so it is in the menu bar

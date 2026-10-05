@@ -366,7 +366,7 @@ public final class CanvasView: NSView {
         case .select:
             if let original = dragOriginal {
                 var d = document
-                d.replace(dragged(original, by: p - anchor))
+                d.replace(dragged(original, by: p - anchor, snapped: shift))
                 history.replaceCurrent(d)
             }
         case .arrow, .callout:
@@ -493,8 +493,8 @@ public final class CanvasView: NSView {
 
     /// The annotation as a drag of `delta` on the part grabbed leaves it, a callout whose arrow
     /// changed shape with its words laid out afresh.
-    private func dragged(_ original: Annotation, by delta: CGPoint) -> Annotation {
-        let moved = original.dragged(dragPart, by: delta)
+    private func dragged(_ original: Annotation, by delta: CGPoint, snapped: Bool = false) -> Annotation {
+        let moved = original.dragged(dragPart, by: delta, snapped: snapped)
         guard case let .callout(from, to, text) = moved.shape, dragPart != .shaft, dragPart != nil else { return moved }
         return relaid(moved, from: from, to: to, string: text.string)
     }

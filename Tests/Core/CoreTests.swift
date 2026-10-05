@@ -248,6 +248,22 @@ import Testing
         #expect(Annotation(shape: .line(from: .zero, to: CGPoint(x: 2, y: 1)), style: style).isDegenerate(in: doc.pixelBounds))
     }
 
+    /// Shift while dragging a line's end snaps it to 45° around the other end, as while drawing.
+    @Test func aLineEndSnapsWithShift() {
+        let line = Annotation(shape: .line(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 400, y: 100)), style: style)
+        // The head pulled to (390, 120): nearly level, so it lands level, as far along as the pointer.
+        #expect(line.dragged(.head, by: CGPoint(x: -10, y: 20), snapped: true).shape
+            == .line(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 390, y: 100)))
+        // Without Shift it goes where it is pulled.
+        #expect(line.dragged(.head, by: CGPoint(x: -10, y: 20)).shape == .line(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 390, y: 120)))
+        // The tail pulled near the diagonal through the head snaps onto it.
+        guard case let .line(tail, head) = line.dragged(.tail, by: CGPoint(x: 0, y: -290), snapped: true).shape else { Issue.record(); return }
+        #expect(head == CGPoint(x: 400, y: 100))
+        #expect(abs(abs(tail.x - head.x) - abs(tail.y - head.y)) < 1e-9)
+        // Moving the whole line is not snapped.
+        #expect(line.dragged(.shaft, by: CGPoint(x: 3, y: 7), snapped: true).shape == .line(from: CGPoint(x: 103, y: 107), to: CGPoint(x: 403, y: 107)))
+    }
+
     @Test func emptyStrokesHitNothing() {
         let doc = Document(width: 100, height: 100, scale: 1, annotations: [Annotation(shape: .pen([]), style: style)])
         #expect(HitTest.annotation(at: .zero, in: doc, tolerance: 4) == nil)

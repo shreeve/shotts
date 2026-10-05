@@ -119,8 +119,9 @@ public struct Annotation: Identifiable, Equatable, Sendable {
     /// The annotation as a drag of `delta` on one of its parts leaves it. An arrow's or callout's
     /// tail end, or a callout's words, move the tail and its head moves the tip, the other end
     /// staying put; the shaft, or anything else, moves the whole. A callout whose tail or tip moved
-    /// needs its words laid out again, which takes the UI's text measuring.
-    public func dragged(_ part: HitTest.ArrowPart?, by delta: CGPoint) -> Annotation {
+    /// needs its words laid out again, which takes the UI's text measuring. With `snapped` (Shift),
+    /// a line's end moved lands on the nearest 45° around the other end, as when it was drawn.
+    public func dragged(_ part: HitTest.ArrowPart?, by delta: CGPoint, snapped: Bool = false) -> Annotation {
         var copy = self
         switch (shape, part) {
         case let (.arrow(from, to), .tail?):
@@ -128,9 +129,9 @@ public struct Annotation: Identifiable, Equatable, Sendable {
         case let (.arrow(from, to), .head?):
             copy.shape = .arrow(from: from, to: to + delta)
         case let (.line(from, to), .tail?):
-            copy.shape = .line(from: from + delta, to: to)
+            copy.shape = .line(from: SelectionRule.lineEnd(anchor: to, pointer: from + delta, snapped: snapped), to: to)
         case let (.line(from, to), .head?):
-            copy.shape = .line(from: from, to: to + delta)
+            copy.shape = .line(from: from, to: SelectionRule.lineEnd(anchor: from, pointer: to + delta, snapped: snapped))
         case let (.callout(from, to, text), .tail?), let (.callout(from, to, text), .text?):
             copy.shape = .callout(from: from + delta, to: to, text: text)
         case let (.callout(from, to, text), .head?):
