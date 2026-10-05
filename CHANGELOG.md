@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.7.1 — 2026-10-05
 
 - Keys shows shortcuts only: keys with Control, Option, or Command, and keys that act on their
   own, such as Return, Escape, and the arrows. Ordinary typing no longer shows, so what you
