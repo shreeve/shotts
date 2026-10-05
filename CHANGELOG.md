@@ -5,6 +5,12 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Keys read as a sequence: everything pressed within two seconds of the key before joins one
+  line, such as `⌘I  ⌃K  99  ↩`, and the line stays five seconds after the last key, long
+  enough to read.
+
 ## 0.7.0 — 2026-10-05
 
 - Click the desktop in the picker to capture the whole display; the outline shows it before you

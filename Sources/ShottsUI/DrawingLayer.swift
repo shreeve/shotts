@@ -118,8 +118,8 @@ final class DrawingCanvas: NSView {
         CATransaction.commit()
     }
 
-    /// A key pressed: typing joins the line showing, a shortcut replaces it, and the line goes
-    /// once no key has come for `KeystrokeLine.linger`.
+    /// A key pressed: it joins the line showing if it came soon enough after the last, and the
+    /// line goes once no key has come for `KeystrokeLine.linger`.
     func showKey(_ key: KeystrokeLine.Key) {
         let now = ProcessInfo.processInfo.systemUptime
         line.add(key, at: now)
@@ -133,9 +133,10 @@ final class DrawingCanvas: NSView {
         badge.alphaValue = 1
         placeKeys()
         keysTimer?.invalidate()
+        // Each key starts it again, so when it fires the line has lingered its while since the last.
         let timer = Timer(timeInterval: KeystrokeLine.linger, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.line.visible(at: ProcessInfo.processInfo.systemUptime) == nil else { return }
+                guard let self else { return }
                 NSAnimationContext.runAnimationGroup { context in
                     context.duration = 0.25
                     self.keysBadge?.animator().alphaValue = 0

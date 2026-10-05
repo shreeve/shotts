@@ -200,7 +200,7 @@ edge, and neither is recorded.
 | Record, or Return | Starts recording. The panel becomes the recording bar; the outline stays. |
 | Microphone | Records your voice as well. Off until turned on, and remembered. The first recording with it on asks macOS for the microphone. |
 | Clicks | Shows a yellow ripple where each click lands in the area, recorded with it. Off until turned on, and remembered. |
-| Keys | Shows the keys pressed, on a dark plate near the area's bottom, recorded with it: typing collects into one line, a shortcut such as ⌘⇧4 shows on its own, and it clears a moment after the last key. Off until turned on, and remembered. The first recording with it on asks macOS for Input Monitoring; until that is allowed, recordings go ahead without keys. macOS sends no keys while a password is typed, so none ever shows. |
+| Keys | Shows the keys pressed, on a dark plate near the area's bottom, recorded with it: keys pressed within two seconds of each other read as one line, typed characters as words and shortcuts and named keys as tokens of their own (`⌘I  ⌃K  99  ↩`), and the line stays five seconds after the last key, as KeyCastr's line-break delay and linger work. Off until turned on, and remembered. The first recording with it on asks macOS for Input Monitoring; until that is allowed, recordings go ahead without keys. macOS sends no keys while a password is typed, so none ever shows. |
 | Cancel, or Escape | Ends without recording. |
 
 Everything in the area is recorded as it happens, at the display's full resolution, up to 60

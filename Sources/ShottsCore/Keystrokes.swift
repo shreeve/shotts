@@ -1,13 +1,16 @@
 import Foundation
 
-/// The keys a recording shows as they are pressed, as Shotts writes them: typing collects into
-/// one line ("hello⌫"), and a shortcut, a key with Control, Option, or Command, shows on its
-/// own ("⌘⇧4"). The line goes once no key has come for a moment.
+/// The keys a recording shows as they are pressed, as Shotts writes them: everything pressed
+/// within `joinGap` of the key before joins one line, typed characters into words ("99") and
+/// shortcuts and named keys as tokens of their own ("⌘I  ⌃K  99  ↩"), and the line shows until
+/// `linger` after its last key. As KeyCastr, the long-standing keystroke display, does: keys join
+/// a line until a pause, and the line lingers so a viewer can read the whole sequence.
 public struct KeystrokeLine: Equatable, Sendable {
     /// One key, as it shows.
     public struct Key: Equatable, Sendable {
         public var text: String
-        /// Typing, which joins the line; a shortcut stands alone.
+        /// A typed character, which joins the characters typed just before into a word; a
+        /// shortcut or a named key (↩, ⌫, ←) is a token of its own.
         public var isTyping: Bool
 
         public init(text: String, isTyping: Bool) {
@@ -16,23 +19,35 @@ public struct KeystrokeLine: Equatable, Sendable {
         }
     }
 
+    /// Keys this close together, in seconds, join one line.
+    public static let joinGap = 2.0
     /// How long the line shows after its last key, in seconds.
-    public static let linger = 1.5
+    public static let linger = 5.0
     /// The most characters shown; a longer line shows its end.
-    public static let longest = 32
+    public static let longest = 40
+    /// Between tokens: wide enough to tell ⌘I from ⌃K at a glance.
+    static let gap = "  "
 
     public private(set) var text = ""
     private var lastKey = -Double.infinity
-    private var typing = false
+    /// Whether the line ends in typed characters, which the next typed one joins.
+    private var endsTyping = false
 
     public init() {}
 
     /// A key pressed at `time` (seconds, on any clock that only goes forward).
     public mutating func add(_ key: Key, at time: Double) {
-        let continues = key.isTyping && typing && time - lastKey < Self.linger
-        text = continues ? text + key.text : key.text
+        let continues = !text.isEmpty && time - lastKey < Self.joinGap
+        if !continues { text = "" }
+        if key.isTyping, endsTyping, continues {
+            text += key.text
+        } else {
+            // A space starting a token would show as nothing: it is written as one.
+            let token = key.isTyping && key.text == " " ? "␣" : key.text
+            text += (text.isEmpty ? "" : Self.gap) + token
+        }
         if text.count > Self.longest { text = "…" + text.suffix(Self.longest - 1) }
-        typing = key.isTyping
+        endsTyping = key.isTyping
         lastKey = time
     }
 
@@ -63,8 +78,8 @@ public struct KeystrokeLine: Equatable, Sendable {
 
     /// A key as it shows: `base` is what the key gives with no modifiers ("4"), `typed` what it
     /// typed ("$" with Shift). With Control, Option, or Command it is a shortcut, its modifiers
-    /// first; otherwise what was typed, or the key's symbol, a space written as one after other
-    /// typing.
+    /// first; a key with a symbol of its own (↩, ⌫, ←) is that symbol; otherwise it is what was
+    /// typed.
     public static func key(code: UInt16, base: String, typed: String, modifiers: Modifiers) -> Key {
         let symbol = named[code]
         if !modifiers.isDisjoint(with: [.control, .option, .command]) {
@@ -76,7 +91,7 @@ public struct KeystrokeLine: Equatable, Sendable {
             return Key(text: prefix + (symbol ?? base.uppercased()), isTyping: false)
         }
         if code == 49 { return Key(text: " ", isTyping: true) }
-        if let symbol { return Key(text: (modifiers.contains(.shift) ? "⇧" : "") + symbol, isTyping: true) }
+        if let symbol { return Key(text: (modifiers.contains(.shift) ? "⇧" : "") + symbol, isTyping: false) }
         return Key(text: typed, isTyping: true)
     }
 }
