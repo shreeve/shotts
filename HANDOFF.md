@@ -5,8 +5,8 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.6.6 is the latest release: tag `v0.6.6` on `main` (commit "Shotts 0.6.6"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#47),
+0.7.0 is the latest release: tag `v0.7.0` on `main` (commit "Shotts 0.7.0"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#48),
 which also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
 (shreeve/shotts#69) added `shotts`, the command line ("Command line" below; SPEC has the
 language). 0.6.1 made `record` show progress while saving and GIFs on-screen size, and took
@@ -17,7 +17,13 @@ had lifted the darks into a gray film), and puts back the level macOS takes off 
 and in, and check Login Items in System Settings agrees with the checkmark. 0.6.6: the crosshair
 opens on the pointer (shreeve/shotts#70, Philip Lindberg; check by hand on a second display and
 an older macOS), Shift snaps a line's end while reshaping it, and the command-line server's
-stop no longer leaves a thread to take the next server's connections (Traps). Checked on a real screen for 0.6.2: `list`;
+stop no longer leaves a thread to take the next server's connections (Traps). 0.7.0: a click on
+the desktop captures the whole display, a Command-click records a window's area or the whole
+display, and recordings can show click ripples and the keys pressed (Input Monitoring). None of
+0.7.0 has been tried by hand yet: capture and record the whole display, Command-click a window,
+record with Clicks and with Keys (the first asks for Input Monitoring; check a password field
+shows nothing), and draw with a tool during a whole-display recording, the bar still in reach.
+Checked on a real screen for 0.6.2: `list`;
 stills of a window, a display at a width, a region, and after a delay, in PNG, JPEG, and HEIC;
 recordings of a window and a region with system sound, the microphone, both, and none (a
 window's recording carries only its app's sound); and a second Control-C while saving, which
