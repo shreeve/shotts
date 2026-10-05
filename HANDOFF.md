@@ -65,7 +65,9 @@ Deferred, with the reason each waits:
 
 - **Start at Login**, a checkmarked item in the menu bar menu: the owner's name for it, over
   macOS's "Open at Login" (System Settings › General › Login Items). The owner asked for it on
-  2026-10-05; not yet scheduled. `SMAppService.mainApp.register()`/`unregister()` (macOS 13 and later, no helper
+  2026-10-05; not yet scheduled. It goes first in the group with Allow Command-Line Capture
+  (how Shotts itself runs), not among the capture options, which follow a capture's order.
+  `SMAppService.mainApp.register()`/`unregister()` (macOS 13 and later, no helper
   app). Off until turned on. The checkmark reads `SMAppService.mainApp.status` each time the menu
   opens, since the user can also remove Shotts in Login Items; `.requiresApproval` opens that
   pane (`SMAppService.openSystemSettingsLoginItems()`).
