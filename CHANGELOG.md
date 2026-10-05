@@ -7,6 +7,9 @@ Unreleased, whose heading becomes the version's when it ships.
 
 ## Unreleased
 
+- The crosshair opens on the pointer. Pressing F10 with the pointer at rest could put it up to
+  22 points away until the pointer moved: the picker's window animated in, and macOS reported
+  the pointer's place scaled away from the screen's center while it did. It now appears at once.
 - Shift snaps a line to 45° while you drag one of its ends to reshape it, as it does while you
   draw it.
 - The command line's listener, when it stops, can no longer leave a thread behind that takes
