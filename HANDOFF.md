@@ -489,6 +489,13 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
 
 ## Traps
 
+- A window that animates as it appears gets pointer events placed wrongly while it does: the
+  picker's overlay, opening with the system's animation, had a pointer-entered event report a
+  position about 2% further from the screen's center than the pointer, and the crosshair opened
+  up to 22 points off until the pointer moved. `OverlayWindow` sets `animationBehavior = .none`
+  (shreeve/shotts#70, Philip Lindberg). No test can catch it: windows that are never shown do
+  not animate. Check it by hand: press F10 without moving the pointer, and the crosshair is on it.
+
 - A file descriptor's number is handed to the next one opened the moment it is closed. Close a
   socket that another thread might still use, and that thread may use whatever gets the number
   next: `ScriptServer.stop` once closed its listening socket while the listening thread was
