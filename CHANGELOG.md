@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.6.6 — 2026-10-05
 
 - The crosshair opens on the pointer. Pressing F10 with the pointer at rest could put it up to
   22 points away until the pointer moved: the picker's window animated in, and macOS reported
