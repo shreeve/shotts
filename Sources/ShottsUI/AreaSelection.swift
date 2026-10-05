@@ -217,6 +217,9 @@ final class OverlayWindow: NSPanel {
         backgroundColor = display.isLive ? .clear : .black
         // A clear window lets clicks through to what is under it unless told otherwise.
         ignoresMouseEvents = false
+        // No animation as the window appears: a pointer-entered event sent while it animates in
+        // reports a position scaled away from the screen's center, and the crosshair follows it.
+        animationBehavior = .none
         hasShadow = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         contentView = overlayView
