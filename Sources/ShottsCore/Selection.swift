@@ -56,4 +56,12 @@ public enum SelectionRule {
     /// A selection under `minimum` either way is a click, not an area. The picker measures in
     /// points; the crop tool passes four points' worth of picture pixels.
     public static func isUsable(_ rect: CGRect, minimum: Double = 4) -> Bool { rect.width >= minimum && rect.height >= minimum }
+
+    /// What a click without a drag takes, at `point` on a display of `bounds`: the frontmost of
+    /// `windows` (frames on the display, front to back) under it, or, on the desktop, the whole
+    /// display. Captured, or with Command recorded, either way.
+    public static func clickTarget(at point: CGPoint, windows: [CGRect], bounds: CGRect) -> (rect: CGRect, isWindow: Bool) {
+        if let window = windows.first(where: { $0.contains(point) }) { return (window, true) }
+        return (bounds, false)
+    }
 }

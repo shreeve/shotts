@@ -119,7 +119,9 @@ public struct SelectionOptions: Equatable, Sendable {
 /// the user drags out a rectangle. Escape cancels, Shift squares the selection, Space moves it
 /// while dragging, the arrow keys move the crosshair (or the corner being dragged) a pixel at a
 /// time or ten with Shift, pressing Command during the drag records the area instead (pressing
-/// it again goes back), and Command-C copies the color under the crosshair and cancels.
+/// it again goes back), and Command-C copies the color under the crosshair and cancels. A
+/// click without a drag takes the window under it, or on the desktop the whole display; with
+/// Command, it records that instead.
 public final class AreaSelection {
     public enum Outcome {
         case cancelled
@@ -127,7 +129,8 @@ public final class AreaSelection {
         case selected(display: DisplayImage, rect: CGRect)
         /// A click on a window: capture that window on its own.
         case window(display: DisplayImage, window: WindowInfo)
-        /// A drag ended with Command down: record the area, in points like `selected`.
+        /// A drag ended, or a click came, with Command down: record the area (a window's, or the
+        /// whole display's), in points like `selected`.
         case record(display: DisplayImage, rect: CGRect)
     }
 
@@ -264,11 +267,15 @@ final class OverlayView: NSView {
     /// Where the magnifier was last drawn: a new frame redraws only that.
     private var magnifierPanel: CGRect?
 
-    /// The frontmost window under the pointer, while nothing is being dragged.
-    var hoveredWindow: CGRect? {
+    /// What a click would take, while nothing is being dragged: the frontmost window under the
+    /// pointer, or on the desktop the whole display.
+    var hoveredTarget: (rect: CGRect, isWindow: Bool)? {
         guard anchor == nil, selection == nil, let pointer else { return nil }
-        return display.windows.first { $0.frame.contains(pointer) }?.frame
+        return SelectionRule.clickTarget(at: pointer, windows: display.windows.map(\.frame), bounds: bounds)
     }
+
+    /// The window under the pointer, if a click would take one.
+    var hoveredWindow: CGRect? { hoveredTarget.flatMap { $0.isWindow ? $0.rect : nil } }
 
     init(display: DisplayImage, options: SelectionOptions) {
         self.display = display
@@ -384,10 +391,10 @@ final class OverlayView: NSView {
     /// Command went down or up. Each press flips the selection between capturing and recording
     /// (red, reading "Record"); letting go of the key changes nothing.
     func commandChanged(_ down: Bool) {
-        defer { commandDown = down }
+        // Redrawn either way: the window or display a click would take is red while it is down.
+        defer { commandDown = down; needsDisplay = true }
         guard down, !commandDown else { return }
         records.toggle()
-        needsDisplay = true
     }
 
     /// `p` in the view's coordinates, which may be past the display's edge.
@@ -425,13 +432,17 @@ final class OverlayView: NSView {
     func released(at p: CGPoint, recording: Bool) {
         defer { anchor = nil }
         guard let rect = selection, SelectionRule.isUsable(rect) else {
-            // A click without a drag captures the window under it, if any.
+            // A click without a drag takes the window under it, or on the desktop the whole
+            // display: captured, or with Command recorded (a window's area, where it is now).
             selection = nil
-            if let window = display.windows.first(where: { $0.frame.contains(p) }) {
+            let target = SelectionRule.clickTarget(at: p, windows: display.windows.map(\.frame), bounds: bounds)
+            if recording {
+                onFinish?(.record(display: display, rect: target.rect))
+            } else if target.isWindow, let window = display.windows.first(where: { $0.frame == target.rect }) {
                 onFinish?(.window(display: display, window: window))
-                return
+            } else {
+                onFinish?(.selected(display: display, rect: target.rect))
             }
-            needsDisplay = true
             return
         }
         onFinish?(recording ? .record(display: display, rect: rect) : .selected(display: display, rect: rect))
@@ -536,10 +547,13 @@ final class OverlayView: NSView {
 
         // The rest follows the pointer, on the display it is on.
         guard let pointer else { return }
-        if let window = hoveredWindow {
-            // The window a click would capture.
-            let path = CGPath(roundedRect: window.insetBy(dx: 1, dy: 1), cornerWidth: 10, cornerHeight: 10, transform: nil)
-            ctx.setStrokeColor(NSColor.controlAccentColor.cgColor)
+        if let target = hoveredTarget {
+            // What a click would take, a window or the whole display; red while Command is
+            // down, since the click would record it.
+            let inset: CGFloat = target.isWindow ? 1 : 2
+            let path = CGPath(roundedRect: target.rect.insetBy(dx: inset, dy: inset), cornerWidth: target.isWindow ? 10 : 6,
+                              cornerHeight: target.isWindow ? 10 : 6, transform: nil)
+            ctx.setStrokeColor(commandDown ? NSColor.systemRed.cgColor : NSColor.controlAccentColor.cgColor)
             ctx.setLineWidth(3)
             ctx.addPath(path)
             ctx.strokePath()
@@ -710,10 +724,10 @@ final class OverlayView: NSView {
     }
 
     static let hints = [
-        "Drag an area, or click a window, to capture it",
+        "Drag an area, or click a window or the desktop, to capture it",
         "⇧ keeps it square, Space moves it",
         "Arrow keys move a pixel, ⇧ ten",
-        "⌘ while dragging records it instead",
+        "⌘ while dragging or clicking records instead",
         "⌘C copies the color under the crosshair",
         "Esc cancels",
     ]

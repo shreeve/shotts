@@ -23,19 +23,20 @@ import Testing
     @Test func returnRecordsAndEscapeCancels() throws {
         let screen = try #require(NSScreen.screens.first)
         var outcomes: [RecordingSetup.Outcome] = []
-        let setup = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), microphone: true) { outcomes.append($0) }
+        let setup = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), choices: RecordingSetup.Choices(microphone: true)) { outcomes.append($0) }
         defer { setup.close() }
         let panel = try #require(setup.setupPanel)
         #expect(setup.windowNumbers.count == 2)
         panel.microphone.state = .off
+        panel.clicks.state = .on
         panel.record.performClick(nil)
         panel.cancelOperation(nil)
         #expect(outcomes.count == 1)
-        guard case let .record(microphone)? = outcomes.first else { Issue.record("did not record"); return }
-        #expect(!microphone)
+        guard case let .record(choices)? = outcomes.first else { Issue.record("did not record"); return }
+        #expect(choices == RecordingSetup.Choices(microphone: false, clicks: true, keys: false))
 
         var cancelled = false
-        let other = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), microphone: false) {
+        let other = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), choices: RecordingSetup.Choices()) {
             if case .cancelled = $0 { cancelled = true }
         }
         try #require(other.setupPanel).cancelOperation(nil)
@@ -45,7 +46,7 @@ import Testing
     /// The area is where the picker put it, flipped into screen coordinates.
     @Test func theAreaIsInScreenCoordinates() throws {
         let screen = try #require(NSScreen.screens.first)
-        let setup = RecordingSetup(screen: screen, rect: CGRect(x: 10, y: 20, width: 300, height: 200), microphone: false) { _ in }
+        let setup = RecordingSetup(screen: screen, rect: CGRect(x: 10, y: 20, width: 300, height: 200), choices: RecordingSetup.Choices()) { _ in }
         defer { setup.close() }
         #expect(setup.area == CGRect(x: screen.frame.minX + 10, y: screen.frame.maxY - 220, width: 300, height: 200))
     }
@@ -218,7 +219,7 @@ import Testing
 @MainActor @Suite struct RecordingBarTests {
     private func setup() throws -> RecordingSetup {
         let screen = try #require(NSScreen.screens.first)
-        return RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), microphone: false) { _ in }
+        return RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), choices: RecordingSetup.Choices()) { _ in }
     }
 
     /// Once recording, the panel is the recording bar: one drawing tool at a time, which the
@@ -275,5 +276,59 @@ import Testing
         #expect(DrawingCanvas.opacity(drawn: drawn, now: drawn.addingTimeInterval(3.9)) == 1)
         #expect(abs(DrawingCanvas.opacity(drawn: drawn, now: drawn.addingTimeInterval(4.5)) - 0.5) < 1e-9)
         #expect(DrawingCanvas.opacity(drawn: drawn, now: drawn.addingTimeInterval(5)) == 0)
+    }
+}
+
+@MainActor @Suite struct RecordingOverlayTests {
+    /// Keys show on the drawing layer, typing collected into one line and a shortcut on its own.
+    @Test func keysShowAsALine() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let setup = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 400, height: 300), choices: RecordingSetup.Choices(keys: true)) { _ in }
+        defer { setup.close() }
+        for c in "hi" { setup.showKey(KeystrokeLine.key(code: 4, base: String(c), typed: String(c), modifiers: [])) }
+        let badge = try #require(setup.drawing.canvas.subviews.compactMap { $0 as? KeysBadge }.first)
+        #expect(badge.text == "hi")
+        setup.showKey(KeystrokeLine.key(code: 8, base: "c", typed: "c", modifiers: [.command]))
+        #expect(badge.text == "⌘C")
+        // Near the bottom, inside the area.
+        #expect(badge.frame.maxY <= setup.drawing.canvas.bounds.maxY && badge.frame.minY > setup.drawing.canvas.bounds.midY)
+    }
+
+    /// A click inside the area ripples where it landed; one outside does nothing.
+    @Test func clicksRippleOnlyInTheArea() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let setup = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 400, height: 300), choices: RecordingSetup.Choices(clicks: true)) { _ in }
+        defer { setup.close() }
+        let canvas = setup.drawing.canvas
+        let before = canvas.layer?.sublayers?.count ?? 0
+        setup.showClick(at: CGPoint(x: setup.area.minX - 5, y: setup.area.midY))
+        #expect((canvas.layer?.sublayers?.count ?? 0) == before)
+        setup.showClick(at: CGPoint(x: setup.area.minX + 40, y: setup.area.maxY - 30))
+        let ripple = try #require(canvas.layer?.sublayers?.last as? CAShapeLayer)
+        // Points from the area's top-left, as the canvas measures.
+        #expect(ripple.position == CGPoint(x: 40, y: 30))
+    }
+
+    /// An area filling its display has no room around it for the frame: it goes just inside.
+    @Test func aWholeDisplayIsFramedInside() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let whole = RecordingSetup(screen: screen, rect: CGRect(origin: .zero, size: screen.frame.size), choices: RecordingSetup.Choices()) { _ in }
+        defer { whole.close() }
+        #expect(whole.outlineFrame == whole.area)
+        let part = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), choices: RecordingSetup.Choices()) { _ in }
+        defer { part.close() }
+        #expect(part.outlineFrame == part.area.insetBy(dx: -OutlineView.width, dy: -OutlineView.width))
+    }
+}
+
+@MainActor @Suite struct RecordingBarLevelTests {
+    /// The bar sits above the drawing layer, which covers the area and takes clicks while a tool
+    /// is on, so a bar inside the area (a whole display's) can still be pressed.
+    @Test func theBarIsAboveTheDrawing() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let setup = RecordingSetup(screen: screen, rect: CGRect(origin: .zero, size: screen.frame.size), choices: RecordingSetup.Choices()) { _ in }
+        defer { setup.close() }
+        let panel = try #require(setup.setupPanel)
+        #expect(panel.level.rawValue > setup.drawing.level.rawValue)
     }
 }

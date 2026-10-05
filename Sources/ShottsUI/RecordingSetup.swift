@@ -1,14 +1,31 @@
 import AppKit
+import ShottsCore
 
-/// The area about to be recorded, and then being recorded: a red outline just outside it, and
-/// a small panel beside it. Until recording starts the panel has Record, the Microphone switch,
-/// and Cancel; Return records, Escape cancels. Then it has the drawing tools, Pause, and Stop,
-/// and a clear layer over the area takes what is drawn. Neither the outline nor the panel is
-/// ever in the recording: the recorder leaves out `windowNumbers`, and both sit outside the
-/// area. The drawing layer is recorded: it is `keptNumbers`.
+/// The area about to be recorded, and then being recorded: a red outline just outside it (just
+/// inside, for an area that fills its display), and a small panel beside it (inside its bottom
+/// edge, when there is no room beside). Until recording starts the panel has Record, the
+/// Microphone, Clicks, and Keys switches, and Cancel; Return records, Escape cancels. Then it has
+/// the drawing tools, Pause, and Stop, and a clear layer over the area takes what is drawn and
+/// shows clicks and keys. Neither the outline nor the panel is ever in the recording: the
+/// recorder leaves out `windowNumbers`. The drawing layer is recorded: it is `keptNumbers`.
 public final class RecordingSetup {
+    /// What the recording takes besides the screen, chosen with the switches.
+    public struct Choices: Equatable, Sendable {
+        public var microphone: Bool
+        /// A ripple where each click lands.
+        public var clicks: Bool
+        /// The keys pressed, shown near the area's bottom.
+        public var keys: Bool
+
+        public init(microphone: Bool = false, clicks: Bool = false, keys: Bool = false) {
+            self.microphone = microphone
+            self.clicks = clicks
+            self.keys = keys
+        }
+    }
+
     public enum Outcome {
-        case record(microphone: Bool)
+        case record(Choices)
         case cancelled
     }
 
@@ -29,19 +46,20 @@ public final class RecordingSetup {
     private var observer: NSObjectProtocol?
 
     /// `rect` is in points from the top-left of `screen`, as the picker gives it.
-    public init(screen: NSScreen, rect: CGRect, microphone: Bool, completion: @escaping (Outcome) -> Void) {
+    public init(screen: NSScreen, rect: CGRect, choices: Choices, completion: @escaping (Outcome) -> Void) {
         self.screen = screen
         area = CGRect(x: screen.frame.minX + rect.minX, y: screen.frame.maxY - rect.maxY, width: rect.width, height: rect.height)
         self.completion = completion
-        outline = Self.makeOutline(around: area)
+        outline = Self.makeOutline(around: area, on: screen.frame)
         drawing = DrawingLayer(area: area, scale: screen.backingScaleFactor)
-        let panel = SetupPanel(microphone: microphone)
+        let panel = SetupPanel(choices: choices)
         self.panel = panel
         panel.onFinish = { [weak self] outcome in self?.finish(outcome) }
         panel.onControl = { [weak self] control in self?.onControl?(control) }
         panel.onTool = { [weak self] tool in self?.drawing.tool = tool }
         drawing.onToolChange = { [weak panel] tool in panel?.showTool(tool) }
         panel.setFrameOrigin(Self.panelOrigin(size: panel.frame.size, beside: area, on: screen.visibleFrame))
+        drawing.keysClearance = Self.clearance(of: panel.frame, in: area)
         // The area's display going, or the displays rearranging, leaves the outline over nothing.
         observer = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil,
                                                           queue: .main) { [weak self] _ in
@@ -74,6 +92,18 @@ public final class RecordingSetup {
         guard let panel else { return }
         panel.showControls()
         panel.setFrameOrigin(Self.panelOrigin(size: panel.frame.size, beside: area, on: screen.visibleFrame))
+        drawing.keysClearance = Self.clearance(of: panel.frame, in: area)
+    }
+
+    /// A ripple where a click landed, `point` in screen coordinates, if it is in the area.
+    public func showClick(at point: CGPoint) { drawing.canvas.showClick(atScreen: point, in: area) }
+
+    /// A key pressed, as it shows.
+    public func showKey(_ key: KeystrokeLine.Key) { drawing.canvas.showKey(key) }
+
+    /// How far above the area's bottom the keys show, clear of a panel inside the area.
+    private static func clearance(of panel: CGRect, in area: CGRect) -> CGFloat {
+        area.intersects(panel) ? panel.maxY - area.minY + 16 : 28
     }
 
     /// The recording bar shows it paused, or not.
@@ -101,14 +131,19 @@ public final class RecordingSetup {
     #if DEBUG
     /// For tests: the panel, as Return and Escape and the switch reach it.
     var setupPanel: SetupPanel? { panel }
+    /// For tests: where the outline's window is.
+    var outlineFrame: CGRect { outline.frame }
     #endif
 
     /// A frame just around the area, clear inside, that lets every click through: a red line
     /// two points wide a point off the area, in a dark band with a faint light edge, so the
     /// area reads as framed on any background.
-    private static func makeOutline(around area: CGRect) -> NSWindow {
-        let window = NSWindow(contentRect: area.insetBy(dx: -OutlineView.width, dy: -OutlineView.width), styleMask: .borderless,
-                              backing: .buffered, defer: false)
+    private static func makeOutline(around area: CGRect, on screen: CGRect) -> NSWindow {
+        // Outside the area when the frame fits on its display; else, as for a whole display,
+        // just inside its edge, where it is still left out of the recording.
+        let outside = area.insetBy(dx: -OutlineView.width, dy: -OutlineView.width)
+        let inward = !screen.contains(outside)
+        let window = NSWindow(contentRect: inward ? area : outside, styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.isOpaque = false
         window.backgroundColor = .clear
@@ -116,7 +151,9 @@ public final class RecordingSetup {
         window.ignoresMouseEvents = true
         window.level = .statusBar
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        window.contentView = OutlineView()
+        let view = OutlineView()
+        view.inward = inward
+        window.contentView = view
         return window
     }
 
@@ -135,8 +172,17 @@ public final class RecordingSetup {
 final class OutlineView: NSView {
     /// How far the frame reaches out from the area.
     static let width: CGFloat = 9
+    /// The frame inside the area's edge, for an area with no room around it.
+    var inward = false
 
     override func draw(_ dirtyRect: NSRect) {
+        if inward {
+            NSColor.systemRed.setStroke()
+            let line = NSBezierPath(rect: bounds.insetBy(dx: 1.5, dy: 1.5))
+            line.lineWidth = 3
+            line.stroke()
+            return
+        }
         let outer = bounds, inner = bounds.insetBy(dx: Self.width, dy: Self.width)
         // The band, between the area and the frame's outer edge.
         let band = NSBezierPath(rect: outer)
@@ -229,6 +275,8 @@ final class SetupPanel: NSPanel {
     var onTool: ((DrawingTool?) -> Void)?
     let record = PillButton(title: "Record", symbol: "record.circle", fill: .systemRed)
     let microphone = PillButton(title: "Microphone", symbol: "mic.slash.fill", fill: SetupPanel.plain, toggles: true)
+    let clicks = PillButton(title: "Clicks", symbol: "cursorarrow.click", fill: SetupPanel.plain, toggles: true)
+    let keys = PillButton(title: "Keys", symbol: "keyboard", fill: SetupPanel.plain, toggles: true)
     let cancel = PillButton(title: "Cancel", symbol: nil, fill: SetupPanel.plain)
     let arrow = PillButton(title: "", symbol: "arrow.up.right", fill: SetupPanel.plain, toggles: true)
     let rectangle = PillButton(title: "", symbol: "rectangle", fill: SetupPanel.plain, toggles: true)
@@ -240,12 +288,14 @@ final class SetupPanel: NSPanel {
     static let plain = NSColor(white: 0.32, alpha: 1)
     static let on = NSColor(srgbRed: 0.16, green: 0.45, blue: 0.95, alpha: 1)
 
-    init(microphone on: Bool) {
+    init(choices: RecordingSetup.Choices) {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
         becomesKeyOnlyIfNeeded = false
-        level = .statusBar
+        // A level above the drawing layer's, which covers the whole area and takes clicks while
+        // a tool is on: a bar inside the area, as for a whole display, stays within reach.
+        level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
@@ -258,8 +308,14 @@ final class SetupPanel: NSPanel {
         record.toolTip = "Start recording (Return)"
         microphone.symbols = ("mic.slash.fill", "mic.fill")
         microphone.onFill = Self.on
-        microphone.state = on ? .on : .off
+        microphone.state = choices.microphone ? .on : .off
         microphone.toolTip = "Record your voice along with the screen"
+        clicks.onFill = Self.on
+        clicks.state = choices.clicks ? .on : .off
+        clicks.toolTip = "Show a ripple where each click lands"
+        keys.onFill = Self.on
+        keys.state = choices.keys ? .on : .off
+        keys.toolTip = "Show the keys you press (never while typing a password)"
         cancel.keyEquivalent = "\u{1b}"
         cancel.target = self
         cancel.action = #selector(cancelPressed)
@@ -281,7 +337,7 @@ final class SetupPanel: NSPanel {
         stop.action = #selector(stopPressed)
         showPaused(false)
 
-        row.setViews([record, microphone, cancel], in: .leading)
+        row.setViews([record, microphone, clicks, keys, cancel], in: .leading)
         row.orientation = .horizontal
         row.spacing = 8
         row.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
@@ -307,7 +363,9 @@ final class SetupPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
-    @objc func recordPressed() { onFinish?(.record(microphone: microphone.state == .on)) }
+    @objc func recordPressed() {
+        onFinish?(.record(RecordingSetup.Choices(microphone: microphone.state == .on, clicks: clicks.state == .on, keys: keys.state == .on)))
+    }
     @objc func cancelPressed() { onFinish?(.cancelled) }
 
     /// Escape: before recording, Cancel; while recording, the tool off.
@@ -350,7 +408,7 @@ final class SetupPanel: NSPanel {
 /// windows, before recording or while it records.
 public enum RecordingSetupPreview {
     public static func write(to output: URL, recording: Bool) -> Bool {
-        let panel = SetupPanel(microphone: true)
+        let panel = SetupPanel(choices: RecordingSetup.Choices(microphone: true, clicks: true))
         if recording {
             panel.showControls()
             panel.showTool(.arrow)

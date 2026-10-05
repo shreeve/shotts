@@ -477,3 +477,58 @@ import Testing
         #expect(Document.scale(ofFile: 3000, pointWidth: 3000, screenWidth: 1920, screenScale: 1) == 1)
     }
 }
+
+@Suite struct ClickTargetTests {
+    let bounds = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    let windows = [CGRect(x: 100, y: 100, width: 400, height: 300), CGRect(x: 50, y: 50, width: 900, height: 700)]
+
+    /// A click takes the frontmost window under it, or on the desktop the whole display.
+    @Test func windowOrDesktop() {
+        #expect(SelectionRule.clickTarget(at: CGPoint(x: 200, y: 200), windows: windows, bounds: bounds) == (windows[0], true))
+        #expect(SelectionRule.clickTarget(at: CGPoint(x: 900, y: 600), windows: windows, bounds: bounds) == (windows[1], true))
+        #expect(SelectionRule.clickTarget(at: CGPoint(x: 1300, y: 900), windows: windows, bounds: bounds) == (bounds, false))
+    }
+}
+
+@Suite struct KeystrokeTests {
+    typealias Line = KeystrokeLine
+    func key(_ code: UInt16, _ base: String, _ typed: String? = nil, _ modifiers: Line.Modifiers = []) -> Line.Key {
+        Line.key(code: code, base: base, typed: typed ?? base, modifiers: modifiers)
+    }
+
+    /// Shortcuts carry their modifiers in the Mac's order and the key's own name; typing is what
+    /// was typed.
+    @Test func keysAreNamed() {
+        #expect(key(21, "4", "$", [.command, .shift]) == Line.Key(text: "⇧⌘4", isTyping: false))
+        #expect(key(8, "c", "c", [.command]) == Line.Key(text: "⌘C", isTyping: false))
+        #expect(key(8, "c", "c", [.control, .option, .shift, .command]).text == "⌃⌥⇧⌘C")
+        #expect(key(4, "h", "H", [.shift]) == Line.Key(text: "H", isTyping: true))
+        #expect(key(51, "\u{7f}") == Line.Key(text: "⌫", isTyping: true))
+        #expect(key(36, "\r", "\r", [.command]).text == "⌘↩")
+        #expect(key(48, "\t", "\t", [.shift]).text == "⇧⇥")
+        #expect(key(49, " ").text == " " && key(109, "").text == "F10")
+    }
+
+    /// Typing collects into a line; a shortcut stands alone; a pause starts afresh; the line goes
+    /// after lingering.
+    @Test func typingCollects() {
+        var line = Line()
+        for (i, c) in "hi there".enumerated() { line.add(key(c == " " ? 49 : 4, String(c)), at: Double(i) * 0.2) }
+        #expect(line.text == "hi there")
+        line.add(key(51, "\u{7f}"), at: 1.7)
+        #expect(line.text == "hi there⌫")
+        line.add(key(1, "s", "s", [.command]), at: 1.8)
+        #expect(line.text == "⌘S")
+        line.add(key(4, "a"), at: 1.9)
+        #expect(line.text == "a")
+        #expect(line.visible(at: 2.0) == "a" && line.visible(at: 1.9 + Line.linger) == nil)
+        line.add(key(4, "b"), at: 10)
+        #expect(line.text == "b")
+    }
+
+    @Test func aLongLineShowsItsEnd() {
+        var line = Line()
+        for i in 0..<50 { line.add(key(4, String(i % 10)), at: Double(i) * 0.1) }
+        #expect(line.text.count == Line.longest && line.text.hasPrefix("…") && line.text.hasSuffix("9"))
+    }
+}

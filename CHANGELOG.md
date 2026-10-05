@@ -5,6 +5,16 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Click the desktop in the picker to capture the whole display; the outline shows it before you
+  click.
+- Command-click a window to record its area, or the desktop to record the whole display. The
+  outline turns red while Command is down.
+- Clicks and Keys, beside Microphone when a recording is set up: a yellow ripple where each click
+  lands, and the keys you press shown near the bottom of the area, both recorded. Keys asks
+  macOS for Input Monitoring the first time; no key ever shows while a password is typed.
+
 ## 0.6.6 — 2026-10-05
 
 - The crosshair opens on the pointer. Pressing F10 with the pointer at rest could put it up to

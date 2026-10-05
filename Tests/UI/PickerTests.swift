@@ -335,15 +335,41 @@ extension OverlayView {
         #expect(window.initialFirstResponder === window.overlayView)
     }
 
-    /// A click, Command or not, still captures the window under it.
-    @Test func aClickStillCapturesAWindow() throws {
-        let view = try overlay(windows: [WindowInfo(id: 7, frame: CGRect(x: 0, y: 0, width: 100, height: 100))])
-        var outcome: AreaSelection.Outcome?
-        view.onFinish = { outcome = $0 }
-        view.pressed(at: CGPoint(x: 50, y: 50))
-        view.released(at: CGPoint(x: 50, y: 50), recording: true)
-        guard case let .window(_, window)? = outcome else { Issue.record("no window came back"); return }
-        #expect(window.id == 7)
+    /// A click captures the window under it; with Command, it records the window's area.
+    @Test func aClickTakesTheWindowUnderIt() throws {
+        let frame = CGRect(x: 0, y: 0, width: 100, height: 100)
+        for command in [false, true] {
+            let view = try overlay(windows: [WindowInfo(id: 7, frame: frame)])
+            var outcome: AreaSelection.Outcome?
+            view.onFinish = { outcome = $0 }
+            view.pressed(at: CGPoint(x: 50, y: 50))
+            view.released(at: CGPoint(x: 50, y: 50), recording: command)
+            switch outcome {
+            case let .window(_, window)? where !command: #expect(window.id == 7)
+            case let .record(_, rect)? where command: #expect(rect == frame)
+            default: Issue.record("a click\(command ? " with Command" : "") came back as \(String(describing: outcome))")
+            }
+        }
+    }
+
+    /// A click on the desktop, where no window is, takes the whole display: captured, or with
+    /// Command recorded. The outline shows it before the click.
+    @Test func aClickOnTheDesktopTakesTheWholeDisplay() throws {
+        for command in [false, true] {
+            let view = try overlay(windows: [WindowInfo(id: 7, frame: CGRect(x: 0, y: 0, width: 100, height: 100))])
+            view.point(at: CGPoint(x: 150, y: 120))
+            #expect(view.hoveredTarget?.rect == view.bounds && view.hoveredTarget?.isWindow == false && view.hoveredWindow == nil,
+                    "pointer \(String(describing: view.pointer)), target \(String(describing: view.hoveredTarget)), bounds \(view.bounds)")
+            var outcome: AreaSelection.Outcome?
+            view.onFinish = { outcome = $0 }
+            view.pressed(at: CGPoint(x: 150, y: 120))
+            view.released(at: CGPoint(x: 150, y: 120), recording: command)
+            switch outcome {
+            case let .selected(_, rect)? where !command: #expect(rect == view.bounds)
+            case let .record(_, rect)? where command: #expect(rect == view.bounds)
+            default: Issue.record("a desktop click\(command ? " with Command" : "") came back as \(String(describing: outcome))")
+            }
+        }
     }
 }
 

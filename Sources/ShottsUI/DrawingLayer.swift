@@ -9,7 +9,8 @@ public enum DrawingTool: Sendable {
 /// A clear window exactly over the area being recorded, which is recorded with it. With a
 /// tool on, a drag draws an arrow or a rectangle in the editor's last style, drawn by the same
 /// renderer; each stays four seconds, then fades over one. With no tool on, every click goes
-/// through to what is underneath.
+/// through to what is underneath. It also shows, when asked, a ripple where each click lands
+/// and the keys pressed.
 final class DrawingLayer: NSPanel {
     let canvas: DrawingCanvas
 
@@ -46,6 +47,12 @@ final class DrawingLayer: NSPanel {
 
     /// Tells the bar when the tool goes off by itself, as Escape does.
     var onToolChange: ((DrawingTool?) -> Void)?
+
+    /// How far above the area's bottom the keys show.
+    var keysClearance: CGFloat {
+        get { canvas.keysClearance }
+        set { canvas.keysClearance = newValue }
+    }
 }
 
 final class DrawingCanvas: NSView {
@@ -70,6 +77,81 @@ final class DrawingCanvas: NSView {
         document = Document(width: max(Int(size.width * scale), 1), height: max(Int(size.height * scale), 1), scale: scale)
         style = EditorWindowController.rememberedStyle
         super.init(frame: CGRect(origin: .zero, size: size))
+        wantsLayer = true
+    }
+
+    // MARK: - Clicks and keys
+
+    /// How far above the area's bottom the keys show.
+    var keysClearance: CGFloat = 28 { didSet { placeKeys() } }
+    private var line = KeystrokeLine()
+    private var keysBadge: KeysBadge?
+    private var keysTimer: Timer?
+
+    /// A ripple at `point` (screen coordinates) if it is inside `area`, the window's frame: a
+    /// soft yellow disc that swells and fades, with a ring, over half a second.
+    func showClick(atScreen point: CGPoint, in area: CGRect) {
+        guard area.contains(point), let layer else { return }
+        let p = CGPoint(x: point.x - area.minX, y: area.maxY - point.y)
+        let ripple = CAShapeLayer()
+        let radius: CGFloat = 26
+        ripple.path = CGPath(ellipseIn: CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2), transform: nil)
+        ripple.position = p
+        ripple.fillColor = NSColor.systemYellow.withAlphaComponent(0.35).cgColor
+        ripple.strokeColor = NSColor.systemYellow.cgColor
+        ripple.lineWidth = 3
+        ripple.opacity = 0
+        layer.addSublayer(ripple)
+        let grow = CABasicAnimation(keyPath: "transform.scale")
+        grow.fromValue = 0.3
+        grow.toValue = 1
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.95
+        fade.toValue = 0
+        let both = CAAnimationGroup()
+        both.animations = [grow, fade]
+        both.duration = 0.5
+        both.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { ripple.removeFromSuperlayer() }
+        ripple.add(both, forKey: "ripple")
+        CATransaction.commit()
+    }
+
+    /// A key pressed: typing joins the line showing, a shortcut replaces it, and the line goes
+    /// once no key has come for `KeystrokeLine.linger`.
+    func showKey(_ key: KeystrokeLine.Key) {
+        let now = ProcessInfo.processInfo.systemUptime
+        line.add(key, at: now)
+        let badge = keysBadge ?? {
+            let badge = KeysBadge()
+            addSubview(badge)
+            keysBadge = badge
+            return badge
+        }()
+        badge.text = line.text
+        badge.alphaValue = 1
+        placeKeys()
+        keysTimer?.invalidate()
+        let timer = Timer(timeInterval: KeystrokeLine.linger, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.line.visible(at: ProcessInfo.processInfo.systemUptime) == nil else { return }
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.25
+                    self.keysBadge?.animator().alphaValue = 0
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        keysTimer = timer
+    }
+
+    /// The keys centered near the bottom, clear of a panel inside the area.
+    private func placeKeys() {
+        guard let badge = keysBadge else { return }
+        let size = badge.fittingSize
+        let width = min(size.width, bounds.width - 16)
+        badge.frame = CGRect(x: (bounds.width - width) / 2, y: bounds.height - keysClearance - size.height, width: width, height: size.height)
     }
 
     @available(*, unavailable)
@@ -177,6 +259,42 @@ final class DrawingCanvas: NSView {
         if newWindow == nil {
             fading?.invalidate()
             fading = nil
+            keysTimer?.invalidate()
+            keysTimer = nil
         }
     }
+}
+
+/// The keys pressed, white on a dark rounded plate, as a keystroke display shows them.
+final class KeysBadge: NSView {
+    private let label = NSTextField(labelWithString: "")
+
+    var text: String {
+        get { label.stringValue }
+        set { label.stringValue = newValue }
+    }
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.82).cgColor
+        layer?.cornerRadius = 14
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor(white: 1, alpha: 0.18).cgColor
+        let font = NSFont.systemFont(ofSize: 30, weight: .semibold)
+        label.font = font.fontDescriptor.withDesign(.rounded).flatMap { NSFont(descriptor: $0, size: 30) } ?? font
+        label.textColor = .white
+        label.lineBreakMode = .byTruncatingHead
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 22),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -22),
+            label.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
 }

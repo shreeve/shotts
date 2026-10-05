@@ -32,8 +32,9 @@ stops a recording under way.
 | Action | Result |
 | --- | --- |
 | F10, or Capture Area in the menu bar | The pointer becomes a crosshair over the screen, which goes on updating underneath, windows, shadows, and all. |
-| Move over a window | The window under the crosshair gets a blue outline. |
-| Click | Captures that window on its own, without whatever was covering it, at the resolution of the display it is on. With Include Window Shadow on, the window comes with the shadow macOS draws around it, on a transparent margin. |
+| Move over a window | The window under the crosshair gets a blue outline; over the desktop, where no window is, the whole display does. |
+| Click | Captures that window on its own, without whatever was covering it, at the resolution of the display it is on. With Include Window Shadow on, the window comes with the shadow macOS draws around it, on a transparent margin. A click on the desktop captures the whole display. |
+| Command-click | Records instead (see Recording): the window's area, where it is now, or on the desktop the whole display. The outline turns red while Command is down. |
 | Drag | Selects an area; everything outside it dims (unless Dim Outside Selection is off). Its size in pixels shows in the magnifier, or beside the selection when the magnifier is off. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
@@ -189,13 +190,17 @@ capture came from. A cancelled capture goes back to the app that was in front.
 ## Recording
 
 Pressing Command while dragging, so the selection turns red, records the area rather than
-capturing it. Letting go leaves
-the area outlined in red, with a small panel beside it; nothing records yet.
+capturing it; a Command-click records a window's area, or on the desktop the whole display.
+Letting go leaves the area outlined in red, with a small panel beside it; nothing records yet.
+For a whole display, the outline sits just inside its edge and the panel inside its bottom
+edge, and neither is recorded.
 
 | Control | Effect |
 | --- | --- |
 | Record, or Return | Starts recording. The panel becomes the recording bar; the outline stays. |
 | Microphone | Records your voice as well. Off until turned on, and remembered. The first recording with it on asks macOS for the microphone. |
+| Clicks | Shows a yellow ripple where each click lands in the area, recorded with it. Off until turned on, and remembered. |
+| Keys | Shows the keys pressed, on a dark plate near the area's bottom, recorded with it: typing collects into one line, a shortcut such as ⌘⇧4 shows on its own, and it clears a moment after the last key. Off until turned on, and remembered. The first recording with it on asks macOS for Input Monitoring; until that is allowed, recordings go ahead without keys. macOS sends no keys while a password is typed, so none ever shows. |
 | Cancel, or Escape | Ends without recording. |
 
 Everything in the area is recorded as it happens, at the display's full resolution, up to 60

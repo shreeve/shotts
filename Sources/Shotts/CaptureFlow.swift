@@ -41,6 +41,8 @@ final class CaptureFlow {
         var frontmost: NSRunningApplication?
         /// The app the recording's window gives focus back to.
         var returnTo: NSRunningApplication?
+        /// Clicks and keys, while a recording that shows them runs.
+        var inputs: InputWatcher?
     }
 
     private struct Capture {
@@ -177,32 +179,57 @@ final class CaptureFlow {
     // MARK: - Recording
 
     private static let microphoneKey = "recording.microphone"
+    private static let clicksKey = "recording.clicks"
+    private static let keysKey = "recording.keys"
+    /// Set once macOS's own Input Monitoring dialog has been shown, which it shows only once.
+    private static let askedKeysKey = "recording.askedInputMonitoring"
 
-    /// The area outlined, with Record, Microphone, and Cancel beside it; nothing records yet.
+    /// The area outlined, with Record, the Microphone, Clicks, and Keys switches as last set, and
+    /// Cancel beside it; nothing records yet.
     private func setUpRecording(on screen: NSScreen, rect: CGRect) {
         let frontmost = capture?.frontmost, returnTo = capture?.returnTo
         capture = nil
-        let setup = RecordingSetup(screen: screen, rect: rect, microphone: UserDefaults.standard.bool(forKey: Self.microphoneKey)) { [weak self] outcome in
+        let d = UserDefaults.standard
+        let last = RecordingSetup.Choices(microphone: d.bool(forKey: Self.microphoneKey), clicks: d.bool(forKey: Self.clicksKey),
+                                          keys: d.bool(forKey: Self.keysKey))
+        let setup = RecordingSetup(screen: screen, rect: rect, choices: last) { [weak self] outcome in
             guard let self else { return }
             switch outcome {
             case .cancelled:
                 cancelRecording()
-            case let .record(microphone):
-                UserDefaults.standard.set(microphone, forKey: Self.microphoneKey)
-                Task { await self.startRecording(on: screen, rect: rect, microphone: microphone) }
+            case let .record(choices):
+                d.set(choices.microphone, forKey: Self.microphoneKey)
+                d.set(choices.clicks, forKey: Self.clicksKey)
+                d.set(choices.keys, forKey: Self.keysKey)
+                Task { await self.startRecording(on: screen, rect: rect, choices: choices) }
             }
         }
         recording = RecordingSession(setup: setup, frontmost: frontmost, returnTo: returnTo)
         setup.show()
     }
 
-    private func startRecording(on screen: NSScreen, rect: CGRect, microphone wanted: Bool) async {
+    private func startRecording(on screen: NSScreen, rect: CGRect, choices wanted: RecordingSetup.Choices) async {
         guard let setup = recording?.setup else { return }
-        var microphone = wanted
+        var microphone = wanted.microphone
         if microphone, !(await Self.microphoneAllowed()) {
             switch askAboutMicrophone() {
             case .withoutIt: microphone = false
             case .cancel: cancelRecording(); return
+            }
+        }
+        var keys = wanted.keys
+        if keys, !InputWatcher.keysAllowed {
+            if !UserDefaults.standard.bool(forKey: Self.askedKeysKey) {
+                // The first time, macOS's own dialog asks, and points to the setting; this
+                // recording goes ahead without keys, which show once Shotts is allowed.
+                UserDefaults.standard.set(true, forKey: Self.askedKeysKey)
+                InputWatcher.askForKeys()
+                keys = false
+            } else {
+                switch askAboutKeys() {
+                case .withoutIt: keys = false
+                case .cancel: cancelRecording(); return
+                }
             }
         }
         let recorder = Recorder()
@@ -229,12 +256,18 @@ final class CaptureFlow {
             setup.showPaused(recorder.isPaused)
         }
         setup.recording()
+        if wanted.clicks || keys {
+            recording?.inputs = InputWatcher(clicks: wanted.clicks, keys: keys,
+                                             onClick: { [weak setup] point in setup?.showClick(at: point) },
+                                             onKey: { [weak setup] key in setup?.showKey(key) })
+        }
         onRecording?(recorder)
     }
 
     /// Takes the outline and panel down and leaves focus with the app that had it.
     private func cancelRecording() {
         let app = recording?.frontmost
+        recording?.inputs?.stop()
         recording?.setup.close()
         recording = nil
         Front.giveBack(to: app)
@@ -246,6 +279,7 @@ final class CaptureFlow {
         recording = nil
         finishing = true
         onRecording?(nil)
+        session.inputs?.stop()
         session.setup.close()
         Task {
             defer { finishing = false }
@@ -285,6 +319,26 @@ final class CaptureFlow {
     }
 
     private enum MicrophoneAnswer { case withoutIt, cancel }
+
+    /// Input Monitoring is off for Shotts: record without keys, or go and turn it on.
+    private func askAboutKeys() -> MicrophoneAnswer {
+        Front.bringShotts()
+        let alert = NSAlert()
+        alert.messageText = "Shotts can't see the keys you press"
+        alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › Input Monitoring, then record again. macOS may ask you to quit and reopen Shotts first."
+        alert.addButton(withTitle: "Record Without Keys")
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return .withoutIt
+        case .alertSecondButtonReturn:
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") { NSWorkspace.shared.open(url) }
+            return .cancel
+        default:
+            return .cancel
+        }
+    }
 
     /// The microphone is turned off for Shotts: record without it, or go and turn it on.
     private func askAboutMicrophone() -> MicrophoneAnswer {

@@ -102,6 +102,7 @@ Deferred, with the reason each waits:
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
+| | `Keystrokes.swift` | `KeystrokeLine`: how a key shows (⌘⇧4, ⌫, typed text) and how typing collects into one line that clears after a moment. |
 | | `Script.swift` | The command line's language: `ScriptParser` (arguments, times, what each command takes), `ScriptRequest` and `ScriptResult` (the JSON lines), `WindowMatch`, `ScriptAim` (what a target comes to), the error codes and exit codes, the socket's path. |
 | | `TextTable.swift` | How `shotts` prints a table: boxed with a title tab and color on a terminal, plain columns for a pipe, widths in terminal columns (wide characters count two). |
 | | `GIF.swift` | The GIF encoder: `BlueNoise` (void-and-cluster), `PaletteBuilder` (exact prominent colors, median cut for the rest), `Quantizer` (blue-noise dithering), `GIFWriter` (GIF89a, changed rectangles only), `GIFTiming`, `LZW`. |
@@ -113,7 +114,7 @@ Deferred, with the reason each waits:
 | | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file, one-file temporary folders. |
 | | `Front.swift` | The one way Shotts comes to the front, and the one way it hands focus back. |
 | | `RecordingSetup.swift` | The red outline around an area being recorded, and the panel beside it: Record, Microphone, and Cancel, then the recording bar (Arrow, Rectangle, Pause, Stop). |
-| | `DrawingLayer.swift` | The clear, recorded window over the area that takes arrows and rectangles while recording and fades each out. |
+| | `DrawingLayer.swift` | The clear, recorded window over the area that takes arrows and rectangles while recording and fades each out, and shows click ripples and the keys pressed (`KeysBadge`). |
 | | `Timeline.swift` | The recording window's timeline: play, the playhead, and the trim brackets. |
 | | `RecordingWindow.swift` | `RecordingWindowController`: the player, the export settings, the file made in the background, Copy, Save, the drag grip, deleting it all on close. |
 | | `RecordingExport.swift` | `Recording` (the kept files) and `RecordingExport`: MP4 and GIF files from it, off the main thread. |
@@ -124,6 +125,7 @@ Deferred, with the reason each waits:
 | | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list; for `shotts`, the numbered displays, the windows it lists, and an area of a display. |
 | | `ScriptRunner.swift` | What `shotts` asks, done: list, shot, and a recording from its request to its files, the countdown, Allow Command-Line Capture. |
 | | `LiveDisplay.swift` | A display streamed while the picker is up: its latest frame and windows. |
+| | `InputWatcher.swift` | Clicks (a global mouse monitor) and keys (a listen-only event tap, needing Input Monitoring) while a recording that shows them runs. |
 | | `Recorder.swift` | Records an area through ScreenCaptureKit, the Mac's sound with it, and the microphone through AVFoundation. |
 | | `HotKey.swift` | The Carbon hot keys: F10 captures (or stops a recording), Option-F10 brings the last capture back. |
 | | `MoveToApplications.swift` | A release launched outside Applications offers to move itself there. |
@@ -137,7 +139,7 @@ reads it each time the menu opens.
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
 `capture.askedPermission` once the system's permission prompt has been shown, `commandLine.allowed` (Allow Command-Line Capture), `recording.soundCalibration` (each output device's measured sound loss), `editor.newWindows`,
-`recording.microphone`, `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
+`recording.microphone`, `recording.clicks`, `recording.keys`, `recording.askedInputMonitoring` (macOS's own Input Monitoring dialog shown), `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
 editor's last style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 
 ## The seam
@@ -491,6 +493,14 @@ From a shell that macOS trusts for Accessibility, `CGEvent` posts reach a real e
 bar. Never do this while someone is at the keyboard: the events land in whatever is in front.
 
 ## Traps
+
+- AppKit's automatic termination ends a background app quietly once its last window closes,
+  and the AppKit test process is one: a test that brings a real window on screen and closes it
+  can end the whole run partway, with no crash and exit code 0. It happened when the recording
+  bar was ordered front in `recording()`; the bar now sits a window level above the drawing
+  layer instead, and the tests' windows are never shown. So `swift test` succeeding is not
+  enough: both summary lines, Core's and AppKit's ("Test run with N tests … passed"), must be
+  there.
 
 - A window that animates as it appears gets pointer events placed wrongly while it does: the
   picker's overlay, opening with the system's animation, had a pointer-entered event report a
