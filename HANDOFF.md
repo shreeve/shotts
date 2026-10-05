@@ -63,15 +63,6 @@ Decided against, so they are not rebuilt:
 
 Deferred, with the reason each waits:
 
-- **Start at Login**, a checkmarked item in the menu bar menu: the owner's name for it, over
-  macOS's "Open at Login" (System Settings › General › Login Items). The owner asked for it on
-  2026-10-05; not yet scheduled. It goes first in the group with Allow Command-Line Capture
-  (how Shotts itself runs), not among the capture options, which follow a capture's order.
-  `SMAppService.mainApp.register()`/`unregister()` (macOS 13 and later, no helper
-  app). Off until turned on. The checkmark reads `SMAppService.mainApp.status` each time the menu
-  opens, since the user can also remove Shotts in Login Items; `.requiresApproval` opens that
-  pane (`SMAppService.openSystemSettingsLoginItems()`).
-
 - Configurable shortcuts. When F10 and Option-F10 become settable, also show that one is taken:
   a small red dot on the menu bar icon whenever another app holds a Shotts shortcut (a failed
   `HotKey.registerF10`), and the menu naming which. Today only Capture Area's title says so, and
@@ -135,9 +126,13 @@ Deferred, with the reason each waits:
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
 | ShottsCLI | `main.swift` | `shotts`: parses, connects (starting Shotts with `open -g -b` when nothing listens), prints, exits with the answer's code, and turns Control-C into `stop`, then `abort`. |
 
+Start at Login is not in the defaults: macOS keeps it (`SMAppService.mainApp`, shown in System
+Settings › General › Login Items, where the user can turn it off too), and the menu's checkmark
+reads it each time the menu opens.
+
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
-`capture.askedPermission` once the system's permission prompt has been shown, `commandLine.allowed` (Allow Command-Line Capture), `editor.newWindows`,
+`capture.askedPermission` once the system's permission prompt has been shown, `commandLine.allowed` (Allow Command-Line Capture), `recording.soundCalibration` (each output device's measured sound loss), `editor.newWindows`,
 `recording.microphone`, `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
 editor's last style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 

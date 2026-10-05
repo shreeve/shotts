@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import ServiceManagement
 import ShottsCore
 import ShottsUI
 import Sparkle
@@ -140,6 +141,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menu.addItem(optionItem("New Window per Capture", \.newWindows))
         menu.delegate = self
         menu.addItem(.separator())
+        // How Shotts itself runs, apart from the capture options above, which follow a capture.
+        let start = NSMenuItem(title: "Start at Login", action: #selector(startAtLoginToggled), keyEquivalent: "")
+        start.target = self
+        menu.addItem(start)
         let allow = NSMenuItem(title: "Allow Command-Line Capture", action: #selector(allowCommandLineToggled), keyEquivalent: "")
         allow.target = self
         allow.toolTip = "Lets the shotts command, and any program you run, take screenshots and recordings through Shotts, with the Mac's sound or the microphone when asked"
@@ -221,6 +226,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     // MARK: - The command line
+
+    // MARK: - Start at Login
+
+    /// Shotts as a login item, through macOS itself, which keeps the setting: it shows in System
+    /// Settings › General › Login Items, where it can be turned off too, so the checkmark reads
+    /// macOS each time the menu opens rather than remembering anything of its own.
+    @objc private func startAtLoginToggled() {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled { try service.unregister() } else { try service.register() }
+        } catch {
+            Front.bringShotts()
+            let alert = NSAlert()
+            alert.messageText = "Shotts could not change Start at Login"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+        // macOS may want the user to allow it in Login Items first.
+        if service.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+    }
 
     @objc private func allowCommandLineToggled() {
         ScriptRunner.isAllowed.toggle()
@@ -369,6 +394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
                 item.state = options[keyPath: key.path] ? .on : .off
             }
             if item.action == #selector(allowCommandLineToggled) { item.state = ScriptRunner.isAllowed ? .on : .off }
+            if item.action == #selector(startAtLoginToggled) { item.state = SMAppService.mainApp.status == .enabled ? .on : .off }
         }
         installItem?.isHidden = Self.toolIsInstalled
     }

@@ -63,7 +63,7 @@ words and the tail follows; move the head and the arrow reshapes.
 
 Options in the menu bar menu: show the magnifier, dim outside the selection, include the window
 shadow, copy to the clipboard the moment a capture is taken, and open each capture in a new
-window.
+window; and Start at Login, to have Shotts in the menu bar after every login and restart.
 
 ## Command line
 

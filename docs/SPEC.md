@@ -62,8 +62,12 @@ magnifier, dimming, and hints never are. While picking, macOS may show its scree
 indicator in the menu bar.
 
 The menu bar menu holds About Shotts (the icon, version, copyright, and a link to the project),
-Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into the editor), Check for
-Updates…, Quit, and the picker's options, remembered across launches. While a recording is
+Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into the editor), the
+picker's options, remembered across launches, then Start at Login and Allow Command-Line Capture
+(how Shotts itself runs), Check for Updates…, and Quit. **Start at Login**, off until turned on,
+makes Shotts a login item, so it is in the menu bar after every login and restart; macOS keeps
+it, in System Settings › General › Login Items, where it can be turned off too, and the
+checkmark always shows what macOS has. While a recording is
 under way the menu bar item is a red dot and the time so far instead, and a click on it stops
 the recording.
 
