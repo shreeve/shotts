@@ -118,11 +118,11 @@ final class DrawingCanvas: NSView {
         CATransaction.commit()
     }
 
-    /// A key pressed: it joins the line showing if it came soon enough after the last, and the
-    /// line goes once no key has come for `KeystrokeLine.linger`.
-    func showKey(_ key: KeystrokeLine.Key) {
+    /// A shortcut pressed: it joins the line showing if it came soon enough after the last, and
+    /// the line goes once no key has come for `KeystrokeLine.linger`.
+    func showKey(_ shortcut: String) {
         let now = ProcessInfo.processInfo.systemUptime
-        line.add(key, at: now)
+        line.add(shortcut, at: now)
         let badge = keysBadge ?? {
             let badge = KeysBadge()
             addSubview(badge)

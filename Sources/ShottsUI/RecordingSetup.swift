@@ -14,7 +14,7 @@ public final class RecordingSetup {
         public var microphone: Bool
         /// A ripple where each click lands.
         public var clicks: Bool
-        /// The keys pressed, shown near the area's bottom.
+        /// The shortcuts pressed, shown near the area's bottom; typing is not.
         public var keys: Bool
 
         public init(microphone: Bool = false, clicks: Bool = false, keys: Bool = false) {
@@ -98,8 +98,8 @@ public final class RecordingSetup {
     /// A ripple where a click landed, `point` in screen coordinates, if it is in the area.
     public func showClick(at point: CGPoint) { drawing.canvas.showClick(atScreen: point, in: area) }
 
-    /// A key pressed, as it shows.
-    public func showKey(_ key: KeystrokeLine.Key) { drawing.canvas.showKey(key) }
+    /// A shortcut pressed, as `KeystrokeLine.key` names it.
+    public func showKey(_ shortcut: String) { drawing.canvas.showKey(shortcut) }
 
     /// How far above the area's bottom the keys show, clear of a panel inside the area.
     private static func clearance(of panel: CGRect, in area: CGRect) -> CGFloat {
@@ -315,7 +315,7 @@ final class SetupPanel: NSPanel {
         clicks.toolTip = "Show a ripple where each click lands"
         keys.onFill = Self.on
         keys.state = choices.keys ? .on : .off
-        keys.toolTip = "Show the keys you press (never while typing a password)"
+        keys.toolTip = "Show the shortcuts you press, such as ⌘C or Return; typing never shows"
         cancel.keyEquivalent = "\u{1b}"
         cancel.target = self
         cancel.action = #selector(cancelPressed)

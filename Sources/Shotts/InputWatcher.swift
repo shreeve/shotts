@@ -2,7 +2,7 @@ import AppKit
 import CoreGraphics
 import ShottsCore
 
-/// While a recording that shows them runs: each click anywhere, and each key pressed. Clicks
+/// While a recording that shows them runs: each click anywhere, and each shortcut pressed. Clicks
 /// come from a global mouse monitor, which needs no permission. Keys come from a listen-only
 /// event tap, which needs Input Monitoring: macOS asks for it the first time a recording shows
 /// keys, and while a password is typed it sends a tap no keys at all. Nothing is kept: each
@@ -12,7 +12,7 @@ final class InputWatcher {
     private var clickMonitor: Any?
     private var tap: CFMachPort?
     private var tapSource: CFRunLoopSource?
-    private let onKey: (KeystrokeLine.Key) -> Void
+    private let onKey: (String) -> Void
 
     /// Whether Shotts may see keys pressed in other apps.
     static var keysAllowed: Bool { CGPreflightListenEventAccess() }
@@ -20,7 +20,7 @@ final class InputWatcher {
     /// Asks macOS for Input Monitoring: its own dialog, once; afterwards it only says no.
     static func askForKeys() { _ = CGRequestListenEventAccess() }
 
-    init(clicks: Bool, keys: Bool, onClick: @escaping (CGPoint) -> Void, onKey: @escaping (KeystrokeLine.Key) -> Void) {
+    init(clicks: Bool, keys: Bool, onClick: @escaping (CGPoint) -> Void, onKey: @escaping (String) -> Void) {
         self.onKey = onKey
         if clicks {
             clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { _ in
@@ -83,8 +83,8 @@ final class InputWatcher {
         if flags.contains(.option) { modifiers.insert(.option) }
         if flags.contains(.shift) { modifiers.insert(.shift) }
         if flags.contains(.command) { modifiers.insert(.command) }
-        // The key's own character, as without modifiers ("4" for Shift-Command-4), and what it typed.
+        // The key's own character, as without modifiers ("4" for Shift-Command-4). Typing is not shown.
         let base = key.characters(byApplyingModifiers: []) ?? key.charactersIgnoringModifiers ?? ""
-        onKey(KeystrokeLine.key(code: key.keyCode, base: base, typed: key.characters ?? base, modifiers: modifiers))
+        if let shortcut = KeystrokeLine.key(code: key.keyCode, base: base, modifiers: modifiers) { onKey(shortcut) }
     }
 }

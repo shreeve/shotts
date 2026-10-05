@@ -492,59 +492,41 @@ import Testing
 
 @Suite struct KeystrokeTests {
     typealias Line = KeystrokeLine
-    func key(_ code: UInt16, _ base: String, _ typed: String? = nil, _ modifiers: Line.Modifiers = []) -> Line.Key {
-        Line.key(code: code, base: base, typed: typed ?? base, modifiers: modifiers)
+    func key(_ code: UInt16, _ base: String, _ modifiers: Line.Modifiers = []) -> String? {
+        Line.key(code: code, base: base, modifiers: modifiers)
     }
 
-    /// Shortcuts carry their modifiers in the Mac's order and the key's own name; named keys
-    /// show their symbol; typing is what was typed.
-    @Test func keysAreNamed() {
-        #expect(key(21, "4", "$", [.command, .shift]) == Line.Key(text: "⇧⌘4", isTyping: false))
-        #expect(key(8, "c", "c", [.command]) == Line.Key(text: "⌘C", isTyping: false))
-        #expect(key(8, "c", "c", [.control, .option, .shift, .command]).text == "⌃⌥⇧⌘C")
-        #expect(key(4, "h", "H", [.shift]) == Line.Key(text: "H", isTyping: true))
-        #expect(key(51, "\u{7f}") == Line.Key(text: "⌫", isTyping: false))
-        #expect(key(36, "\r", "\r", [.command]).text == "⌘↩")
-        #expect(key(48, "\t", "\t", [.shift]).text == "⇧⇥")
-        #expect(key(49, " ") == Line.Key(text: " ", isTyping: true) && key(109, "").text == "F10")
+    /// Shortcuts show, their modifiers in the Mac's order; keys that act on their own show their
+    /// symbol; typing shows nothing, letters, numbers, space, and the Delete keys alike.
+    @Test func onlyShortcutsShow() {
+        #expect(key(21, "4", [.command, .shift]) == "⇧⌘4")
+        #expect(key(8, "c", [.command]) == "⌘C")
+        #expect(key(8, "c", [.control, .option, .shift, .command]) == "⌃⌥⇧⌘C")
+        #expect(key(36, "\r") == "↩" && key(53, "\u{1b}") == "⎋" && key(123, "") == "←" && key(109, "") == "F10")
+        #expect(key(48, "\t", [.shift]) == "⇧⇥" && key(36, "\r", [.command]) == "⌘↩")
+        #expect(key(51, "\u{7f}", [.command]) == "⌘⌫" && key(49, " ", [.control]) == "⌃␣")
+        for typing in [key(4, "h"), key(4, "h", [.shift]), key(25, "9"), key(49, " "), key(51, "\u{7f}"), key(117, "")] {
+            #expect(typing == nil)
+        }
     }
 
-    /// Keys within two seconds of each other join one line: typed characters into words, the
-    /// rest as tokens of their own. Command-I, Control-K, 99, Return reads as one sequence.
+    /// Shortcuts within two seconds of each other join one line; a pause of two starts afresh;
+    /// a line shows for five seconds after its last key.
     @Test func aSequenceReadsAsOne() {
         var line = Line()
-        line.add(key(34, "i", "i", [.command]), at: 0)
-        line.add(key(40, "k", "k", [.control]), at: 0.8)
-        line.add(key(25, "9"), at: 1.5)
-        line.add(key(25, "9"), at: 1.7)
-        line.add(key(36, "\r"), at: 2.4)
-        #expect(line.text == "⌘I  ⌃K  99  ↩")
-        // Words keep their spaces; a space starting a token is written as one.
-        var words = Line()
-        for (i, c) in "hi there".enumerated() { words.add(key(c == " " ? 49 : 4, String(c)), at: Double(i) * 0.2) }
-        words.add(key(51, "\u{7f}"), at: 1.7)
-        #expect(words.text == "hi there  ⌫")
-        var spaced = Line()
-        spaced.add(key(1, "s", "s", [.command]), at: 0)
-        spaced.add(key(49, " "), at: 0.5)
-        #expect(spaced.text == "⌘S  ␣")
-    }
-
-    /// A pause of two seconds starts a new line; a line shows for five seconds after its last key.
-    @Test func aPauseStartsAfreshAndALineLingers() {
-        var line = Line()
-        line.add(key(34, "i", "i", [.command]), at: 0)
-        line.add(key(4, "a"), at: 1.9)
-        #expect(line.text == "⌘I  a")
-        line.add(key(4, "b"), at: 1.9 + Line.joinGap)
-        #expect(line.text == "b")
-        let last = 1.9 + Line.joinGap
-        #expect(line.visible(at: last + 4.9) == "b" && line.visible(at: last + Line.linger) == nil)
+        line.add("⌘I", at: 0)
+        line.add("⌃K", at: 0.8)
+        line.add("↩", at: 2.4)
+        #expect(line.text == "⌘I  ⌃K  ↩")
+        line.add("⌘S", at: 2.4 + Line.joinGap)
+        #expect(line.text == "⌘S")
+        let last = 2.4 + Line.joinGap
+        #expect(line.visible(at: last + 4.9) == "⌘S" && line.visible(at: last + Line.linger) == nil)
     }
 
     @Test func aLongLineShowsItsEnd() {
         var line = Line()
-        for i in 0..<50 { line.add(key(4, String(i % 10)), at: Double(i) * 0.1) }
-        #expect(line.text.count == Line.longest && line.text.hasPrefix("…") && line.text.hasSuffix("9"))
+        for i in 0..<30 { line.add("⌘\(i % 10)", at: Double(i) * 0.1) }
+        #expect(line.text.count == Line.longest && line.text.hasPrefix("…") && line.text.hasSuffix("⌘9"))
     }
 }

@@ -280,16 +280,16 @@ import Testing
 }
 
 @MainActor @Suite struct RecordingOverlayTests {
-    /// Keys show on the drawing layer as one line: typing into words, a shortcut as a token of its own.
+    /// Shortcuts show on the drawing layer, those close together on one line.
     @Test func keysShowAsALine() throws {
         let screen = try #require(NSScreen.screens.first)
         let setup = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 400, height: 300), choices: RecordingSetup.Choices(keys: true)) { _ in }
         defer { setup.close() }
-        for c in "hi" { setup.showKey(KeystrokeLine.key(code: 4, base: String(c), typed: String(c), modifiers: [])) }
+        setup.showKey("⌘I")
         let badge = try #require(setup.drawing.canvas.subviews.compactMap { $0 as? KeysBadge }.first)
-        #expect(badge.text == "hi")
-        setup.showKey(KeystrokeLine.key(code: 8, base: "c", typed: "c", modifiers: [.command]))
-        #expect(badge.text == "hi  ⌘C")
+        #expect(badge.text == "⌘I")
+        setup.showKey("⌃K")
+        #expect(badge.text == "⌘I  ⌃K")
         // Near the bottom, inside the area.
         #expect(badge.frame.maxY <= setup.drawing.canvas.bounds.maxY && badge.frame.minY > setup.drawing.canvas.bounds.midY)
     }

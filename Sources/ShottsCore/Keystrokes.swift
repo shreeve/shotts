@@ -1,53 +1,32 @@
 import Foundation
 
-/// The keys a recording shows as they are pressed, as Shotts writes them: everything pressed
-/// within `joinGap` of the key before joins one line, typed characters into words ("99") and
-/// shortcuts and named keys as tokens of their own ("⌘I  ⌃K  99  ↩"), and the line shows until
-/// `linger` after its last key. As KeyCastr, the long-standing keystroke display, does: keys join
-/// a line until a pause, and the line lingers so a viewer can read the whole sequence.
+/// The shortcuts a recording shows as they are pressed: keys with Control, Option, or Command
+/// ("⇧⌘4"), and the keys that act on their own (↩, ⎋, ⇥, arrows, F-keys). Typing does not show,
+/// letters, numbers, punctuation, and space, with or without Shift, nor the Delete keys that
+/// correct it: a viewer needs to see what was done, not what was written, and what is typed
+/// stays private. As CleanShot X's and Screen Studio's "shortcuts only". Everything pressed
+/// within `joinGap` of the key before joins one line ("⌘I  ⌃K  ↩"), and the line shows until
+/// `linger` after its last key, as KeyCastr's line-break delay and linger work.
 public struct KeystrokeLine: Equatable, Sendable {
-    /// One key, as it shows.
-    public struct Key: Equatable, Sendable {
-        public var text: String
-        /// A typed character, which joins the characters typed just before into a word; a
-        /// shortcut or a named key (↩, ⌫, ←) is a token of its own.
-        public var isTyping: Bool
-
-        public init(text: String, isTyping: Bool) {
-            self.text = text
-            self.isTyping = isTyping
-        }
-    }
-
     /// Keys this close together, in seconds, join one line.
     public static let joinGap = 2.0
     /// How long the line shows after its last key, in seconds.
     public static let linger = 5.0
     /// The most characters shown; a longer line shows its end.
     public static let longest = 40
-    /// Between tokens: wide enough to tell ⌘I from ⌃K at a glance.
+    /// Between keys: wide enough to tell ⌘I from ⌃K at a glance.
     static let gap = "  "
 
     public private(set) var text = ""
     private var lastKey = -Double.infinity
-    /// Whether the line ends in typed characters, which the next typed one joins.
-    private var endsTyping = false
 
     public init() {}
 
-    /// A key pressed at `time` (seconds, on any clock that only goes forward).
-    public mutating func add(_ key: Key, at time: Double) {
+    /// A shortcut pressed at `time` (seconds, on any clock that only goes forward), as `key` names it.
+    public mutating func add(_ shortcut: String, at time: Double) {
         let continues = !text.isEmpty && time - lastKey < Self.joinGap
-        if !continues { text = "" }
-        if key.isTyping, endsTyping, continues {
-            text += key.text
-        } else {
-            // A space starting a token would show as nothing: it is written as one.
-            let token = key.isTyping && key.text == " " ? "␣" : key.text
-            text += (text.isEmpty ? "" : Self.gap) + token
-        }
+        text = (continues ? text + Self.gap : "") + shortcut
         if text.count > Self.longest { text = "…" + text.suffix(Self.longest - 1) }
-        endsTyping = key.isTyping
         lastKey = time
     }
 
@@ -76,11 +55,13 @@ public struct KeystrokeLine: Equatable, Sendable {
         101: "F9", 109: "F10", 103: "F11", 111: "F12",
     ]
 
-    /// A key as it shows: `base` is what the key gives with no modifiers ("4"), `typed` what it
-    /// typed ("$" with Shift). With Control, Option, or Command it is a shortcut, its modifiers
-    /// first; a key with a symbol of its own (↩, ⌫, ←) is that symbol; otherwise it is what was
-    /// typed.
-    public static func key(code: UInt16, base: String, typed: String, modifiers: Modifiers) -> Key {
+    /// The keys that are part of typing even though they have a symbol: they correct what is typed.
+    static let typingKeys: Set<UInt16> = [51, 117, 49]
+
+    /// A key as it shows, or nil for typing, which does not. `base` is what the key gives with no
+    /// modifiers ("4"). With Control, Option, or Command it shows, its modifiers first in the
+    /// Mac's order; a key that acts on its own (↩, ⎋, arrows) shows its symbol, with ⇧ if held.
+    public static func key(code: UInt16, base: String, modifiers: Modifiers) -> String? {
         let symbol = named[code]
         if !modifiers.isDisjoint(with: [.control, .option, .command]) {
             var prefix = ""
@@ -88,10 +69,9 @@ public struct KeystrokeLine: Equatable, Sendable {
             if modifiers.contains(.option) { prefix += "⌥" }
             if modifiers.contains(.shift) { prefix += "⇧" }
             if modifiers.contains(.command) { prefix += "⌘" }
-            return Key(text: prefix + (symbol ?? base.uppercased()), isTyping: false)
+            return prefix + (symbol ?? base.uppercased())
         }
-        if code == 49 { return Key(text: " ", isTyping: true) }
-        if let symbol { return Key(text: (modifiers.contains(.shift) ? "⇧" : "") + symbol, isTyping: false) }
-        return Key(text: typed, isTyping: true)
+        guard let symbol, !typingKeys.contains(code) else { return nil }
+        return (modifiers.contains(.shift) ? "⇧" : "") + symbol
     }
 }

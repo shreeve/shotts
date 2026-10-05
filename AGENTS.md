@@ -62,8 +62,9 @@ read it before changing capture, the selection overlay, the editor, or export.
 - The hot key is a Carbon hot key, which needs no Accessibility permission. Screen Recording is
   the permission Shotts asks for, when the first capture needs it; the others are the
   microphone, asked the first time a recording uses it, and Input Monitoring, asked the first
-  time a recording shows the keys pressed. Keys are watched only while such a recording runs,
-  never kept, and macOS sends none while a password is typed.
+  time a recording shows the shortcuts pressed. Keys are watched only while such a recording
+  runs, never kept, and only shortcuts show, never typing; macOS sends none while a password is
+  typed.
 - Developer switches (`--edit`, `--render`, …) exist only in debug builds. A release build must
   not act on command-line arguments: one could make it capture under its Screen Recording grant.
   The one way in from outside is `shotts`, and only while Allow Command-Line Capture is on, which

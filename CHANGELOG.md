@@ -7,9 +7,11 @@ Unreleased, whose heading becomes the version's when it ships.
 
 ## Unreleased
 
-- Keys read as a sequence: everything pressed within two seconds of the key before joins one
-  line, such as `⌘I  ⌃K  99  ↩`, and the line stays five seconds after the last key, long
-  enough to read.
+- Keys shows shortcuts only: keys with Control, Option, or Command, and keys that act on their
+  own, such as Return, Escape, and the arrows. Ordinary typing no longer shows, so what you
+  type stays private.
+- Shortcuts read as a sequence: those pressed within two seconds of each other join one line,
+  such as `⌘I  ⌃K  ↩`, and the line stays five seconds after the last, long enough to read.
 
 ## 0.7.0 — 2026-10-05
 
