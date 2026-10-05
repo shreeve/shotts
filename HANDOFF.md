@@ -63,6 +63,13 @@ Decided against, so they are not rebuilt:
 
 Deferred, with the reason each waits:
 
+- **Open at Login**, a checkmarked item in the menu bar menu (macOS's own name for it, from
+  System Settings › General › Login Items). The owner asked for it on 2026-10-05; not yet
+  scheduled. `SMAppService.mainApp.register()`/`unregister()` (macOS 13 and later, no helper
+  app). Off until turned on. The checkmark reads `SMAppService.mainApp.status` each time the menu
+  opens, since the user can also remove Shotts in Login Items; `.requiresApproval` opens that
+  pane (`SMAppService.openSystemSettingsLoginItems()`).
+
 - Configurable shortcuts. When F10 and Option-F10 become settable, also show that one is taken:
   a small red dot on the menu bar icon whenever another app holds a Shotts shortcut (a failed
   `HotKey.registerF10`), and the menu naming which. Today only Capture Area's title says so, and
