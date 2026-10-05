@@ -63,8 +63,8 @@ Decided against, so they are not rebuilt:
 
 Deferred, with the reason each waits:
 
-- **Open at Login**, a checkmarked item in the menu bar menu (macOS's own name for it, from
-  System Settings › General › Login Items; the owner chose that name). The owner asked for it on
+- **Start at Login**, a checkmarked item in the menu bar menu: the owner's name for it, over
+  macOS's "Open at Login" (System Settings › General › Login Items). The owner asked for it on
   2026-10-05; not yet scheduled. `SMAppService.mainApp.register()`/`unregister()` (macOS 13 and later, no helper
   app). Off until turned on. The checkmark reads `SMAppService.mainApp.status` each time the menu
   opens, since the user can also remove Shotts in Login Items; `.requiresApproval` opens that
