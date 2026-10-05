@@ -11,6 +11,9 @@ public nonisolated final class ScriptServer: @unchecked Sendable {
     private let path: String
     private let handle: Handler
     private var listener: Int32 = -1
+    /// Runs on the listening thread after each connection is taken, before it waits for the
+    /// next: for tests, to hold it there as a busy Mac might.
+    var afterAccept: (@Sendable () -> Void)?
 
     public init(path: String, handle: @escaping Handler) {
         self.path = path
@@ -52,14 +55,19 @@ public nonisolated final class ScriptServer: @unchecked Sendable {
     /// Stops listening; connections already made go on.
     public func stop() {
         guard listener >= 0 else { return }
-        // Shutting the socket down wakes `accept`, which then returns an error and ends.
+        // Shut down, not closed: the listening thread closes it as it ends. Its `accept` returns
+        // an error at once, whether it is waiting or comes back to wait from serving a
+        // connection. Closed here, the socket's number would go straight to the next one opened,
+        // and a thread coming back to wait would take that one's connections for this server.
         shutdown(listener, SHUT_RDWR)
-        close(listener)
         listener = -1
         unlink(path)
     }
 
     private func accept(on fd: Int32) {
+        // The thread that waits on the socket is the one that closes it, so its number cannot be
+        // reused while it might still wait on it.
+        defer { close(fd) }
         while true {
             let client = Darwin.accept(fd, nil, nil)
             if client < 0 {
@@ -71,6 +79,7 @@ public nonisolated final class ScriptServer: @unchecked Sendable {
             var on: Int32 = 1
             setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
             Thread.detachNewThread { [self] in serve(client) }
+            afterAccept?()
         }
     }
 

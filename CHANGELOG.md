@@ -9,6 +9,9 @@ Unreleased, whose heading becomes the version's when it ships.
 
 - Shift snaps a line to 45° while you drag one of its ends to reshape it, as it does while you
   draw it.
+- The command line's listener, when it stops, can no longer leave a thread behind that takes
+  connections meant for the next one. Found as a rare hang in the tests; in the app the
+  listener stops only when Shotts quits.
 
 ## 0.6.5 — 2026-10-05
 

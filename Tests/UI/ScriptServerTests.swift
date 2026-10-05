@@ -62,6 +62,37 @@ import Testing
         #expect(answers.map(\.state) == ["recording", "done"])
     }
 
+    /// A server stopped while its thread is between connections must not come back and take the
+    /// next server's: the closed socket's number goes straight to the next socket opened, and the
+    /// old thread, waiting again, would answer the new server's tools with the old handler. One
+    /// that never closes leaves a tool waiting forever, as once hung the whole test run.
+    @Test func aStoppedServerTakesNothingFromTheNext() async throws {
+        let oldPath = socketPath()
+        let old = ScriptServer(path: oldPath) { _, connection in
+            connection.send(ScriptResult(command: .list, state: "old"))
+            connection.close()
+        }
+        old.afterAccept = { usleep(300_000) }
+        try old.start()
+        let first = try #require(ScriptServer.connect(to: oldPath))
+        defer { close(first) }
+        // The old server's thread has taken that connection and is between connections; stop it there.
+        try await Task.sleep(for: .milliseconds(100))
+        old.stop()
+        let path = socketPath()
+        let new = ScriptServer(path: path) { request, connection in
+            connection.send(ScriptResult(command: request.command, state: "new"))
+            connection.close()
+        }
+        try new.start()
+        defer { new.stop() }
+        // Past the old thread's pause, every tool is answered by the new server.
+        try await Task.sleep(for: .milliseconds(400))
+        var states: [String?] = []
+        for _ in 0..<8 { states += await Self.ask(path, ScriptRequest(command: .list)).map(\.state) }
+        #expect(states == Array(repeating: "new", count: 8))
+    }
+
     /// A tool that goes first, as on Control-C, is how a recording learns to stop.
     @Test func hangingUpIsNoticed() async throws {
         let path = socketPath()

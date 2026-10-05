@@ -489,6 +489,16 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
 
 ## Traps
 
+- A file descriptor's number is handed to the next one opened the moment it is closed. Close a
+  socket that another thread might still use, and that thread may use whatever gets the number
+  next: `ScriptServer.stop` once closed its listening socket while the listening thread was
+  between connections, and the next server's socket got the same number, so the old thread
+  took the new server's connections and answered them with the old handler. In the tests that
+  hung a whole run, about one in twenty, waiting on a handler that never closed. Now `stop` only
+  shuts the socket down and the listening thread closes it as it ends;
+  `aStoppedServerTakesNothingFromTheNext` holds the thread in that gap (`afterAccept`) and fails
+  without the fix. Only the thread using a descriptor should close it.
+
 - Screen Recording permission is keyed to the code signature. An ad-hoc-signed build has a new
   signature every time, so each rebuild would ask again and leave another row in System
   Settings. `Scripts/package-app.sh` signs every build with the Developer ID for that reason.
