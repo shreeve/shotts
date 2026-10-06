@@ -346,8 +346,8 @@ import Testing
         setup.show(.scrolling)
         setup.showProgress(height: 2480, lost: false, full: false)
         #expect(panel.message.stringValue.hasPrefix("Scrolling") && panel.message.stringValue.contains("2,480"))
-        for (state, words) in [(ScrollSetup.State.capturing, "Scroll down, then press Return"), (.gaveUp, "Couldn't follow it"),
-                               (.needsPermission, "Scroll down, then press Return (allow Accessibility")] {
+        for (state, words) in [(ScrollSetup.State.capturing, "Scroll down, then press F10"), (.gaveUp, "Couldn't follow it"),
+                               (.needsPermission, "Scroll down, then press F10 (allow Accessibility")] {
             setup.show(state)
             #expect(panel.message.stringValue.hasPrefix(words))
         }

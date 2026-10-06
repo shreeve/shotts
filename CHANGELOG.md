@@ -15,6 +15,8 @@ Unreleased, whose heading becomes the version's when it ships.
 - Option-click no longer starts a scrolling capture.
 - Shorter picker hints: "Drag an area, or click a window or the desktop", "⌘ records video
   instead", the new ⌥ line, and the arrow keys last before Esc.
+- F10 ends both a scrolling capture and a recording, and says so: the scrolling panel reads
+  "Scrolling; F10 stops", and the recording bar's button "Stop (F10)".
 - No arrow beside the crosshair. When what was under the pointer changed as F10 was pressed (a
   page loading, a list updating), the app in front put its arrow back until the mouse moved.
 

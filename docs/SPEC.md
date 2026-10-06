@@ -204,9 +204,9 @@ any capture is (and copies it, with Copy to Clipboard on).
 | Cancel, or Escape | Ends without keeping anything. |
 
 Scrolling another app needs Accessibility: the first scrolling capture asks macOS for it, and
-until it is allowed the panel says to scroll yourself and press Return. If frames keep not
+until it is allowed the panel says to scroll yourself and press F10. If frames keep not
 matching (an area that does not all scroll together), Shotts stops scrolling and says so;
-scroll by hand, or press Return.
+scroll by hand, then press F10. F10 ends a scrolling capture as it ends a recording.
 
 Shotts adds only what comes into view below what it already has, so scrolling back up adds
 nothing; scrolled too far between two looks, the panel says to scroll a little slower, and it
@@ -245,7 +245,7 @@ and the bar beside the area has:
 | --- | --- |
 | Arrow, Rectangle | Draws on the area as it records, in the editor's last style: tapered or even arrows, the color, the width, the shadow. Each shape stays four seconds, then fades over one, and is recorded. While a tool is on, clicks in the area draw rather than reaching what is underneath; its button again, or Escape, turns it off. Shift keeps a rectangle square. |
 | Pause | Stops taking the screen and sound until pressed again; the recording goes straight from before the pause to after it. The menu bar item shows ❚❚ and holds the time. |
-| Stop | Ends the recording, as F10 and a click on the menu bar item do. |
+| Stop (F10) | Ends the recording, as F10 and a click on the menu bar item do. |
 
 Quitting Shotts while it records stops the recording and opens it instead; quitting again
 quits. Logging out or shutting down is not held up, and the recording goes with it. If the display being recorded goes, the recording stops there and opens.

@@ -284,7 +284,7 @@ final class SetupPanel: NSPanel {
     let arrow = PillButton(title: "", symbol: "arrow.up.right", fill: SetupPanel.plain, toggles: true)
     let rectangle = PillButton(title: "", symbol: "rectangle", fill: SetupPanel.plain, toggles: true)
     let pause = PillButton(title: "", symbol: "pause.fill", fill: SetupPanel.plain, toggles: true)
-    let stop = PillButton(title: "Stop", symbol: "stop.fill", fill: .systemRed)
+    let stop = PillButton(title: "Stop (F10)", symbol: "stop.fill", fill: .systemRed)
     private let row = NSStackView()
     private(set) var recording = false
     /// A button's fill at rest, and while a toggle is on.

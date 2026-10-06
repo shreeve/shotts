@@ -2,8 +2,8 @@ import AppKit
 
 /// An area being captured as it is scrolled: a blue outline just outside it (just inside, for
 /// an area that fills its display), and a small panel beside it saying where the capture stands
-/// (Shotts scrolling, or the user, how tall the picture is so far), with Done (Return) and
-/// Cancel (Escape). Neither the outline nor the panel is ever in the picture: the capture leaves
+/// (Shotts scrolling, or the user, how tall the picture is so far), with Done (F10, as it ends a
+/// recording too, or Return) and Cancel (Escape). Neither the outline nor the panel is ever in the picture: the capture leaves
 /// out `windowNumbers`. The panel takes the keys without bringing Shotts forward, as the picker
 /// does, and scrolling goes, as always, to what is under the pointer.
 public final class ScrollSetup {
@@ -128,7 +128,7 @@ final class ScrollPanel: NSPanel {
         message.font = .systemFont(ofSize: 14, weight: .medium)
         message.textColor = .white
         message.setContentHuggingPriority(.required, for: .horizontal)
-        for (button, action, tip) in [(done, #selector(donePressed), "Make the picture (Return)"),
+        for (button, action, tip) in [(done, #selector(donePressed), "Make the picture (F10)"),
                                       (cancel, #selector(cancelPressed), "Put it away (Escape)")] {
             button.target = self
             button.action = action
@@ -171,17 +171,17 @@ final class ScrollPanel: NSPanel {
         var warning = false
         switch state {
         case _ where full:
-            words = "As tall as it can be: press Return"
+            words = "As tall as it can be: press F10"
         case .scrolling:
-            words = "Scrolling; Return stops"
+            words = "Scrolling; F10 stops"
         case .capturing:
-            words = lost ? "Scroll a little slower" : "Scroll down, then press Return"
+            words = lost ? "Scroll a little slower" : "Scroll down, then press F10"
             warning = lost
         case .gaveUp:
-            words = "Couldn't follow it: scroll by hand, then press Return"
+            words = "Couldn't follow it: scroll by hand, then press F10"
             warning = true
         case .needsPermission:
-            words = lost ? "Scroll a little slower" : "Scroll down, then press Return (allow Accessibility for Shotts to scroll)"
+            words = lost ? "Scroll a little slower" : "Scroll down, then press F10 (allow Accessibility for Shotts to scroll)"
             warning = lost
         }
         message.stringValue = words + tall
