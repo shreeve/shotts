@@ -10,7 +10,7 @@ Unreleased, whose heading becomes the version's when it ships.
 - Scrolling capture is Option during a drag, as recording is Command: the selection turns blue
   and reads "■ Scroll". Let go, and Shotts scrolls just that area to the bottom by itself and
   opens the picture. Dragging just the part that scrolls, a message list without its sidebar,
-  is what makes a window with still parts come out right. Return stops early.
+  is what makes a window with still parts come out right. F10 stops early.
 - Shotts no longer bobs up and down when it cannot follow an area: it stops and lets you scroll.
 - Option-click no longer starts a scrolling capture.
 - Shorter picker hints: "Drag an area, or click a window or the desktop", "⌘ records video
