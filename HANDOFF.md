@@ -82,6 +82,18 @@ Decided against, so they are not rebuilt:
 
 Deferred, with the reason each waits:
 
+- Scrolling capture: one tall image of a thread, list, or page longer than its window. The owner
+  could see it helping but held it on 2026-10-05 as not yet critical. The plan agreed: the user
+  scrolls and Shotts stitches (scrolling for them would need Accessibility, a fourth permission).
+  Option-drag in the picker (a third outline color) or a menu item starts it; a panel beside the
+  area says to scroll and press Return. The area streams as the picker's displays do; each frame
+  is matched to the last to find how far it moved, tolerant of fractional Retina scrolling and of
+  small parts that change on their own (cursors, spinners), and only new rows are added. Fixed
+  bands at the top and bottom (sticky headers and footers) are found and kept once. The matching
+  belongs in Core, tested on generated pages scrolled by awkward amounts; real apps (Safari,
+  Slack, Messages, Finder, an editor) need tuning by hand. Vertical only at first, with a height
+  cap so a runaway scroll cannot take unbounded memory.
+
 - Configurable shortcuts. When F10 and Option-F10 become settable, also show that one is taken:
   a small red dot on the menu bar icon whenever another app holds a Shotts shortcut (a failed
   `HotKey.registerF10`), and the menu naming which. Today only Capture Area's title says so, and
