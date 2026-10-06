@@ -61,8 +61,10 @@ read it before changing capture, the selection overlay, the editor, or export.
   Option-F10, brings Shotts to the front. While recording, F10 stops it.
 - The hot key is a Carbon hot key, which needs no Accessibility permission. Screen Recording is
   the permission Shotts asks for, when the first capture needs it; the others are the
-  microphone, asked the first time a recording uses it, and Input Monitoring, asked the first
-  time a recording shows the shortcuts pressed. Keys are watched only while such a recording
+  microphone, asked the first time a recording uses it; Input Monitoring, asked the first
+  time a recording shows the shortcuts pressed; and Accessibility, asked the first time a
+  scrolling capture starts, used only to send scroll-wheel steps while one runs (without it,
+  the user scrolls). Keys are watched only while such a recording
   runs, never kept, and only shortcuts show, never typing; macOS sends none while a password is
   typed.
 - Developer switches (`--edit`, `--render`, …) exist only in debug builds. A release build must

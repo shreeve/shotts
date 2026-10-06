@@ -407,21 +407,32 @@ extension OverlayView {
 }
 
 @MainActor @Suite struct ScrollPickerTests {
-    /// Option as the drag ends captures the area as it is scrolled; Command outranks it.
-    @Test func optionScrolls() throws {
-        for (scrolling, recording) in [(true, false), (true, true)] {
+    /// Option does nothing to a drag: it is captured as ever, or recorded with Command.
+    @Test func optionDoesNotChangeADrag() throws {
+        for recording in [false, true] {
             let view = try overlay()
             var outcome: AreaSelection.Outcome?
             view.onFinish = { outcome = $0 }
             view.pressed(at: CGPoint(x: 20, y: 20))
             view.dragged(to: CGPoint(x: 120, y: 90), square: false)
-            view.released(at: CGPoint(x: 120, y: 90), recording: recording, scrolling: scrolling)
+            view.released(at: CGPoint(x: 120, y: 90), recording: recording, scrolling: true)
             switch outcome {
-            case let .scroll(_, rect)? where !recording: #expect(rect == CGRect(x: 20, y: 20, width: 100, height: 70))
+            case let .selected(_, rect)? where !recording: #expect(rect == CGRect(x: 20, y: 20, width: 100, height: 70))
             case .record? where recording: break
             default: Issue.record("came back as \(String(describing: outcome))")
             }
         }
+    }
+
+    /// An Option-click on the desktop, where there is nothing to scroll, captures the display.
+    @Test func optionClickOnTheDesktopCapturesIt() throws {
+        let view = try overlay(windows: [WindowInfo(id: 7, frame: CGRect(x: 0, y: 0, width: 100, height: 100))])
+        var outcome: AreaSelection.Outcome?
+        view.onFinish = { outcome = $0 }
+        view.pressed(at: CGPoint(x: 150, y: 120))
+        view.released(at: CGPoint(x: 150, y: 120), recording: false, scrolling: true)
+        guard case let .selected(_, rect)? = outcome else { Issue.record("came back as \(String(describing: outcome))"); return }
+        #expect(rect == view.bounds)
     }
 
     /// Option-clicking a window scrolls that window's area.

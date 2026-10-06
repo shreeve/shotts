@@ -355,6 +355,14 @@ import Testing
         #expect(outcomes.count == 1)
         guard case .done? = outcomes.first else { Issue.record("not done"); return }
 
+        // Shotts scrolling: the panel says it does, and that Return stops it.
+        let auto = ScrollSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200)) { _ in }
+        defer { auto.close() }
+        auto.automatic = true
+        #expect(auto.scrollPanel.message.stringValue == "Scrolling to the bottom; Return stops")
+        auto.showProgress(height: 1200, lost: true, full: false)
+        #expect(auto.scrollPanel.message.stringValue.hasPrefix("Scrolling to the bottom"))
+
         var cancelled = false
         let other = ScrollSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200)) { if case .cancelled = $0 { cancelled = true } }
         other.scrollPanel.cancelOperation(nil)

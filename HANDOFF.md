@@ -120,6 +120,7 @@ Deferred, with the reason each waits:
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
+| | `AutoScroll.swift` | How a scrolling capture scrolls by itself: the step, backing up and slowing when a frame is not matched, the bottom as where the picture stops growing, the other direction tried once. |
 | | `ScrollStitcher.swift` | A scrolling capture's picture from its frames: row fingerprints, the shift that fits (coarse, then fine, nearest the last move among near-ties), sticky bands kept once, only new rows added, a size cap. |
 | | `Keystrokes.swift` | `KeystrokeLine`: which keys show (shortcuts and keys that act on their own, never typing) and as what (⇧⌘4, ↩), and how those within two seconds join one line (`⌘I  ⌃K  ↩`) that stays five seconds after the last. |
 | | `Script.swift` | The command line's language: `ScriptParser` (arguments, times, what each command takes), `ScriptRequest` and `ScriptResult` (the JSON lines), `WindowMatch`, `ScriptAim` (what a target comes to), the error codes and exit codes, the socket's path. |
@@ -145,6 +146,7 @@ Deferred, with the reason each waits:
 | | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list; for `shotts`, the numbered displays, the windows it lists, and an area of a display. |
 | | `ScriptRunner.swift` | What `shotts` asks, done: list, shot, and a recording from its request to its files, the countdown, Allow Command-Line Capture. |
 | | `LiveDisplay.swift` | A display streamed while the picker is up: its latest frame and windows. |
+| | `AutoScroller.swift` | Scrolls a scrolling capture's area for the user, with Accessibility, in steps `AutoScroll` paces, and says when the bottom is reached. |
 | | `ScrollCapture.swift` | Streams the area for a scrolling capture and feeds each frame to `ScrollStitcher` off the main thread. |
 | | `InputWatcher.swift` | Clicks (a global mouse monitor) and keys (a listen-only event tap, needing Input Monitoring) while a recording that shows them runs. |
 | | `Recorder.swift` | Records an area through ScreenCaptureKit, the Mac's sound with it, and the microphone through AVFoundation. |
@@ -160,7 +162,7 @@ reads it each time the menu opens.
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
 `capture.askedPermission` once the system's permission prompt has been shown, `commandLine.allowed` (Allow Command-Line Capture), `recording.soundCalibration` (each output device's measured sound loss), `editor.newWindows`,
-`recording.microphone`, `recording.clicks`, `recording.keys`, `recording.askedInputMonitoring` (macOS's own Input Monitoring dialog shown), `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
+`recording.microphone`, `recording.clicks`, `recording.keys`, `recording.askedInputMonitoring` (macOS's own Input Monitoring dialog shown), `scroll.askedAccessibility` (its Accessibility dialog shown for scrolling), `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
 editor's last style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 
 ## The seam
@@ -355,7 +357,19 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
 
 ## Scrolling capture
 
-Option at the picker's release (or an Option-click on a window) is `AreaSelection.Outcome.scroll`;
+Shotts scrolls for the user when Accessibility allows (`AutoScroller`, paced by Core's
+`AutoScroll`): scroll-wheel steps in points, a sixth of the area (12 to 120) twenty times a
+second, sent with `CGEvent.post` to whatever is under the pointer, which the Option-click leaves
+on the pane chosen. The bottom
+is where the picture has not grown for 0.8 s while scrolling; a frame not matched backs it up a
+step and halves the step; nothing new at all tries the other direction once (in case the
+system's scrolling direction reverses posted steps), then takes the one frame. Without
+Accessibility, macOS's own dialog asks once (`scroll.askedAccessibility`), and the user scrolls.
+Auto-scrolling has not been tried by hand: the pacing is tested in Core, and the events can only
+be tried on a screen nobody is using.
+
+An Option-click on a window is `AreaSelection.Outcome.scroll` (Option changes nothing for a drag
+or on the desktop, and Command outranks it);
 `CaptureFlow.setUpScroll` puts up `ScrollSetup` (the blue outline and panel, left out of the
 capture) and starts `ScrollCapture`, which streams the area at up to 60 frames a second, BGRA, in the
 display's P3 colors, without the pointer, and hands each frame to Core's `ScrollStitcher` on its

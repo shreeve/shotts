@@ -33,6 +33,16 @@ public final class ScrollSetup {
         }
     }
 
+    /// Shotts scrolls, rather than the user: the panel says to wait, or Return to stop early.
+    public var automatic: Bool {
+        get { panel.automatic }
+        set {
+            panel.automatic = newValue
+            panel.show(height: 0, lost: false, full: false)
+            place()
+        }
+    }
+
     /// The outline's and the panel's windows, for the capture to leave out.
     public var windowNumbers: Set<Int> { [outline.windowNumber, panel.windowNumber] }
 
@@ -86,6 +96,8 @@ final class ScrollPanel: NSPanel {
     let done = PillButton(title: "Done", symbol: "checkmark", fill: .systemBlue)
     let cancel = PillButton(title: "Cancel", symbol: nil, fill: SetupPanel.plain)
     private let row = NSStackView()
+    /// Shotts scrolls, rather than the user.
+    var automatic = false
 
     init() {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -145,9 +157,10 @@ final class ScrollPanel: NSPanel {
     func show(height: Int, lost: Bool, full: Bool) {
         let tall = height > 0 ? "   \(height.formatted()) px" : ""
         message.stringValue = full ? "As tall as it can be: press Return" + tall
+            : automatic ? "Scrolling to the bottom; Return stops" + tall
             : lost ? "Scroll a little slower" + tall
             : "Scroll down, then press Return" + tall
-        message.textColor = lost && !full ? .systemYellow : .white
+        message.textColor = lost && !full && !automatic ? .systemYellow : .white
         setContentSize(row.fittingSize)
     }
 }

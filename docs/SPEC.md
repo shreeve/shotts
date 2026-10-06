@@ -35,7 +35,7 @@ stops a recording under way.
 | Move over a window | The window under the crosshair gets a blue outline; over the desktop, where no window is, the whole display does. |
 | Click | Captures that window on its own, without whatever was covering it, at the resolution of the display it is on. With Include Window Shadow on, the window comes with the shadow macOS draws around it, on a transparent margin. A click on the desktop captures the whole display. |
 | Command-click | Records instead (see Recording): the window's area, where it is now, or on the desktop the whole display. The outline turns red while Command is down. |
-| Option while dragging, or Option-click | Captures as you scroll (see Scrolling capture): the area, or a clicked window's. The selection's outline turns blue and its size reads "Scroll". Command outranks it. |
+| Option-click a window | Captures all of it, scrolled to the bottom (see Scrolling capture). The window's outline turns blue while Option is down. Command outranks it; on the desktop, or with a drag, Option changes nothing. |
 | Drag | Selects an area; everything outside it dims (unless Dim Outside Selection is off). Its size in pixels shows in the magnifier, or beside the selection when the magnifier is off. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
@@ -190,18 +190,25 @@ capture came from. A cancelled capture goes back to the app that was in front.
 
 ## Scrolling capture
 
-Holding Option as a drag ends, or Option-clicking a window, outlines the area in blue with a
-panel beside it: "Scroll down, then press Return", and how tall the picture is so far. Scroll
-what is in the area, at your own pace, as you would anyway; Shotts watches the area and adds
-what comes into view below what it already has, so scrolling back up adds nothing. Return,
-Done, or F10 opens the whole picture in an editor, as any capture is (and copies it, with Copy
-to Clipboard on); Escape or Cancel keeps nothing.
+Option-clicking a window, with the pointer on the part of it to scroll (a message list, say,
+rather than its sidebar), outlines the window in blue with a panel beside it and how tall the
+picture is so far. Shotts then scrolls what is under the pointer, in steady steps as fast as it
+can stitch, until the picture stops growing for most of a second: the
+bottom. Then the picture opens in an editor, as any capture does (and is copied, with Copy to
+Clipboard on). Return, Done, or F10 stops early and keeps what it has; Escape or Cancel keeps
+nothing. A frame it could not match makes it back up a step and go on at half the speed.
+
+Scrolling another app needs Accessibility: the first scrolling capture asks macOS for it, and
+until it is allowed the panel says "Scroll down, then press Return" and you scroll yourself,
+at your own pace. Either way Shotts adds only what comes into view below what it already has,
+so scrolling back up adds nothing.
 
 A bar that stays put at the top or bottom while the rest scrolls, a sticky header or a toolbar,
 is kept once, not repeated down the picture. Scrolled too far between two looks, the panel says
 to scroll a little slower, and Shotts goes on from where it last matched. The picture stops
 growing at 256 MB (some 20,000 rows of a wide window), and the panel says so. Neither the
-outline, the panel, nor the pointer is in the picture. Shotts never scrolls anything itself.
+outline, the panel, nor the pointer is in the picture. Shotts sends nothing but scroll-wheel
+steps, and only while a scrolling capture runs.
 
 ## Recording
 

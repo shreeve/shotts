@@ -132,8 +132,8 @@ public final class AreaSelection {
         /// A drag ended, or a click came, with Command down: record the area (a window's, or the
         /// whole display's), in points like `selected`.
         case record(display: DisplayImage, rect: CGRect)
-        /// A drag ended, or a click came, with Option down (and not Command): capture the area as
-        /// the user scrolls what is in it, in points like `selected`.
+        /// An Option-click on a window (not Command): capture all of it as it is scrolled, its
+        /// area in points like `selected`.
         case scroll(display: DisplayImage, rect: CGRect)
     }
 
@@ -257,8 +257,8 @@ final class OverlayView: NSView {
     private(set) var records = false
     /// Whether Command is down, to tell a press from a key held.
     private var commandDown = false
-    /// Whether Option is down: letting go then captures the area as the user scrolls it, shown
-    /// blue, unless Command's red says it records.
+    /// Whether Option is down: a click on a window then captures all of it as it is scrolled,
+    /// the window's outline blue, unless Command's red says it records.
     private(set) var scrolls = false
     /// Whether the drag is squaring the selection, which the arrow keys keep doing.
     private var squaring = false
@@ -437,7 +437,8 @@ final class OverlayView: NSView {
     }
 
     /// `p` in the view's coordinates; `recording` when the selection is red as the drag ends;
-    /// `scrolling` when Option is down then, which recording outranks.
+    /// `scrolling` when Option is down then, which recording outranks and which matters only
+    /// for a click on a window.
     func released(at p: CGPoint, recording: Bool, scrolling: Bool = false) {
         let scrolling = scrolling && !recording
         defer { anchor = nil }
@@ -448,7 +449,7 @@ final class OverlayView: NSView {
             let target = SelectionRule.clickTarget(at: p, windows: display.windows.map(\.frame), bounds: bounds)
             if recording {
                 onFinish?(.record(display: display, rect: target.rect))
-            } else if scrolling {
+            } else if scrolling, target.isWindow {
                 onFinish?(.scroll(display: display, rect: target.rect))
             } else if target.isWindow, let window = display.windows.first(where: { $0.frame == target.rect }) {
                 onFinish?(.window(display: display, window: window))
@@ -457,8 +458,7 @@ final class OverlayView: NSView {
             }
             return
         }
-        onFinish?(recording ? .record(display: display, rect: rect)
-                  : scrolling ? .scroll(display: display, rect: rect) : .selected(display: display, rect: rect))
+        onFinish?(recording ? .record(display: display, rect: rect) : .selected(display: display, rect: rect))
     }
 
     override func keyDown(with event: NSEvent) {
@@ -553,11 +553,6 @@ final class OverlayView: NSView {
                 ctx.setStrokeColor(NSColor.systemRed.cgColor)
                 ctx.setLineWidth(2)
                 ctx.stroke(selection.insetBy(dx: -1, dy: -1))
-            } else if scrolls {
-                // Blue, as the outline stays while the area is scrolled.
-                ctx.setStrokeColor(NSColor.systemBlue.cgColor)
-                ctx.setLineWidth(2)
-                ctx.stroke(selection.insetBy(dx: -1, dy: -1))
             } else {
                 ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.9))
                 ctx.setLineWidth(1)
@@ -571,11 +566,13 @@ final class OverlayView: NSView {
         guard let pointer else { return }
         if let target = hoveredTarget {
             // What a click would take, a window or the whole display; red while Command is
-            // down, since the click would record it.
+            // down, since the click would record it, and a window blue while Option is, since
+            // the click would scroll it.
             let inset: CGFloat = target.isWindow ? 1 : 2
             let path = CGPath(roundedRect: target.rect.insetBy(dx: inset, dy: inset), cornerWidth: target.isWindow ? 10 : 6,
                               cornerHeight: target.isWindow ? 10 : 6, transform: nil)
-            ctx.setStrokeColor(commandDown ? NSColor.systemRed.cgColor : NSColor.controlAccentColor.cgColor)
+            ctx.setStrokeColor(commandDown ? NSColor.systemRed.cgColor
+                               : scrolls && target.isWindow ? NSColor.systemBlue.cgColor : NSColor.controlAccentColor.cgColor)
             ctx.setLineWidth(3)
             ctx.addPath(path)
             ctx.strokePath()
@@ -642,10 +639,6 @@ final class OverlayView: NSView {
             // The color matters little to a recording; the size it will have does.
             let size = display.pixelRect(for: selection).size
             text = "Record  \(Int(size.width)) × \(Int(size.height))"
-        } else if let selection, scrolls {
-            // Its width is what a scrolling capture keeps; its height grows.
-            let size = display.pixelRect(for: selection).size
-            text = "Scroll  \(Int(size.width)) × \(Int(size.height))"
         } else if let selection {
             let size = display.pixelRect(for: selection).size
             text = "\(Int(size.width)) × \(Int(size.height))   " + hex
@@ -754,7 +747,7 @@ final class OverlayView: NSView {
         "⇧ keeps it square, Space moves it",
         "Arrow keys move a pixel, ⇧ ten",
         "⌘ while dragging or clicking records instead",
-        "⌥ while dragging or clicking captures as you scroll",
+        "⌥-click a window to capture all of it, scrolled",
         "⌘C copies the color under the crosshair",
         "Esc cancels",
     ]
@@ -789,7 +782,7 @@ final class OverlayView: NSView {
 
     private func drawSizeLabel(_ rect: CGRect, in ctx: CGContext) {
         let size = display.pixelRect(for: rect).size
-        let words = records ? "Record  " : scrolls ? "Scroll  " : ""
+        let words = records ? "Record  " : ""
         let text = Self.label(words + "\(Int(size.width)) × \(Int(size.height))", recording: records)
         let textSize = text.size()
         var origin = CGPoint(x: rect.maxX - textSize.width - 6, y: rect.maxY + 6)
