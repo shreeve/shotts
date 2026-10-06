@@ -219,8 +219,9 @@ final class CaptureFlow {
         if AutoScroller.allowed {
             let area = setup.area
             let primary = NSScreen.screens.first?.frame.maxY ?? area.maxY
-            CGWarpMouseCursorPosition(CGPoint(x: area.midX, y: primary - area.midY))
-            let autoScroller = AutoScroller(areaHeight: area.height)
+            let middle = CGPoint(x: area.midX, y: primary - area.midY)
+            CGWarpMouseCursorPosition(middle)
+            let autoScroller = AutoScroller(areaHeight: area.height, pointer: middle)
             // At the bottom, the picture opens; unable to follow, the user scrolls.
             autoScroller.onFinish = { [weak setup] in setup?.done() }
             autoScroller.onGiveUp = { [weak self, weak setup] in

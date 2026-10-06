@@ -378,7 +378,13 @@ Escape cancels.
 
 With Accessibility, Shotts scrolls (`AutoScroller`, paced by Core's `AutoScroll`): the pointer
 is put in the middle of the area, and scroll-wheel steps in points, a sixth of the area (12 to
-120) twenty times a second, go with `CGEvent.post` to what is under it. The bottom, where the
+120) twenty times a second, go with `CGEvent.post` to what is under it. Until it stops, the
+mouse is held (the owner's nudge of it sent the steps elsewhere, and the capture gave up):
+`CGAssociateMouseAndMouseCursorPosition(0)` keeps the pointer put, and an active session event
+tap, which Accessibility allows, drops every mouse move, click, and scroll but Shotts' own steps
+(marked in `eventSourceUserData`), warping the pointer back should it have moved all the same.
+`stop()`, from every way scrolling ends, lets go; quitting cannot come first, as the menu
+cannot be clicked meanwhile, and a tap dies with its process. The bottom, where the
 picture has not grown for 0.8 s while scrolling, opens the picture. A frame not matched backs it
 up a step and halves the step; five in a row with nothing added give up and leave the user to
 scroll (a whole window with a still sidebar once made it bob back and forth for ever: an area

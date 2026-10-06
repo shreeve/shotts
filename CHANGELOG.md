@@ -5,6 +5,15 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- While Shotts scrolls a scrolling capture, the mouse is held: the pointer stays put and moving,
+  clicking, or scrolling does nothing, so a nudge no longer sends the scrolling elsewhere and
+  makes it give up. The keys still work, and the mouse comes back when scrolling stops.
+- No haze on the "D" of Done: with keyboard navigation on, the button was focused as its panel
+  opened, its focus ring drawn around the title. Nothing is focused now, and a ring goes around
+  the whole button.
+
 ## 0.8.3 — 2026-10-05
 
 - Scrolling capture no longer leaves a row blank. Browsers draw what scrolls into view a moment

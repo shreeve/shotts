@@ -83,6 +83,8 @@ public final class RecordingSetup {
         outline.orderFrontRegardless()
         panel?.orderFrontRegardless()
         panel?.makeKey()
+        // Nothing focused: with keyboard navigation on, a button would be, its ring around it.
+        panel?.makeFirstResponder(nil)
     }
 
     /// Recording has started: the panel becomes the recording bar, and the drawing layer goes
@@ -234,6 +236,10 @@ final class PillButton: NSButton {
     }
 
     override var isHighlighted: Bool { didSet { needsDisplay = true } }
+
+    /// With keyboard navigation on, the focus ring goes around the pill, not around its title.
+    override var focusRingMaskBounds: NSRect { bounds }
+    override func drawFocusRingMask() { NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill() }
 
     private static let font = NSFont.systemFont(ofSize: 14, weight: .semibold)
     private static let icon: CGFloat = 18

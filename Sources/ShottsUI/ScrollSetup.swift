@@ -52,6 +52,8 @@ public final class ScrollSetup {
         outline.orderFrontRegardless()
         panel.orderFrontRegardless()
         panel.makeKey()
+        // Nothing focused: with keyboard navigation on, a button would be, its ring around it.
+        panel.makeFirstResponder(nil)
     }
 
     public var state: State { panel.state }

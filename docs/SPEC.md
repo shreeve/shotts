@@ -204,7 +204,10 @@ any capture is (and copies it, with Copy to Clipboard on).
 | Cancel, or Escape | Ends without keeping anything. |
 
 Scrolling another app needs Accessibility: the first scrolling capture asks macOS for it, and
-until it is allowed the panel says to scroll yourself and press F10. If frames keep not
+until it is allowed the panel says to scroll yourself and press F10. While Shotts scrolls, the
+mouse is held: the pointer stays in the middle of the area, and moving, clicking, or scrolling
+does nothing, since scrolling goes to what is under the pointer and a click would land in what
+is being captured. The keys still work, and the mouse comes back when scrolling stops. If frames keep not
 matching (an area that does not all scroll together), Shotts stops scrolling and says so;
 scroll by hand, then press F10. F10 ends a scrolling capture as it ends a recording.
 

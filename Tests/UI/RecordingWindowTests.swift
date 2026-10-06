@@ -366,4 +366,14 @@ import Testing
         other.scrollPanel.cancelOperation(nil)
         #expect(cancelled)
     }
+    /// With keyboard navigation on, a focused button's ring goes around the whole pill, not
+    /// around its title, where it blurred the "D" of Done.
+    @Test func theFocusRingIsThePill() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let setup = ScrollSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200)) { _ in }
+        defer { setup.close() }
+        let done = setup.scrollPanel.done
+        setup.scrollPanel.layoutIfNeeded()
+        #expect(done.bounds.width > 40 && done.focusRingMaskBounds == done.bounds)
+    }
 }
