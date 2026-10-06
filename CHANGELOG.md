@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.8.0 — 2026-10-05
 
 - Scrolling capture: hold Option as you let go of a drag, or Option-click a window, then scroll
   what is in it and press Return. Shotts stitches one tall picture as you scroll, keeps a sticky
