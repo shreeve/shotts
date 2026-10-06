@@ -5,8 +5,8 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.8.1 is the latest release: tag `v0.8.1` on `main` (commit "Shotts 0.8.1"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#54),
+0.8.2 is the latest release: tag `v0.8.2` on `main` (commit "Shotts 0.8.2"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#59),
 which also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
 (shreeve/shotts#69) added `shotts`, the command line ("Command line" below; SPEC has the
 language). 0.6.1 made `record` show progress while saving and GIFs on-screen size, and took
@@ -24,9 +24,13 @@ tried 0.7.0's keys and liked them. 0.7.1 shows shortcuts only, never typing, tho
 seconds on one line, for five seconds. 0.8.0 adds scrolling capture ("Scrolling capture" below),
 proven on a window of text scrolled in code but not yet tried by hand on real apps (Safari,
 Slack, Messages, Finder): sticky toolbars, lazy loading, and fast flicks are what to watch.
-0.8.1 scrolls for the user (Accessibility) from an Option-click on a window, the only way in
-now; its scrolling has not been tried on a real screen: that it reaches the bottom and stops,
-and which way the posted steps scroll under the user's scrolling direction.
+0.8.1 scrolled for the user from an Option-click on a window, which on the owner's Google Drive
+window (a still sidebar and toolbar around a scrolling list) bobbed up and down for ever. 0.8.2
+makes it Option during a drag, as recording is Command, so the area is just the part that
+scrolls; auto-scrolling gives up rather than bob; F10 ends a scrolling capture as a recording;
+the picker keeps the arrow away (Traps); and its hints are shorter. Auto-scrolling still has not
+been tried by hand: that it reaches the bottom and opens the picture, and which way the posted
+steps scroll under the user's scrolling direction.
 Still to try by hand: capture and record the whole display, Command-click a window,
 record with Clicks and with Keys (the first asks for Input Monitoring; check a password field
 shows nothing), and draw with a tool during a whole-display recording, the bar still in reach.
