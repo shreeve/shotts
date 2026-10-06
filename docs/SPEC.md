@@ -207,7 +207,8 @@ Scrolling another app needs Accessibility: the first scrolling capture asks macO
 until it is allowed the panel says to scroll yourself and press F10. While Shotts scrolls, the
 mouse is held: the pointer stays in the middle of the area, and moving, clicking, or scrolling
 does nothing, since scrolling goes to what is under the pointer and a click would land in what
-is being captured. The keys still work, and the mouse comes back when scrolling stops. If frames keep not
+is being captured. The keys still work, and the mouse comes back when scrolling stops: at the
+bottom, or after 30 seconds at most, when the picture opens with what it has. If frames keep not
 matching (an area that does not all scroll together), Shotts stops scrolling and says so;
 scroll by hand, then press F10. F10 ends a scrolling capture as it ends a recording.
 

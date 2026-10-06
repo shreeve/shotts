@@ -30,6 +30,19 @@ import Testing
         #expect(abs(still - AutoScroll.settle) < AutoScroll.tick * 1.5)
     }
 
+    /// A page that goes on growing still stops at `limit`, with what it has.
+    @Test func itStopsAtTheLimit() {
+        var auto = AutoScroll(areaHeight: 600, now: 10)
+        var height = 840
+        var t = 10.0
+        while t < 10 + AutoScroll.limit - AutoScroll.tick / 2 {
+            height += 120
+            #expect(auto.next(height: height, lost: false, full: false, now: t) == .scroll(100))
+            t += AutoScroll.tick
+        }
+        #expect(auto.next(height: height + 120, lost: false, full: false, now: 10 + AutoScroll.limit) == .finish)
+    }
+
     /// Before the first frame there is nothing to grow; that does not count as the bottom.
     @Test func waitingForTheFirstFrameIsNotTheBottom() {
         var auto = AutoScroll(areaHeight: 600, now: 0)

@@ -6,12 +6,13 @@ import Foundation
 /// on at half the speed, and after `giveUpAfter` of those in a row with nothing added it stops
 /// trying, rather than going back and forth for ever (as a window whose parts do not all scroll
 /// together made it). Should nothing new come at all, the scrolling may be going the other way
-/// than expected (the system's scrolling direction): it tries the other way once.
+/// than expected (the system's scrolling direction): it tries the other way once. However it
+/// goes, it stops after `limit`, with what it has: the mouse is held until then.
 public struct AutoScroll: Equatable, Sendable {
     public enum Action: Equatable, Sendable {
         /// Scroll by this many points, down being positive.
         case scroll(Double)
-        /// The bottom: no new rows for `settle` while scrolling.
+        /// The bottom (no new rows for `settle` while scrolling), or `limit` reached.
         case finish
         /// Frames keep not matching: it cannot follow this area.
         case giveUp
@@ -26,6 +27,8 @@ public struct AutoScroll: Equatable, Sendable {
     public static let settle = 0.8
     /// The slowest step, in points.
     public static let slowest = 4.0
+    /// The longest it scrolls, in seconds, bottom or not.
+    public static let limit = 30.0
 
     public private(set) var step: Double
     /// 1 or -1: which way a step goes.
@@ -37,6 +40,7 @@ public struct AutoScroll: Equatable, Sendable {
     private var turned = false
     private var misses = 0
     private var grew: Double
+    private let started: Double
 
     /// For an area `areaHeight` points tall, starting at `now` (seconds, on any clock that only
     /// goes forward). A step is a sixth of the area, between 12 and 120 points: at 20 steps a
@@ -44,11 +48,12 @@ public struct AutoScroll: Equatable, Sendable {
     public init(areaHeight: Double, now: Double) {
         step = min(max(areaHeight / 6, 12), 120)
         grew = now
+        started = now
     }
 
     /// What to do next, given the picture's height so far and whether the last frame was matched.
     public mutating func next(height: Int, lost: Bool, full: Bool, now: Double) -> Action {
-        if full { return .finish }
+        if full || now - started >= Self.limit { return .finish }
         if height > self.height {
             if first == nil { first = height } else { added = true }
             self.height = height

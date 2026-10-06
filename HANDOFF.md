@@ -383,7 +383,8 @@ mouse is held (the owner's nudge of it sent the steps elsewhere, and the capture
 `CGAssociateMouseAndMouseCursorPosition(0)` keeps the pointer put, and an active session event
 tap, which Accessibility allows, drops every mouse move, click, and scroll but Shotts' own steps
 (marked in `eventSourceUserData`), warping the pointer back should it have moved all the same.
-`stop()`, from every way scrolling ends, lets go; quitting cannot come first, as the menu
+`stop()`, from every way scrolling ends, lets go, and `AutoScroll.limit` (30 s) ends it with
+what it has however far it got, so the mouse is never held longer; quitting cannot come first, as the menu
 cannot be clicked meanwhile, and a tap dies with its process. The bottom, where the
 picture has not grown for 0.8 s while scrolling, opens the picture. A frame not matched backs it
 up a step and halves the step; five in a row with nothing added give up and leave the user to
