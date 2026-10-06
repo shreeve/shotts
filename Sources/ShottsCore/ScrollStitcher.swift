@@ -2,7 +2,13 @@ import Foundation
 
 /// A scrolling capture: one tall picture from the frames of an area while the user scrolls what
 /// is in it. Each frame is matched to the last one taken to find how far its content moved, and
-/// only rows new below what is already held are added, so scrolling back up adds nothing.
+/// rows new below what is already held are added, so scrolling back up adds nothing.
+///
+/// Rows just scrolled in are not final: a browser draws what comes into view a moment late when
+/// scrolling fast, leaving it blank in the frame that first shows it. So the last `fresh` rows
+/// are taken again from every frame that shows them, moved or not, until they have scrolled up
+/// past them; above that they stay as taken. What the pointer rests on, at the area's middle,
+/// is above them, so a highlight following it down the page is not taken again.
 ///
 /// Matching compares row fingerprints, each row's brightness averaged over a few dozen blocks
 /// across it: cheap to compare, and steady under the small differences a redraw brings (a
@@ -12,8 +18,9 @@ import Foundation
 ///
 /// Bands that stay put at the top and bottom while the rest moves, sticky headers and footers,
 /// are found at the first move and kept once: the top from the first frame, the bottom from the
-/// last. A band taken for one that is not (blank margin) costs nothing: what passes under it is
-/// still taken while it is in the middle, and the last frame's bottom band continues the middle.
+/// last to reach the picture's end. A band taken for one that is not (blank margin) costs
+/// nothing: what passes under it is still taken while it is in the middle, and that frame's
+/// bottom band continues the middle.
 ///
 /// Frames are BGRA, rows of `width` pixels; the picture is built as they come, never holding
 /// more than the last frame besides it, and stops growing at `maxBytes`.
@@ -44,6 +51,8 @@ public struct ScrollStitcher: Sendable {
     private var lastPrints: [Float] = []
     /// The first frame's top band, once the bands are known.
     private var top: [UInt8] = []
+    /// The bottom band of the last frame to reach the picture's end.
+    private var bottom: [UInt8] = []
     private(set) var header = 0
     private(set) var footer = 0
     private var bandsKnown = false
@@ -52,6 +61,8 @@ public struct ScrollStitcher: Sendable {
     private var lastMove = 0
     /// The middle rows so far.
     private var middle: [UInt8] = []
+    /// How many of them are final; those below are taken again from each frame showing them.
+    private var settled = 0
     public private(set) var isFull = false
 
     public init(width: Int, height: Int) {
@@ -82,38 +93,66 @@ public struct ScrollStitcher: Sendable {
             return .started
         }
         if !bandsKnown {
-            guard let (t, b) = bands(prints) else { return .unmoved }
+            guard let (t, b) = bands(prints) else {
+                // Still: the latest frame, which may show what the first had not drawn yet.
+                last = frame
+                lastPrints = prints
+                return .unmoved
+            }
             header = t
             footer = b
             bandsKnown = true
             top = Array(last[0..<t * rowBytes])
             middle = Array(last[t * rowBytes..<(height - b) * rowBytes])
+            bottom = Array(last[(height - b) * rowBytes..<height * rowBytes])
+            settled = max(0, middleRows - fresh)
         }
         if isFull { return .full }
         guard let d = shift(from: lastPrints, to: prints) else { return .lost }
-        if d == 0 { return .unmoved }
-        position += d
-        // The rows of this frame's middle below what the picture holds.
-        let first = header + max(middleRows - position, 0)
-        if position >= 0, first < height - footer {
-            let adding = height - footer - first
-            if (middleRows + adding) * rowBytes + (header + footer) * rowBytes > Self.maxBytes {
-                isFull = true
-                return .full
-            }
-            middle.append(contentsOf: frame[first * rowBytes..<(height - footer) * rowBytes])
+        let start = position + d, end = start + height - header - footer
+        if (max(end, middleRows) + header + footer) * rowBytes > Self.maxBytes {
+            isFull = true
+            return .full
         }
+        take(frame, at: start)
+        position = start
         last = frame
         lastPrints = prints
+        guard d != 0 else { return .unmoved }
         lastMove = d
         return .moved(d)
     }
 
+    /// The rows at the end of the middle taken again while they may still be being drawn: a
+    /// third of it, below the middle of the area, where the pointer rests.
+    private var fresh: Int { (height - header - footer) / 3 }
+
+    /// Takes `frame`'s middle, its first row at `start` in the picture's middle: over the rows
+    /// not yet final, and below them those the picture does not have yet. A frame reaching the
+    /// picture's end gives it its bottom band, and the rows it shows `fresh` above its own
+    /// bottom are final.
+    private mutating func take(_ frame: [UInt8], at start: Int) {
+        let end = start + height - header - footer
+        let from = max(start, settled)
+        guard from < end else { return }
+        let header = header, rowBytes = rowBytes
+        func source(_ rows: Range<Int>) -> ArraySlice<UInt8> {
+            frame[(header + rows.lowerBound - start) * rowBytes..<(header + rows.upperBound - start) * rowBytes]
+        }
+        let held = min(end, middleRows)
+        if from < held { middle.replaceSubrange(from * rowBytes..<held * rowBytes, with: source(from..<held)) }
+        if end > middleRows { middle.append(contentsOf: source(max(from, middleRows)..<end)) }
+        guard end >= middleRows else { return }
+        bottom = Array(frame[(height - footer) * rowBytes..<height * rowBytes])
+        settled = max(settled, min(middleRows, end - fresh))
+    }
+
     /// The picture so far: the top band from the first frame, the middle as built, and the
-    /// bottom band from the last frame. BGRA rows of `width` pixels, `pictureHeight` of them.
+    /// bottom band from the last frame to reach its end. BGRA rows of `width` pixels,
+    /// `pictureHeight` of them.
     public func picture() -> [UInt8] {
         guard bandsKnown else { return last }
-        return top + middle + Array(last[(height - footer) * rowBytes..<height * rowBytes])
+        return top + middle + bottom
     }
 
     // MARK: - Matching

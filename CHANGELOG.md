@@ -5,6 +5,13 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Scrolling capture no longer leaves a row blank. Browsers draw what scrolls into view a moment
+  late, and the row first seen blank stayed blank; rows are now taken again until they have
+  scrolled well up.
+- A scrolling capture that backs up at the end no longer ends with rows from higher up.
+
 ## 0.8.2 — 2026-10-05
 
 - Scrolling capture is Option during a drag, as recording is Command: the selection turns blue

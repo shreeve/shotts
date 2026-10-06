@@ -30,7 +30,9 @@ makes it Option during a drag, as recording is Command, so the area is just the 
 scrolls; auto-scrolling gives up rather than bob; F10 ends a scrolling capture as a recording;
 the picker keeps the arrow away (Traps); and its hints are shorter. Auto-scrolling still has not
 been tried by hand: that it reaches the bottom and opens the picture, and which way the posted
-steps scroll under the user's scrolling direction.
+steps scroll under the user's scrolling direction. The owner then captured a Google Drive list
+by Option-drag, auto-scrolled, whole but for one row left blank as Chrome drew it late; rows
+just come into view are now taken again until they scroll up (Unreleased).
 Still to try by hand: capture and record the whole display, Command-click a window,
 record with Clicks and with Keys (the first asks for Input Monitoring; check a password field
 shows nothing), and draw with a tool during a whole-display recording, the bar still in reach.
@@ -128,7 +130,7 @@ Deferred, with the reason each waits:
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
 | | `AutoScroll.swift` | How Shotts paces its scrolling: the step, backing up and slowing when a frame is not matched, giving up after five in a row, the bottom as where the picture stops growing, the other direction tried once. |
-| | `ScrollStitcher.swift` | A scrolling capture's picture from its frames: row fingerprints, the shift that fits (coarse, then fine, nearest the last move among near-ties), sticky bands kept once, only new rows added, a size cap. |
+| | `ScrollStitcher.swift` | A scrolling capture's picture from its frames: row fingerprints, the shift that fits (coarse, then fine, nearest the last move among near-ties), sticky bands kept once, new rows added and taken again until they scroll up, a size cap. |
 | | `Keystrokes.swift` | `KeystrokeLine`: which keys show (shortcuts and keys that act on their own, never typing) and as what (⇧⌘4, ↩), and how those within two seconds join one line (`⌘I  ⌃K  ↩`) that stays five seconds after the last. |
 | | `Script.swift` | The command line's language: `ScriptParser` (arguments, times, what each command takes), `ScriptRequest` and `ScriptResult` (the JSON lines), `WindowMatch`, `ScriptAim` (what a target comes to), the error codes and exit codes, the socket's path. |
 | | `TextTable.swift` | How `shotts` prints a table: boxed with a title tab and color on a terminal, plain columns for a pipe, widths in terminal columns (wide characters count two). |
@@ -392,7 +394,13 @@ takes the one nearest the last move, since lists of rows alike fit at several. R
 level count as the same, a shift is believed below three levels, and it must keep a quarter of
 the middle overlapping. At the first move, the rows that stayed put at the top and bottom (a
 third of the frame at most) become bands: the top kept from the first frame, the bottom from the
-last, the middle stitched between. A band taken wrongly (a blank margin) costs nothing, since
+last frame to reach the picture's end (not simply the last, which may have backed up), the
+middle stitched between. The last third of the middle is not final: each frame showing it,
+moved or not, takes it again, and only rows that have scrolled above it stay as taken. Chrome
+leaves rows blank for a moment where they come into view when scrolling fast; taken once, as
+0.8.2 did, one of them stayed blank in the owner's Google Drive capture, the only flaw in an
+otherwise whole list. A third keeps the retaking below the middle of the area, where the
+pointer rests and a row under it may be highlighted. A band taken wrongly (a blank margin) costs nothing, since
 what passes under it is still taken in the middle. The bottom band is at least a twelfth of the
 frame: a window's rounded corners sit in its last rows over moving content, and rows taken from
 there carried the corners into the middle at every step. Shifts within a quarter of the middle
@@ -405,7 +413,8 @@ Core optimized (a debug build alone is too slow to keep up, and loses its place)
 steps came out 10,848 rows tall, the document's height, differing from it by 0.024 levels on
 average and nowhere in the body by more than 0.1. It is tested on generated pages: uneven
 scrolls, a still frame, scrolling back up, a jump too far then recovered, noise, a blinking
-cursor, and padded rows; real apps need trying by hand.
+cursor, and padded rows, and on a list of rows alike: rows drawn late, a last frame backed up,
+and random speeds; real apps need trying by hand.
 
 ## The editor
 
