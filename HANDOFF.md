@@ -68,6 +68,14 @@ Next, in order:
 
 Decided against, so they are not rebuilt:
 
+- Reversing an arrow's direction (CleanShot's "inverse arrow"). The direction is chosen while
+  drawing, tail where the press starts and head where it ends, and either end of a drawn arrow
+  drags anywhere; an arrow with text keeps its words at the tail, so flipping one would strand
+  them or have to move them. Nothing it would do is not already a drag away.
+- A background tool (CleanShot's padding, backdrop presets, and auto balance): decoration for
+  posting screenshots, not capture. Shotts stays a small capture utility; Include Window Shadow
+  is the one finish it adds, and layout tools exist for the rest.
+
 - Wrapping plain text at the picture's edge. The user breaks lines with Return; text that
   wrapped on its own would either keep its line breaks when moved (a stranded narrow column) or
   reflow as it moves, and both are worse than lines that only change when the user says so.
