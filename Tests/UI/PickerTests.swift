@@ -407,43 +407,56 @@ extension OverlayView {
 }
 
 @MainActor @Suite struct ScrollPickerTests {
-    /// Option does nothing to a drag: it is captured as ever, or recorded with Command.
-    @Test func optionDoesNotChangeADrag() throws {
-        for recording in [false, true] {
+    /// Option during a drag turns the selection blue, and letting go scrolls the area; a second
+    /// press turns it back, as Command does red.
+    @Test func optionTogglesScrolling() throws {
+        for presses in [1, 2] {
             let view = try overlay()
             var outcome: AreaSelection.Outcome?
             view.onFinish = { outcome = $0 }
             view.pressed(at: CGPoint(x: 20, y: 20))
+            for _ in 0..<presses {
+                view.optionChanged(true)
+                view.optionChanged(false)
+            }
+            #expect(view.scrolls == (presses == 1))
             view.dragged(to: CGPoint(x: 120, y: 90), square: false)
-            view.released(at: CGPoint(x: 120, y: 90), recording: recording, scrolling: true)
+            view.released(at: CGPoint(x: 120, y: 90), recording: view.records, scrolling: view.scrolls)
             switch outcome {
-            case let .selected(_, rect)? where !recording: #expect(rect == CGRect(x: 20, y: 20, width: 100, height: 70))
-            case .record? where recording: break
-            default: Issue.record("came back as \(String(describing: outcome))")
+            case let .scroll(_, rect)? where presses == 1: #expect(rect == CGRect(x: 20, y: 20, width: 100, height: 70))
+            case .selected? where presses == 2: break
+            default: Issue.record("\(presses) press(es) came back as \(String(describing: outcome))")
             }
         }
     }
 
-    /// An Option-click on the desktop, where there is nothing to scroll, captures the display.
-    @Test func optionClickOnTheDesktopCapturesIt() throws {
-        let view = try overlay(windows: [WindowInfo(id: 7, frame: CGRect(x: 0, y: 0, width: 100, height: 100))])
-        var outcome: AreaSelection.Outcome?
-        view.onFinish = { outcome = $0 }
-        view.pressed(at: CGPoint(x: 150, y: 120))
-        view.released(at: CGPoint(x: 150, y: 120), recording: false, scrolling: true)
-        guard case let .selected(_, rect)? = outcome else { Issue.record("came back as \(String(describing: outcome))"); return }
-        #expect(rect == view.bounds)
+    /// Red and blue are one or the other: the key pressed last wins.
+    @Test func commandAndOptionTakeTurns() throws {
+        let view = try overlay()
+        view.pressed(at: CGPoint(x: 20, y: 20))
+        view.commandChanged(true)
+        #expect(view.records && !view.scrolls)
+        view.optionChanged(true)
+        #expect(view.scrolls && !view.records)
+        view.commandChanged(false)
+        view.commandChanged(true)
+        #expect(view.records && !view.scrolls)
     }
 
-    /// Option-clicking a window scrolls that window's area.
-    @Test func optionClickScrollsAWindow() throws {
-        let frame = CGRect(x: 0, y: 0, width: 100, height: 100)
-        let view = try overlay(windows: [WindowInfo(id: 7, frame: frame)])
+    /// A click is as ever, Option or not: it captures the window under it.
+    @Test func aClickIsNotScrolled() throws {
+        let view = try overlay(windows: [WindowInfo(id: 7, frame: CGRect(x: 0, y: 0, width: 100, height: 100))])
         var outcome: AreaSelection.Outcome?
         view.onFinish = { outcome = $0 }
         view.pressed(at: CGPoint(x: 50, y: 50))
         view.released(at: CGPoint(x: 50, y: 50), recording: false, scrolling: true)
-        guard case let .scroll(_, rect)? = outcome else { Issue.record("no scrolling capture"); return }
-        #expect(rect == frame)
+        guard case .window? = outcome else { Issue.record("came back as \(String(describing: outcome))"); return }
+    }
+
+    /// The label says what letting go does: a red dot to record, a blue square to scroll.
+    @Test func theLabelMarksIt() {
+        #expect(OverlayView.label("Scroll  100 × 70", recording: false, scrolling: true).string == "■ Scroll  100 × 70")
+        #expect(OverlayView.label("Record  100 × 70", recording: true).string == "● Record  100 × 70")
+        #expect(OverlayView.label("100 × 70", recording: false).string == "100 × 70")
     }
 }

@@ -5,6 +5,15 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Scrolling capture is Option during a drag, as recording is Command: the selection turns blue
+  and reads "■ Scroll". Let go, and Shotts scrolls just that area to the bottom by itself and
+  opens the picture. Dragging just the part that scrolls, a message list without its sidebar,
+  is what makes a window with still parts come out right. Return stops early.
+- Shotts no longer bobs up and down when it cannot follow an area: it stops and lets you scroll.
+- Option-click no longer starts a scrolling capture.
+
 ## 0.8.1 — 2026-10-05
 
 - Scrolling capture scrolls by itself: Option-click a window, with the pointer on the part to

@@ -1,17 +1,24 @@
 import Foundation
 
-/// How Shotts scrolls an area for a scrolling capture: steady steps, as fast as the stitching
-/// can follow, until the picture stops growing, which is the bottom. A frame that could not be
-/// matched means it went too fast: it backs up a step and goes on at half the speed. Should
-/// nothing new come at all, the scrolling may be going the other way than expected (the system's
-/// scrolling direction): it tries the other way once before taking the frame as all there is.
+/// How Shotts scrolls an area for a scrolling capture once Auto-Scroll is pressed: steady
+/// steps, as fast as the stitching can follow, until the picture stops growing, which is the
+/// bottom. A frame that could not be matched means it went too fast: it backs up a step and goes
+/// on at half the speed, and after `giveUpAfter` of those in a row with nothing added it stops
+/// trying, rather than going back and forth for ever (as a window whose parts do not all scroll
+/// together made it). Should nothing new come at all, the scrolling may be going the other way
+/// than expected (the system's scrolling direction): it tries the other way once.
 public struct AutoScroll: Equatable, Sendable {
     public enum Action: Equatable, Sendable {
         /// Scroll by this many points, down being positive.
         case scroll(Double)
         /// The bottom: no new rows for `settle` while scrolling.
         case finish
+        /// Frames keep not matching: it cannot follow this area.
+        case giveUp
     }
+
+    /// Frames not matched in a row, with nothing added between, before it gives up.
+    public static let giveUpAfter = 5
 
     /// How often it steps, in seconds.
     public static let tick = 0.05
@@ -28,6 +35,7 @@ public struct AutoScroll: Equatable, Sendable {
     private var first: Int?
     private var added = false
     private var turned = false
+    private var misses = 0
     private var grew: Double
 
     /// For an area `areaHeight` points tall, starting at `now` (seconds, on any clock that only
@@ -45,8 +53,11 @@ public struct AutoScroll: Equatable, Sendable {
             if first == nil { first = height } else { added = true }
             self.height = height
             grew = now
+            misses = 0
         }
         if lost {
+            misses += 1
+            if misses >= Self.giveUpAfter { return .giveUp }
             // Back to where the last frame matched, then on at half the speed.
             let back = step
             step = max(Self.slowest, step / 2)

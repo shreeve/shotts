@@ -132,8 +132,8 @@ public final class AreaSelection {
         /// A drag ended, or a click came, with Command down: record the area (a window's, or the
         /// whole display's), in points like `selected`.
         case record(display: DisplayImage, rect: CGRect)
-        /// An Option-click on a window (not Command): capture all of it as it is scrolled, its
-        /// area in points like `selected`.
+        /// A drag ended with the selection blue (Option pressed during it): Shotts scrolls the area
+        /// and captures all of it, in points like `selected`.
         case scroll(display: DisplayImage, rect: CGRect)
     }
 
@@ -257,9 +257,12 @@ final class OverlayView: NSView {
     private(set) var records = false
     /// Whether Command is down, to tell a press from a key held.
     private var commandDown = false
-    /// Whether Option is down: a click on a window then captures all of it as it is scrolled,
-    /// the window's outline blue, unless Command's red says it records.
+    /// The selection is blue: letting go of the drag scrolls the area and captures all of it.
+    /// Pressing Option turns it on, and pressing it again off, as Command does red; turning
+    /// either on turns the other off. What the selection shows is what letting go does.
     private(set) var scrolls = false
+    /// Whether Option is down, to tell a press from a key held.
+    private var optionDown = false
     /// Whether the drag is squaring the selection, which the arrow keys keep doing.
     private var squaring = false
     /// Moves the real pointer to a point in global display coordinates (origin at the primary
@@ -365,10 +368,11 @@ final class OverlayView: NSView {
         window?.makeKey()
         window?.makeFirstResponder(self)
         pressed(at: convert(event.locationInWindow, from: nil))
-        // Command already down as the drag begins records from the start.
+        // Command already down as the drag begins records from the start; Option, scrolls.
         commandDown = Self.held(event).contains(.command)
+        optionDown = Self.held(event).contains(.option)
         records = commandDown
-        scrolls = Self.held(event).contains(.option)
+        scrolls = optionDown && !records
     }
 
     /// `p` in the view's coordinates.
@@ -385,6 +389,7 @@ final class OverlayView: NSView {
         // A press seen first here, should the modifier change itself not have arrived; this only
         // ever turns recording on, so a late event cannot undo a second press.
         if held.contains(.command), !records { commandChanged(true) }
+        if held.contains(.option), !scrolls, !records { optionChanged(true) }
         dragged(to: convert(event.locationInWindow, from: nil), square: held.contains(.shift))
     }
 
@@ -402,6 +407,16 @@ final class OverlayView: NSView {
         defer { commandDown = down; needsDisplay = true }
         guard down, !commandDown else { return }
         records.toggle()
+        if records { scrolls = false }
+    }
+
+    /// Option went down or up. Each press flips the selection between capturing and scrolling
+    /// (blue, reading "Scroll"); letting go of the key changes nothing.
+    func optionChanged(_ down: Bool) {
+        defer { optionDown = down; needsDisplay = true }
+        guard down, !optionDown else { return }
+        scrolls.toggle()
+        if scrolls { records = false }
     }
 
     /// `p` in the view's coordinates, which may be past the display's edge.
@@ -432,13 +447,11 @@ final class OverlayView: NSView {
 
     /// Letting go records whenever the selection shows red: what the picker shows is what it does.
     override func mouseUp(with event: NSEvent) {
-        released(at: convert(event.locationInWindow, from: nil), recording: records,
-                 scrolling: Self.held(event).contains(.option))
+        released(at: convert(event.locationInWindow, from: nil), recording: records, scrolling: scrolls)
     }
 
-    /// `p` in the view's coordinates; `recording` when the selection is red as the drag ends;
-    /// `scrolling` when Option is down then, which recording outranks and which matters only
-    /// for a click on a window.
+    /// `p` in the view's coordinates; `recording` when the selection is red as the drag ends,
+    /// `scrolling` when it is blue, which counts only for a drag: a click is as ever.
     func released(at p: CGPoint, recording: Bool, scrolling: Bool = false) {
         let scrolling = scrolling && !recording
         defer { anchor = nil }
@@ -449,8 +462,6 @@ final class OverlayView: NSView {
             let target = SelectionRule.clickTarget(at: p, windows: display.windows.map(\.frame), bounds: bounds)
             if recording {
                 onFinish?(.record(display: display, rect: target.rect))
-            } else if scrolling, target.isWindow {
-                onFinish?(.scroll(display: display, rect: target.rect))
             } else if target.isWindow, let window = display.windows.first(where: { $0.frame == target.rect }) {
                 onFinish?(.window(display: display, window: window))
             } else {
@@ -458,7 +469,8 @@ final class OverlayView: NSView {
             }
             return
         }
-        onFinish?(recording ? .record(display: display, rect: rect) : .selected(display: display, rect: rect))
+        onFinish?(recording ? .record(display: display, rect: rect)
+                  : scrolling ? .scroll(display: display, rect: rect) : .selected(display: display, rect: rect))
     }
 
     override func keyDown(with event: NSEvent) {
@@ -491,10 +503,7 @@ final class OverlayView: NSView {
 
     override func flagsChanged(with event: NSEvent) {
         commandChanged(event.modifierFlags.contains(.command))
-        if scrolls != event.modifierFlags.contains(.option) {
-            scrolls = event.modifierFlags.contains(.option)
-            needsDisplay = true
-        }
+        optionChanged(event.modifierFlags.contains(.option))
         if anchor != nil, !moving {
             select(to: lastPointer, square: event.modifierFlags.contains(.shift))
             needsDisplay = true
@@ -548,9 +557,9 @@ final class OverlayView: NSView {
         }
 
         if let selection {
-            if records {
-                // Red, and just outside the area, as the outline stays while it records.
-                ctx.setStrokeColor(NSColor.systemRed.cgColor)
+            if records || scrolls {
+                // Red to record, blue to scroll, and just outside the area, as the outline stays.
+                ctx.setStrokeColor(records ? NSColor.systemRed.cgColor : NSColor.systemBlue.cgColor)
                 ctx.setLineWidth(2)
                 ctx.stroke(selection.insetBy(dx: -1, dy: -1))
             } else {
@@ -566,13 +575,11 @@ final class OverlayView: NSView {
         guard let pointer else { return }
         if let target = hoveredTarget {
             // What a click would take, a window or the whole display; red while Command is
-            // down, since the click would record it, and a window blue while Option is, since
-            // the click would scroll it.
+            // down, since the click would record it.
             let inset: CGFloat = target.isWindow ? 1 : 2
             let path = CGPath(roundedRect: target.rect.insetBy(dx: inset, dy: inset), cornerWidth: target.isWindow ? 10 : 6,
                               cornerHeight: target.isWindow ? 10 : 6, transform: nil)
-            ctx.setStrokeColor(commandDown ? NSColor.systemRed.cgColor
-                               : scrolls && target.isWindow ? NSColor.systemBlue.cgColor : NSColor.controlAccentColor.cgColor)
+            ctx.setStrokeColor(commandDown ? NSColor.systemRed.cgColor : NSColor.controlAccentColor.cgColor)
             ctx.setLineWidth(3)
             ctx.addPath(path)
             ctx.strokePath()
@@ -635,10 +642,10 @@ final class OverlayView: NSView {
         // The pointer's pixel while aiming (a comma pair, as coordinates are written), the
         // selection's size while dragging (with ×, as sizes are), and the color under the pointer.
         let text: String
-        if let selection, records {
-            // The color matters little to a recording; the size it will have does.
+        if let selection, records || scrolls {
+            // The color matters little to a recording or a scrolling capture; the size does.
             let size = display.pixelRect(for: selection).size
-            text = "Record  \(Int(size.width)) × \(Int(size.height))"
+            text = (records ? "Record  " : "Scroll  ") + "\(Int(size.width)) × \(Int(size.height))"
         } else if let selection {
             let size = display.pixelRect(for: selection).size
             text = "\(Int(size.width)) × \(Int(size.height))   " + hex
@@ -708,7 +715,7 @@ final class OverlayView: NSView {
         let label = CGRect(x: panel.minX, y: pixels.maxY, width: panel.width, height: Self.labelHeight)
         ctx.setFillColor(CGColor(gray: 0.12, alpha: 0.95))
         ctx.fill(label)
-        let text = Self.label(m.text, recording: records)
+        let text = Self.label(m.text, recording: records, scrolling: scrolls && selection != nil)
         let textSize = text.size()
         text.draw(at: CGPoint(x: label.midX - textSize.width / 2, y: label.minY + (Self.labelHeight - textSize.height) / 2))
         ctx.restoreGState()
@@ -719,13 +726,14 @@ final class OverlayView: NSView {
         ctx.strokePath()
     }
 
-    /// A label's words, behind a red dot while Command would record.
-    static func label(_ text: String, recording: Bool) -> NSAttributedString {
+    /// A label's words, behind a red dot while Command would record, or a blue square while
+    /// Option would scroll.
+    static func label(_ text: String, recording: Bool, scrolling: Bool = false) -> NSAttributedString {
         let label = NSMutableAttributedString(string: text, attributes: labelAttributes)
-        if recording {
-            var dot = labelAttributes
-            dot[.foregroundColor] = NSColor.systemRed
-            label.insert(NSAttributedString(string: "● ", attributes: dot), at: 0)
+        if recording || scrolling {
+            var mark = labelAttributes
+            mark[.foregroundColor] = recording ? NSColor.systemRed : NSColor.systemBlue
+            label.insert(NSAttributedString(string: recording ? "● " : "■ ", attributes: mark), at: 0)
         }
         return label
     }
@@ -747,10 +755,11 @@ final class OverlayView: NSView {
         "⇧ keeps it square, Space moves it",
         "Arrow keys move a pixel, ⇧ ten",
         "⌘ while dragging or clicking records instead",
-        "⌥-click a window to capture all of it, scrolled",
+        "⌥ while dragging scrolls it, capturing it all",
         "⌘C copies the color under the crosshair",
         "Esc cancels",
     ]
+    private var hints: [String] { Self.hints }
     private static let hintLineHeight: CGFloat = 17
     private static let hintAttributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.systemFont(ofSize: 12),
@@ -759,8 +768,8 @@ final class OverlayView: NSView {
 
     /// Where the keys go: in the corner above and left of `p`, the mirror of the magnifier's.
     private func hintsRect(near p: CGPoint) -> CGRect {
-        let width = Self.hints.map { ($0 as NSString).size(withAttributes: Self.hintAttributes).width }.max()! + 20
-        let size = CGSize(width: width, height: CGFloat(Self.hints.count) * Self.hintLineHeight + 10)
+        let width = hints.map { ($0 as NSString).size(withAttributes: Self.hintAttributes).width }.max()! + 20
+        let size = CGSize(width: width, height: CGFloat(hints.count) * Self.hintLineHeight + 10)
         var origin = CGPoint(x: p.x - 24 - size.width, y: p.y - 24 - size.height)
         if origin.x < bounds.minX { origin.x = p.x + 24 }
         if origin.y < bounds.minY { origin.y = p.y + 24 }
@@ -775,15 +784,15 @@ final class OverlayView: NSView {
         ctx.setFillColor(CGColor(gray: 0.12, alpha: 0.85))
         ctx.addPath(CGPath(roundedRect: box, cornerWidth: 6, cornerHeight: 6, transform: nil))
         ctx.fillPath()
-        for (i, line) in Self.hints.enumerated() {
+        for (i, line) in hints.enumerated() {
             (line as NSString).draw(at: CGPoint(x: box.minX + 10, y: box.minY + 5 + CGFloat(i) * Self.hintLineHeight), withAttributes: Self.hintAttributes)
         }
     }
 
     private func drawSizeLabel(_ rect: CGRect, in ctx: CGContext) {
         let size = display.pixelRect(for: rect).size
-        let words = records ? "Record  " : ""
-        let text = Self.label(words + "\(Int(size.width)) × \(Int(size.height))", recording: records)
+        let words = records ? "Record  " : scrolls ? "Scroll  " : ""
+        let text = Self.label(words + "\(Int(size.width)) × \(Int(size.height))", recording: records, scrolling: scrolls)
         let textSize = text.size()
         var origin = CGPoint(x: rect.maxX - textSize.width - 6, y: rect.maxY + 6)
         if origin.y + textSize.height + 4 > bounds.height { origin.y = rect.maxY - textSize.height - 10 }

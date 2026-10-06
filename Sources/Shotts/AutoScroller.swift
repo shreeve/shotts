@@ -2,11 +2,11 @@ import AppKit
 import ApplicationServices
 import ShottsCore
 
-/// Scrolls what is under the pointer for a scrolling capture, in steps Core's `AutoScroll`
-/// paces, until the picture stops growing (the bottom), when it calls `onFinish`. Sending
-/// scrolling to another app needs Accessibility: macOS asks for it the first time a scrolling
-/// capture starts, and until it is allowed the user scrolls. It sends nothing but scroll-wheel
-/// steps, and only while a scrolling capture runs.
+/// Scrolls what is under the pointer for a scrolling capture once Auto-Scroll is pressed, in
+/// steps Core's `AutoScroll` paces, until the picture stops growing (the bottom, `onFinish`) or
+/// frames keep not matching (`onGiveUp`). Sending scrolling to another app needs Accessibility:
+/// macOS asks for it when Auto-Scroll is first pressed, and without it the user scrolls. It sends
+/// nothing but scroll-wheel steps, and only while Auto-Scroll runs.
 final class AutoScroller {
     /// Whether Shotts may scroll other apps.
     static var allowed: Bool { AXIsProcessTrusted() }
@@ -22,6 +22,8 @@ final class AutoScroller {
     private var height = 0, lost = false, full = false
     /// Called once, at the bottom.
     var onFinish: (() -> Void)?
+    /// Called once, when frames keep not matching and it stops trying.
+    var onGiveUp: (() -> Void)?
 
     init(areaHeight: Double) {
         rule = AutoScroll(areaHeight: areaHeight, now: ProcessInfo.processInfo.systemUptime)
@@ -58,6 +60,10 @@ final class AutoScroller {
             stop()
             onFinish?()
             onFinish = nil
+        case .giveUp:
+            stop()
+            onGiveUp?()
+            onGiveUp = nil
         case let .scroll(points):
             // In points, smoothly, to whatever is under the pointer; down is a negative delta.
             guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,

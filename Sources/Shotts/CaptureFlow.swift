@@ -27,7 +27,7 @@ final class CaptureFlow {
     private struct ScrollSession {
         var setup: ScrollSetup
         var capture: ScrollCapture
-        /// Shotts scrolling, when it may.
+        /// Shotts scrolling, when Accessibility allows, until the bottom or it gives up.
         var auto: AutoScroller?
         /// The app in front when the hot key fired, for a capture cancelled.
         var frontmost: NSRunningApplication?
@@ -196,8 +196,14 @@ final class CaptureFlow {
 
     // MARK: - Scrolling capture
 
-    /// The area outlined in blue, with a panel saying to scroll; it streams at once, and each
-    /// frame is stitched as it comes.
+    /// Set once macOS's own Accessibility dialog has been shown for scrolling, which it shows once.
+    private static let askedScrollingKey = "scroll.askedAccessibility"
+
+    /// The area, from a drag that ended blue (Option pressed during it), outlined in blue with a
+    /// panel beside it. It streams at once, each frame stitched as it comes. With Accessibility,
+    /// Shotts puts the pointer in the middle of the area and scrolls what is under it to the
+    /// bottom, then opens the picture; without it (macOS asks once), the user scrolls and presses
+    /// Return.
     private func setUpScroll(on display: DisplayImage, rect: CGRect) {
         let frontmost = capture?.frontmost, returnTo = capture?.returnTo
         capture = nil
@@ -209,22 +215,31 @@ final class CaptureFlow {
             case .cancelled: self?.cancelScroll()
             }
         }
-        // Shotts scrolls, once it may: the first time, macOS asks for Accessibility, and until it
-        // is allowed the user scrolls.
         var auto: AutoScroller?
         if AutoScroller.allowed {
-            // It scrolls what is under the pointer: where the Option-click left it.
-            auto = AutoScroller(areaHeight: setup.area.height)
-            setup.automatic = true
-        } else if !UserDefaults.standard.bool(forKey: Self.askedScrollingKey) {
-            UserDefaults.standard.set(true, forKey: Self.askedScrollingKey)
-            AutoScroller.ask()
+            let area = setup.area
+            let primary = NSScreen.screens.first?.frame.maxY ?? area.maxY
+            CGWarpMouseCursorPosition(CGPoint(x: area.midX, y: primary - area.midY))
+            let autoScroller = AutoScroller(areaHeight: area.height)
+            // At the bottom, the picture opens; unable to follow, the user scrolls.
+            autoScroller.onFinish = { [weak setup] in setup?.done() }
+            autoScroller.onGiveUp = { [weak self, weak setup] in
+                self?.scrolling?.auto = nil
+                setup?.show(.gaveUp)
+            }
+            auto = autoScroller
+            setup.show(.scrolling)
+        } else {
+            if !UserDefaults.standard.bool(forKey: Self.askedScrollingKey) {
+                UserDefaults.standard.set(true, forKey: Self.askedScrollingKey)
+                AutoScroller.ask()
+            }
+            setup.show(.needsPermission)
         }
-        scroller.onProgress = { [weak setup, weak auto] height, lost, full in
+        scroller.onProgress = { [weak self, weak setup] height, lost, full in
             setup?.showProgress(height: height, lost: lost, full: full)
-            auto?.progress(height: height, lost: lost, full: full)
+            self?.scrolling?.auto?.progress(height: height, lost: lost, full: full)
         }
-        auto?.onFinish = { [weak setup] in setup?.done() }
         // The display going ends it with what was taken.
         scroller.onInterrupted = { [weak setup] in setup?.done() }
         scrolling = ScrollSession(setup: setup, capture: scroller, auto: auto, frontmost: frontmost, returnTo: returnTo)
@@ -235,6 +250,7 @@ final class CaptureFlow {
                     throw ScreenCapture.Failure.noDisplay
                 }
                 try await scroller.start(display: number.uint32Value, rect: rect, excluding: setup.windowNumbers)
+                // It waits for the first frame before counting anything against the bottom.
                 scrolling?.auto?.start()
             } catch {
                 cancelScroll()
@@ -243,7 +259,8 @@ final class CaptureFlow {
         }
     }
 
-    /// Done, Return, or F10: the stitched picture opens in an editor, as any capture does.
+    /// Done, Return, F10, or the bottom reached: the stitched picture opens in an editor, as any
+    /// capture does.
     private func finishScroll() {
         guard let session = scrolling else { return }
         scrolling = nil
@@ -270,9 +287,6 @@ final class CaptureFlow {
         Task { await session.capture.cancel() }
         Front.giveBack(to: session.frontmost)
     }
-
-    /// Set once macOS's own Accessibility dialog has been shown for scrolling, which it shows once.
-    private static let askedScrollingKey = "scroll.askedAccessibility"
 
     // MARK: - Recording
 

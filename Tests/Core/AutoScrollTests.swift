@@ -66,6 +66,24 @@ import Testing
         #expect(auto.step == AutoScroll.slowest)
     }
 
+    /// Frames that keep not matching, nothing added between: it gives up rather than bob.
+    @Test func endlessMissesGiveUp() {
+        var auto = AutoScroll(areaHeight: 600, now: 0)
+        _ = auto.next(height: 840, lost: false, full: false, now: 0.05)
+        var actions: [AutoScroll.Action] = []
+        for i in 0..<AutoScroll.giveUpAfter { actions.append(auto.next(height: 840, lost: true, full: false, now: 0.1 + Double(i) * 0.05)) }
+        #expect(actions.dropLast().allSatisfy { if case .scroll = $0 { true } else { false } })
+        #expect(actions.last == .giveUp)
+        // Misses with rows added between them never add up.
+        var steady = AutoScroll(areaHeight: 600, now: 0)
+        var h = 840
+        for i in 0..<20 {
+            h += 50
+            _ = steady.next(height: h, lost: false, full: false, now: Double(i) * 0.1)
+            #expect(steady.next(height: h, lost: true, full: false, now: Double(i) * 0.1 + 0.05) != .giveUp)
+        }
+    }
+
     /// As tall as it may be: done.
     @Test func fullFinishes() {
         var auto = AutoScroll(areaHeight: 600, now: 0)

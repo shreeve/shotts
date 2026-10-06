@@ -35,12 +35,12 @@ stops a recording under way.
 | Move over a window | The window under the crosshair gets a blue outline; over the desktop, where no window is, the whole display does. |
 | Click | Captures that window on its own, without whatever was covering it, at the resolution of the display it is on. With Include Window Shadow on, the window comes with the shadow macOS draws around it, on a transparent margin. A click on the desktop captures the whole display. |
 | Command-click | Records instead (see Recording): the window's area, where it is now, or on the desktop the whole display. The outline turns red while Command is down. |
-| Option-click a window | Captures all of it, scrolled to the bottom (see Scrolling capture). The window's outline turns blue while Option is down. Command outranks it; on the desktop, or with a drag, Option changes nothing. |
 | Drag | Selects an area; everything outside it dims (unless Dim Outside Selection is off). Its size in pixels shows in the magnifier, or beside the selection when the magnifier is off. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
 | Arrow keys | Move the crosshair a pixel, or ten with Shift, and the pointer with it; while dragging, the corner being dragged. |
 | Command while dragging | Records the area instead (see Recording): the selection's outline turns red and its size reads "Record". Letting go of Command keeps it so; pressing Command again turns it back. Letting go of the drag records whenever the selection is red. |
+| Option while dragging | Scrolls the area and captures all of it (see Scrolling capture): the selection's outline turns blue and its size reads "■ Scroll". Pressing Option again turns it back; pressing Command makes it red instead, and the other way about. Letting go scrolls whenever the selection is blue. |
 | Release | Captures the area as it is at that moment, at the display's full resolution, puts it on the clipboard (unless Copy to Clipboard is off), and opens the editor. |
 | Command-C | Copies the color under the crosshair as `#RRGGBB` and ends the capture. |
 | Escape | Cancels, even mid-drag. Nothing is kept. |
@@ -190,18 +190,27 @@ capture came from. A cancelled capture goes back to the app that was in front.
 
 ## Scrolling capture
 
-Option-clicking a window, with the pointer on the part of it to scroll (a message list, say,
-rather than its sidebar), outlines the window in blue with a panel beside it and how tall the
-picture is so far. Shotts then scrolls what is under the pointer, in steady steps as fast as it
-can stitch, until the picture stops growing for most of a second: the
-bottom. Then the picture opens in an editor, as any capture does (and is copied, with Copy to
-Clipboard on). Return, Done, or F10 stops early and keeps what it has; Escape or Cancel keeps
-nothing. A frame it could not match makes it back up a step and go on at half the speed.
+One tall picture of something longer than its window. Press Option while dragging out the area
+to scroll, the part that scrolls (the message list, say, without its sidebar or toolbar), so the
+selection turns blue and reads "■ Scroll", as Command turns it red to record. Letting go
+outlines the area in blue, with a small panel beside it, and capturing starts at once: Shotts
+puts the pointer in the middle of the area and scrolls it down, in steady steps as fast as it
+can stitch, until the picture stops growing (the bottom), and then opens it in an editor, as
+any capture is (and copies it, with Copy to Clipboard on).
+
+| Control | Effect |
+| --- | --- |
+| Done, Return, or F10 | Stops, and opens the picture as it is. |
+| Cancel, or Escape | Ends without keeping anything. |
 
 Scrolling another app needs Accessibility: the first scrolling capture asks macOS for it, and
-until it is allowed the panel says "Scroll down, then press Return" and you scroll yourself,
-at your own pace. Either way Shotts adds only what comes into view below what it already has,
-so scrolling back up adds nothing.
+until it is allowed the panel says to scroll yourself and press Return. If frames keep not
+matching (an area that does not all scroll together), Shotts stops scrolling and says so;
+scroll by hand, or press Return.
+
+Shotts adds only what comes into view below what it already has, so scrolling back up adds
+nothing; scrolled too far between two looks, the panel says to scroll a little slower, and it
+goes on from where it last matched.
 
 A bar that stays put at the top or bottom while the rest scrolls, a sticky header or a toolbar,
 is kept once, not repeated down the picture. Scrolled too far between two looks, the panel says

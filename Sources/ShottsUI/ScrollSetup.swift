@@ -1,13 +1,25 @@
 import AppKit
 
-/// An area being captured as the user scrolls what is in it: a blue outline just outside it
-/// (just inside, for an area that fills its display), and a small panel beside it that says to
-/// scroll, how tall the picture is so far, and Done or Cancel; Return is Done, Escape cancels.
-/// Neither is ever in the picture: the capture leaves out `windowNumbers`. The panel takes the
-/// keys without bringing Shotts forward, as the picker does, and scrolling goes, as always, to
-/// what is under the pointer.
+/// An area being captured as it is scrolled: a blue outline just outside it (just inside, for
+/// an area that fills its display), and a small panel beside it saying where the capture stands
+/// (Shotts scrolling, or the user, how tall the picture is so far), with Done (Return) and
+/// Cancel (Escape). Neither the outline nor the panel is ever in the picture: the capture leaves
+/// out `windowNumbers`. The panel takes the keys without bringing Shotts forward, as the picker
+/// does, and scrolling goes, as always, to what is under the pointer.
 public final class ScrollSetup {
     public enum Outcome { case done, cancelled }
+
+    /// Where the capture stands, as the panel shows it.
+    public enum State: Equatable, Sendable {
+        /// Shotts scrolling to the bottom.
+        case scrolling
+        /// The user scrolling.
+        case capturing
+        /// Shotts could not follow the area, frames kept not matching: the user scrolls.
+        case gaveUp
+        /// Shotts may not scroll other apps until Accessibility allows it: the user scrolls.
+        case needsPermission
+    }
 
     /// The area in screen coordinates.
     public let area: CGRect
@@ -33,16 +45,6 @@ public final class ScrollSetup {
         }
     }
 
-    /// Shotts scrolls, rather than the user: the panel says to wait, or Return to stop early.
-    public var automatic: Bool {
-        get { panel.automatic }
-        set {
-            panel.automatic = newValue
-            panel.show(height: 0, lost: false, full: false)
-            place()
-        }
-    }
-
     /// The outline's and the panel's windows, for the capture to leave out.
     public var windowNumbers: Set<Int> { [outline.windowNumber, panel.windowNumber] }
 
@@ -52,10 +54,22 @@ public final class ScrollSetup {
         panel.makeKey()
     }
 
-    /// How tall the picture is so far, in pixels, and how the last frame went: matched, not
-    /// matched (scrolled too fast), or as tall as it may be.
+    public var state: State { panel.state }
+
+    /// Shows where the capture stands.
+    public func show(_ state: State) {
+        panel.state = state
+        panel.refresh()
+        place()
+    }
+
+    /// How tall the picture is so far, in pixels, and how the last frame went: not matched
+    /// (scrolled too fast), or the picture as tall as it may be.
     public func showProgress(height: Int, lost: Bool, full: Bool) {
-        panel.show(height: height, lost: lost, full: full)
+        panel.height = height
+        panel.lost = lost
+        panel.full = full
+        panel.refresh()
         place()
     }
 
@@ -88,16 +102,16 @@ public final class ScrollSetup {
     #endif
 }
 
-/// The panel: what to do, the height so far, Done, and Cancel. A non-activating panel, like the
-/// recording's, so Shotts stays in the background and nothing on screen moves.
+/// The panel. A non-activating panel, like the recording's, so Shotts stays in the background
+/// and nothing on screen moves.
 final class ScrollPanel: NSPanel {
     var onFinish: ((ScrollSetup.Outcome) -> Void)?
     let message = NSTextField(labelWithString: "")
     let done = PillButton(title: "Done", symbol: "checkmark", fill: .systemBlue)
     let cancel = PillButton(title: "Cancel", symbol: nil, fill: SetupPanel.plain)
     private let row = NSStackView()
-    /// Shotts scrolls, rather than the user.
-    var automatic = false
+    var state: ScrollSetup.State = .scrolling
+    var height = 0, lost = false, full = false
 
     init() {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -114,19 +128,16 @@ final class ScrollPanel: NSPanel {
         message.font = .systemFont(ofSize: 14, weight: .medium)
         message.textColor = .white
         message.setContentHuggingPriority(.required, for: .horizontal)
+        for (button, action, tip) in [(done, #selector(donePressed), "Make the picture (Return)"),
+                                      (cancel, #selector(cancelPressed), "Put it away (Escape)")] {
+            button.target = self
+            button.action = action
+            button.toolTip = tip
+        }
         done.keyEquivalent = "\r"
-        done.target = self
-        done.action = #selector(donePressed)
-        done.toolTip = "Make the picture (Return)"
         cancel.keyEquivalent = "\u{1b}"
-        cancel.target = self
-        cancel.action = #selector(cancelPressed)
-        cancel.toolTip = "Put it away (Escape)"
-
-        row.setViews([message, done, cancel], in: .leading)
         row.orientation = .horizontal
         row.spacing = 8
-        row.setCustomSpacing(14, after: message)
         row.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 8)
         let background = NSView()
         background.wantsLayer = true
@@ -143,7 +154,7 @@ final class ScrollPanel: NSPanel {
             row.bottomAnchor.constraint(equalTo: background.bottomAnchor),
         ])
         contentView = background
-        show(height: 0, lost: false, full: false)
+        refresh()
     }
 
     override var canBecomeKey: Bool { true }
@@ -153,14 +164,30 @@ final class ScrollPanel: NSPanel {
     @objc func cancelPressed() { onFinish?(.cancelled) }
     override func cancelOperation(_ sender: Any?) { cancelPressed() }
 
-    /// What to do next, and the height so far.
-    func show(height: Int, lost: Bool, full: Bool) {
+    /// The words for the state, and the height so far.
+    func refresh() {
         let tall = height > 0 ? "   \(height.formatted()) px" : ""
-        message.stringValue = full ? "As tall as it can be: press Return" + tall
-            : automatic ? "Scrolling to the bottom; Return stops" + tall
-            : lost ? "Scroll a little slower" + tall
-            : "Scroll down, then press Return" + tall
-        message.textColor = lost && !full && !automatic ? .systemYellow : .white
+        let words: String
+        var warning = false
+        switch state {
+        case _ where full:
+            words = "As tall as it can be: press Return"
+        case .scrolling:
+            words = "Scrolling; Return stops"
+        case .capturing:
+            words = lost ? "Scroll a little slower" : "Scroll down, then press Return"
+            warning = lost
+        case .gaveUp:
+            words = "Couldn't follow it: scroll by hand, then press Return"
+            warning = true
+        case .needsPermission:
+            words = lost ? "Scroll a little slower" : "Scroll down, then press Return (allow Accessibility for Shotts to scroll)"
+            warning = lost
+        }
+        message.stringValue = words + tall
+        message.textColor = warning ? .systemYellow : .white
+        row.setViews([message, done, cancel], in: .leading)
+        row.setCustomSpacing(14, after: message)
         setContentSize(row.fittingSize)
     }
 }

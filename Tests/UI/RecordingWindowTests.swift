@@ -334,18 +334,24 @@ import Testing
 }
 
 @MainActor @Suite struct ScrollSetupTests {
-    /// Return is Done and Escape cancels, once; the panel says how tall the picture is, and to
-    /// scroll slower when a frame was not matched.
-    @Test func returnIsDoneAndEscapeCancels() throws {
+    /// The panel says where the capture stands, with Done (Return) and Cancel (Escape), once.
+    @Test func itSaysWhereItStands() throws {
         let screen = try #require(NSScreen.screens.first)
         var outcomes: [ScrollSetup.Outcome] = []
         let setup = ScrollSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200)) { outcomes.append($0) }
         defer { setup.close() }
         #expect(setup.windowNumbers.count == 2)
         let panel = setup.scrollPanel
-        #expect(panel.message.stringValue == "Scroll down, then press Return")
+        #expect(panel.done.keyEquivalent == "\r" && panel.cancel.keyEquivalent == "\u{1b}")
+        setup.show(.scrolling)
         setup.showProgress(height: 2480, lost: false, full: false)
-        #expect(panel.message.stringValue.hasPrefix("Scroll down, then press Return") && panel.message.stringValue.contains("2,480"))
+        #expect(panel.message.stringValue.hasPrefix("Scrolling") && panel.message.stringValue.contains("2,480"))
+        for (state, words) in [(ScrollSetup.State.capturing, "Scroll down, then press Return"), (.gaveUp, "Couldn't follow it"),
+                               (.needsPermission, "Scroll down, then press Return (allow Accessibility")] {
+            setup.show(state)
+            #expect(panel.message.stringValue.hasPrefix(words))
+        }
+        setup.show(.capturing)
         setup.showProgress(height: 2480, lost: true, full: false)
         #expect(panel.message.stringValue.hasPrefix("Scroll a little slower"))
         setup.showProgress(height: 9000, lost: false, full: true)
@@ -354,14 +360,6 @@ import Testing
         panel.cancelOperation(nil)
         #expect(outcomes.count == 1)
         guard case .done? = outcomes.first else { Issue.record("not done"); return }
-
-        // Shotts scrolling: the panel says it does, and that Return stops it.
-        let auto = ScrollSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200)) { _ in }
-        defer { auto.close() }
-        auto.automatic = true
-        #expect(auto.scrollPanel.message.stringValue == "Scrolling to the bottom; Return stops")
-        auto.showProgress(height: 1200, lost: true, full: false)
-        #expect(auto.scrollPanel.message.stringValue.hasPrefix("Scrolling to the bottom"))
 
         var cancelled = false
         let other = ScrollSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200)) { if case .cancelled = $0 { cancelled = true } }
