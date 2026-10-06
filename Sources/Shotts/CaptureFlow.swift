@@ -21,6 +21,17 @@ final class CaptureFlow {
     private var recording: RecordingSession?
     /// The open recording windows.
     private var recordings: [RecordingWindowController] = []
+    /// A scrolling capture under way, from Option-release until Done or Cancel.
+    private var scrolling: ScrollSession?
+
+    private struct ScrollSession {
+        var setup: ScrollSetup
+        var capture: ScrollCapture
+        /// The app in front when the hot key fired, for a capture cancelled.
+        var frontmost: NSRunningApplication?
+        /// The app the editor gives focus back to.
+        var returnTo: NSRunningApplication?
+    }
     /// Tells the menu bar item when a recording starts, with its recorder, and stops, with nil.
     var onRecording: ((Recorder?) -> Void)?
     /// A stopped recording's files are being finished; its window opens next.
@@ -61,6 +72,8 @@ final class CaptureFlow {
     /// a recording is being set up.
     func begin() {
         if recording?.recorder != nil { stopRecording(); return }
+        // While an area is scrolled, F10 is Done.
+        if let scrolling { scrolling.setup.done(); return }
         guard capture == nil, recording == nil, !finishing else { return }
         let frontmost = NSWorkspace.shared.frontmostApplication
         capture = Capture(frontmost: frontmost, returnTo: appToReturnTo(from: frontmost))
@@ -114,6 +127,9 @@ final class CaptureFlow {
             case let .record(display, rect):
                 live.forEach { $0.stop() }
                 setUpRecording(on: display.screen, rect: rect)
+            case let .scroll(display, rect):
+                live.forEach { $0.stop() }
+                setUpScroll(on: display, rect: rect)
             case let .window(display, window):
                 // The window on its own, whatever covered it. If it has gone meanwhile, the
                 // area it occupied on the display stands in.
@@ -174,6 +190,65 @@ final class CaptureFlow {
         }
         editors.append((editor, returnTo))
         editor.present()
+    }
+
+    // MARK: - Scrolling capture
+
+    /// The area outlined in blue, with a panel saying to scroll; it streams at once, and each
+    /// frame is stitched as it comes.
+    private func setUpScroll(on display: DisplayImage, rect: CGRect) {
+        let frontmost = capture?.frontmost, returnTo = capture?.returnTo
+        capture = nil
+        let screen = display.screen
+        let scroller = ScrollCapture(scale: display.scale)
+        let setup = ScrollSetup(screen: screen, rect: rect) { [weak self] outcome in
+            switch outcome {
+            case .done: self?.finishScroll()
+            case .cancelled: self?.cancelScroll()
+            }
+        }
+        scroller.onProgress = { [weak setup] height, lost, full in setup?.showProgress(height: height, lost: lost, full: full) }
+        // The display going ends it with what was taken.
+        scroller.onInterrupted = { [weak setup] in setup?.done() }
+        scrolling = ScrollSession(setup: setup, capture: scroller, frontmost: frontmost, returnTo: returnTo)
+        setup.show()
+        Task {
+            do {
+                guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                    throw ScreenCapture.Failure.noDisplay
+                }
+                try await scroller.start(display: number.uint32Value, rect: rect, excluding: setup.windowNumbers)
+            } catch {
+                cancelScroll()
+                fail("Shotts could not capture the screen", error)
+            }
+        }
+    }
+
+    /// Done, Return, or F10: the stitched picture opens in an editor, as any capture does.
+    private func finishScroll() {
+        guard let session = scrolling else { return }
+        scrolling = nil
+        session.setup.close()
+        Task {
+            guard let image = await session.capture.finish() else {
+                NSSound.beep()
+                Front.giveBack(to: session.frontmost)
+                return
+            }
+            let scale = session.capture.scale
+            if SelectionOptions.current.copiesOnCapture { Export.copyInBackground(image, scale: scale) }
+            open(image: image, scale: scale, on: session.setup.screen, returningTo: session.returnTo)
+        }
+    }
+
+    /// Cancel or Escape: nothing is kept, and focus goes back to the app that had it.
+    private func cancelScroll() {
+        guard let session = scrolling else { return }
+        scrolling = nil
+        session.setup.close()
+        Task { await session.capture.cancel() }
+        Front.giveBack(to: session.frontmost)
     }
 
     // MARK: - Recording

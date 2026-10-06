@@ -35,6 +35,7 @@ stops a recording under way.
 | Move over a window | The window under the crosshair gets a blue outline; over the desktop, where no window is, the whole display does. |
 | Click | Captures that window on its own, without whatever was covering it, at the resolution of the display it is on. With Include Window Shadow on, the window comes with the shadow macOS draws around it, on a transparent margin. A click on the desktop captures the whole display. |
 | Command-click | Records instead (see Recording): the window's area, where it is now, or on the desktop the whole display. The outline turns red while Command is down. |
+| Option while dragging, or Option-click | Captures as you scroll (see Scrolling capture): the area, or a clicked window's. The selection's outline turns blue and its size reads "Scroll". Command outranks it. |
 | Drag | Selects an area; everything outside it dims (unless Dim Outside Selection is off). Its size in pixels shows in the magnifier, or beside the selection when the magnifier is off. |
 | Shift while dragging | Keeps the selection square. |
 | Space while dragging | Moves the selection instead of resizing it. |
@@ -186,6 +187,21 @@ and its color space.
 When the editor you are working in closes, the app that was in front when its F10 was pressed
 comes back to the front; with several editors open, each gives focus back to the app its own
 capture came from. A cancelled capture goes back to the app that was in front.
+
+## Scrolling capture
+
+Holding Option as a drag ends, or Option-clicking a window, outlines the area in blue with a
+panel beside it: "Scroll down, then press Return", and how tall the picture is so far. Scroll
+what is in the area, at your own pace, as you would anyway; Shotts watches the area and adds
+what comes into view below what it already has, so scrolling back up adds nothing. Return,
+Done, or F10 opens the whole picture in an editor, as any capture is (and copies it, with Copy
+to Clipboard on); Escape or Cancel keeps nothing.
+
+A bar that stays put at the top or bottom while the rest scrolls, a sticky header or a toolbar,
+is kept once, not repeated down the picture. Scrolled too far between two looks, the panel says
+to scroll a little slower, and Shotts goes on from where it last matched. The picture stops
+growing at 256 MB (some 20,000 rows of a wide window), and the panel says so. Neither the
+outline, the panel, nor the pointer is in the picture. Shotts never scrolls anything itself.
 
 ## Recording
 

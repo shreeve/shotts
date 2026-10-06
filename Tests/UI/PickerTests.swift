@@ -405,3 +405,34 @@ extension OverlayView {
         #expect(abs(pointer.y - 35.25) < 1e-6)
     }
 }
+
+@MainActor @Suite struct ScrollPickerTests {
+    /// Option as the drag ends captures the area as it is scrolled; Command outranks it.
+    @Test func optionScrolls() throws {
+        for (scrolling, recording) in [(true, false), (true, true)] {
+            let view = try overlay()
+            var outcome: AreaSelection.Outcome?
+            view.onFinish = { outcome = $0 }
+            view.pressed(at: CGPoint(x: 20, y: 20))
+            view.dragged(to: CGPoint(x: 120, y: 90), square: false)
+            view.released(at: CGPoint(x: 120, y: 90), recording: recording, scrolling: scrolling)
+            switch outcome {
+            case let .scroll(_, rect)? where !recording: #expect(rect == CGRect(x: 20, y: 20, width: 100, height: 70))
+            case .record? where recording: break
+            default: Issue.record("came back as \(String(describing: outcome))")
+            }
+        }
+    }
+
+    /// Option-clicking a window scrolls that window's area.
+    @Test func optionClickScrollsAWindow() throws {
+        let frame = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let view = try overlay(windows: [WindowInfo(id: 7, frame: frame)])
+        var outcome: AreaSelection.Outcome?
+        view.onFinish = { outcome = $0 }
+        view.pressed(at: CGPoint(x: 50, y: 50))
+        view.released(at: CGPoint(x: 50, y: 50), recording: false, scrolling: true)
+        guard case let .scroll(_, rect)? = outcome else { Issue.record("no scrolling capture"); return }
+        #expect(rect == frame)
+    }
+}

@@ -132,6 +132,9 @@ public final class AreaSelection {
         /// A drag ended, or a click came, with Command down: record the area (a window's, or the
         /// whole display's), in points like `selected`.
         case record(display: DisplayImage, rect: CGRect)
+        /// A drag ended, or a click came, with Option down (and not Command): capture the area as
+        /// the user scrolls what is in it, in points like `selected`.
+        case scroll(display: DisplayImage, rect: CGRect)
     }
 
     private var windows: [OverlayWindow] = []
@@ -254,6 +257,9 @@ final class OverlayView: NSView {
     private(set) var records = false
     /// Whether Command is down, to tell a press from a key held.
     private var commandDown = false
+    /// Whether Option is down: letting go then captures the area as the user scrolls it, shown
+    /// blue, unless Command's red says it records.
+    private(set) var scrolls = false
     /// Whether the drag is squaring the selection, which the arrow keys keep doing.
     private var squaring = false
     /// Moves the real pointer to a point in global display coordinates (origin at the primary
@@ -362,6 +368,7 @@ final class OverlayView: NSView {
         // Command already down as the drag begins records from the start.
         commandDown = Self.held(event).contains(.command)
         records = commandDown
+        scrolls = Self.held(event).contains(.option)
     }
 
     /// `p` in the view's coordinates.
@@ -425,11 +432,14 @@ final class OverlayView: NSView {
 
     /// Letting go records whenever the selection shows red: what the picker shows is what it does.
     override func mouseUp(with event: NSEvent) {
-        released(at: convert(event.locationInWindow, from: nil), recording: records)
+        released(at: convert(event.locationInWindow, from: nil), recording: records,
+                 scrolling: Self.held(event).contains(.option))
     }
 
-    /// `p` in the view's coordinates; `recording` when Command is down as the drag ends.
-    func released(at p: CGPoint, recording: Bool) {
+    /// `p` in the view's coordinates; `recording` when the selection is red as the drag ends;
+    /// `scrolling` when Option is down then, which recording outranks.
+    func released(at p: CGPoint, recording: Bool, scrolling: Bool = false) {
+        let scrolling = scrolling && !recording
         defer { anchor = nil }
         guard let rect = selection, SelectionRule.isUsable(rect) else {
             // A click without a drag takes the window under it, or on the desktop the whole
@@ -438,6 +448,8 @@ final class OverlayView: NSView {
             let target = SelectionRule.clickTarget(at: p, windows: display.windows.map(\.frame), bounds: bounds)
             if recording {
                 onFinish?(.record(display: display, rect: target.rect))
+            } else if scrolling {
+                onFinish?(.scroll(display: display, rect: target.rect))
             } else if target.isWindow, let window = display.windows.first(where: { $0.frame == target.rect }) {
                 onFinish?(.window(display: display, window: window))
             } else {
@@ -445,7 +457,8 @@ final class OverlayView: NSView {
             }
             return
         }
-        onFinish?(recording ? .record(display: display, rect: rect) : .selected(display: display, rect: rect))
+        onFinish?(recording ? .record(display: display, rect: rect)
+                  : scrolling ? .scroll(display: display, rect: rect) : .selected(display: display, rect: rect))
     }
 
     override func keyDown(with event: NSEvent) {
@@ -478,6 +491,10 @@ final class OverlayView: NSView {
 
     override func flagsChanged(with event: NSEvent) {
         commandChanged(event.modifierFlags.contains(.command))
+        if scrolls != event.modifierFlags.contains(.option) {
+            scrolls = event.modifierFlags.contains(.option)
+            needsDisplay = true
+        }
         if anchor != nil, !moving {
             select(to: lastPointer, square: event.modifierFlags.contains(.shift))
             needsDisplay = true
@@ -534,6 +551,11 @@ final class OverlayView: NSView {
             if records {
                 // Red, and just outside the area, as the outline stays while it records.
                 ctx.setStrokeColor(NSColor.systemRed.cgColor)
+                ctx.setLineWidth(2)
+                ctx.stroke(selection.insetBy(dx: -1, dy: -1))
+            } else if scrolls {
+                // Blue, as the outline stays while the area is scrolled.
+                ctx.setStrokeColor(NSColor.systemBlue.cgColor)
                 ctx.setLineWidth(2)
                 ctx.stroke(selection.insetBy(dx: -1, dy: -1))
             } else {
@@ -620,6 +642,10 @@ final class OverlayView: NSView {
             // The color matters little to a recording; the size it will have does.
             let size = display.pixelRect(for: selection).size
             text = "Record  \(Int(size.width)) × \(Int(size.height))"
+        } else if let selection, scrolls {
+            // Its width is what a scrolling capture keeps; its height grows.
+            let size = display.pixelRect(for: selection).size
+            text = "Scroll  \(Int(size.width)) × \(Int(size.height))"
         } else if let selection {
             let size = display.pixelRect(for: selection).size
             text = "\(Int(size.width)) × \(Int(size.height))   " + hex
@@ -728,6 +754,7 @@ final class OverlayView: NSView {
         "⇧ keeps it square, Space moves it",
         "Arrow keys move a pixel, ⇧ ten",
         "⌘ while dragging or clicking records instead",
+        "⌥ while dragging or clicking captures as you scroll",
         "⌘C copies the color under the crosshair",
         "Esc cancels",
     ]
@@ -762,7 +789,8 @@ final class OverlayView: NSView {
 
     private func drawSizeLabel(_ rect: CGRect, in ctx: CGContext) {
         let size = display.pixelRect(for: rect).size
-        let text = Self.label(records ? "Record  \(Int(size.width)) × \(Int(size.height))" : "\(Int(size.width)) × \(Int(size.height))", recording: records)
+        let words = records ? "Record  " : scrolls ? "Scroll  " : ""
+        let text = Self.label(words + "\(Int(size.width)) × \(Int(size.height))", recording: records)
         let textSize = text.size()
         var origin = CGPoint(x: rect.maxX - textSize.width - 6, y: rect.maxY + 6)
         if origin.y + textSize.height + 4 > bounds.height { origin.y = rect.maxY - textSize.height - 10 }

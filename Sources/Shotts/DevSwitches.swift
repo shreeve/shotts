@@ -32,6 +32,7 @@ enum DevSwitches {
                 case let .selected(display, rect): line = "selected \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(display.screen.localizedName)"
                 case let .window(display, window): line = "window \(window.id) at \(Int(window.frame.minX)),\(Int(window.frame.minY)) on \(display.screen.localizedName)"
                 case let .record(display, rect): line = "record \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(display.screen.localizedName)"
+                case let .scroll(display, rect): line = "scroll \(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height)) on \(display.screen.localizedName)"
                 }
                 try? line.write(to: out, atomically: true, encoding: .utf8)
                 exit(0)
@@ -89,6 +90,13 @@ enum DevSwitches {
             }
             return
         }
+        if let v = value(after: "--scroll-test") {
+            // A scrolling capture of a window of numbered lines, scrolled in code (not by posting
+            // events): ScreenCaptureKit and the stitcher as on a real screen. Writes the picture,
+            // and the window's whole document beside it as `-expected`, to compare.
+            Task { exit(await scrollTest(to: URL(fileURLWithPath: v[0])) ? 0 : 1) }
+            return
+        }
         if let v = value(after: "--render", 2) {
             // The renderer: every kind of annotation on the given picture, written as a PNG,
             // no window.
@@ -98,6 +106,68 @@ enum DevSwitches {
 
     /// A picture standing in for a display: a gradient with a few marks, so the magnifier and
     /// the color readout have something to show.
+    static func scrollTest(to output: URL) async -> Bool {
+        guard let screen = NSScreen.main, let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else { return false }
+        // A window of lines unlike one another, over a long document.
+        let size = CGSize(width: 520, height: 420)
+        let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: screen.visibleFrame.midX - size.width / 2, y: screen.visibleFrame.midY - size.height / 2),
+                                                  size: size), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.title = "Shotts scrolling test"
+        let scroll = NSScrollView(frame: CGRect(origin: .zero, size: size))
+        scroll.hasVerticalScroller = false
+        let text = NSTextView(frame: CGRect(origin: .zero, size: size))
+        text.string = (1...300).map { "Line \($0): " + String(repeating: ["alpha ", "bravo ", "charlie ", "delta ", "echo "][$0 % 5], count: 1 + $0 % 7) }
+            .joined(separator: "\n")
+        text.font = .systemFont(ofSize: 15)
+        text.textContainerInset = CGSize(width: 12, height: 12)
+        text.isVerticallyResizable = true
+        text.autoresizingMask = [.width]
+        scroll.documentView = text
+        window.contentView = scroll
+        // An ordinary window: the capture leaves out Shotts' floating ones (its outline and panel).
+        window.orderFrontRegardless()
+        text.layoutManager?.ensureLayout(for: text.textContainer!)
+        text.sizeToFit()
+        try? await Task.sleep(for: .milliseconds(600))
+        // The window's content, in points from the display's top-left, as the picker gives areas.
+        let content = window.convertToScreen(scroll.frame)
+        let rect = CGRect(x: content.minX - screen.frame.minX, y: screen.frame.maxY - content.maxY, width: content.width, height: content.height)
+        let capture = ScrollCapture(scale: screen.backingScaleFactor)
+        do {
+            try await capture.start(display: number.uint32Value, rect: rect, excluding: [])
+        } catch {
+            print("could not capture: \(error)")
+            return false
+        }
+        try? await Task.sleep(for: .milliseconds(300))
+        // Scrolled in uneven steps, as a trackpad does, to the end.
+        let end = text.frame.height - size.height
+        var y: CGFloat = 0, step = 0
+        while y < end {
+            y = min(end, y + [23, 41, 37, 58, 12, 64][step % 6])
+            step += 1
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: y))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            try? await Task.sleep(for: .milliseconds(70))
+        }
+        try? await Task.sleep(for: .milliseconds(300))
+        guard let picture = await capture.finish() else { return false }
+        // The whole document as the view draws it, to compare.
+        let expected = text.bitmapImageRepForCachingDisplay(in: text.bounds)
+        if let expected {
+            text.cacheDisplay(in: text.bounds, to: expected)
+            try? expected.representation(using: .png, properties: [:])?
+                .write(to: output.deletingPathExtension().appendingPathExtension("expected.png"))
+        }
+        window.orderOut(nil)
+        print("picture \(picture.width)×\(picture.height); document \(Int(text.frame.width * screen.backingScaleFactor))×\(Int(text.frame.height * screen.backingScaleFactor)); window \(Int(size.width * screen.backingScaleFactor))×\(Int(size.height * screen.backingScaleFactor)); scrolled to \(Int(end * screen.backingScaleFactor)) in \(step) steps")
+        guard let file = CGImageDestinationCreateWithURL(output as CFURL, "public.png" as CFString, 1, nil) else { return false }
+        CGImageDestinationAddImage(file, picture, nil)
+        return CGImageDestinationFinalize(file)
+    }
+
     static func standIn(for screen: NSScreen) -> DisplayImage {
         let scale = screen.backingScaleFactor
         let w = Int(screen.frame.width * scale), h = Int(screen.frame.height * scale)

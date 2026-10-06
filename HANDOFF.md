@@ -82,18 +82,6 @@ Decided against, so they are not rebuilt:
 
 Deferred, with the reason each waits:
 
-- Scrolling capture: one tall image of a thread, list, or page longer than its window. The owner
-  could see it helping but held it on 2026-10-05 as not yet critical. The plan agreed: the user
-  scrolls and Shotts stitches (scrolling for them would need Accessibility, a fourth permission).
-  Option-drag in the picker (a third outline color) or a menu item starts it; a panel beside the
-  area says to scroll and press Return. The area streams as the picker's displays do; each frame
-  is matched to the last to find how far it moved, tolerant of fractional Retina scrolling and of
-  small parts that change on their own (cursors, spinners), and only new rows are added. Fixed
-  bands at the top and bottom (sticky headers and footers) are found and kept once. The matching
-  belongs in Core, tested on generated pages scrolled by awkward amounts; real apps (Safari,
-  Slack, Messages, Finder, an editor) need tuning by hand. Vertical only at first, with a height
-  cap so a runaway scroll cannot take unbounded memory.
-
 - Configurable shortcuts. When F10 and Option-F10 become settable, also show that one is taken:
   a small red dot on the menu bar icon whenever another app holds a Shotts shortcut (a failed
   `HotKey.registerF10`), and the menu naming which. Today only Capture Area's title says so, and
@@ -129,6 +117,7 @@ Deferred, with the reason each waits:
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
+| | `ScrollStitcher.swift` | A scrolling capture's picture from its frames: row fingerprints, the shift that fits (coarse, then fine, nearest the last move among near-ties), sticky bands kept once, only new rows added, a size cap. |
 | | `Keystrokes.swift` | `KeystrokeLine`: which keys show (shortcuts and keys that act on their own, never typing) and as what (⇧⌘4, ↩), and how those within two seconds join one line (`⌘I  ⌃K  ↩`) that stays five seconds after the last. |
 | | `Script.swift` | The command line's language: `ScriptParser` (arguments, times, what each command takes), `ScriptRequest` and `ScriptResult` (the JSON lines), `WindowMatch`, `ScriptAim` (what a target comes to), the error codes and exit codes, the socket's path. |
 | | `TextTable.swift` | How `shotts` prints a table: boxed with a title tab and color on a terminal, plain columns for a pipe, widths in terminal columns (wide characters count two). |
@@ -141,6 +130,7 @@ Deferred, with the reason each waits:
 | | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file, one-file temporary folders. |
 | | `Front.swift` | The one way Shotts comes to the front, and the one way it hands focus back. |
 | | `RecordingSetup.swift` | The red outline around an area being recorded, and the panel beside it: Record, Microphone, and Cancel, then the recording bar (Arrow, Rectangle, Pause, Stop). |
+| | `ScrollSetup.swift` | A scrolling capture's blue outline and its panel (height so far, Done, Cancel). |
 | | `DrawingLayer.swift` | The clear, recorded window over the area that takes arrows and rectangles while recording and fades each out, and shows click ripples and the keys pressed (`KeysBadge`). |
 | | `Timeline.swift` | The recording window's timeline: play, the playhead, and the trim brackets. |
 | | `RecordingWindow.swift` | `RecordingWindowController`: the player, the export settings, the file made in the background, Copy, Save, the drag grip, deleting it all on close. |
@@ -152,6 +142,7 @@ Deferred, with the reason each waits:
 | | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list; for `shotts`, the numbered displays, the windows it lists, and an area of a display. |
 | | `ScriptRunner.swift` | What `shotts` asks, done: list, shot, and a recording from its request to its files, the countdown, Allow Command-Line Capture. |
 | | `LiveDisplay.swift` | A display streamed while the picker is up: its latest frame and windows. |
+| | `ScrollCapture.swift` | Streams the area for a scrolling capture and feeds each frame to `ScrollStitcher` off the main thread. |
 | | `InputWatcher.swift` | Clicks (a global mouse monitor) and keys (a listen-only event tap, needing Input Monitoring) while a recording that shows them runs. |
 | | `Recorder.swift` | Records an area through ScreenCaptureKit, the Mac's sound with it, and the microphone through AVFoundation. |
 | | `HotKey.swift` | The Carbon hot keys: F10 captures (or stops a recording), Option-F10 brings the last capture back. |
@@ -359,6 +350,37 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
   `.<name>.<pid>.partial` beside its place and renamed over it; the recording's folder goes once
   they are made, as a closed window's does.
 
+## Scrolling capture
+
+Option at the picker's release (or an Option-click on a window) is `AreaSelection.Outcome.scroll`;
+`CaptureFlow.setUpScroll` puts up `ScrollSetup` (the blue outline and panel, left out of the
+capture) and starts `ScrollCapture`, which streams the area at up to 60 frames a second, BGRA, in the
+display's P3 colors, without the pointer, and hands each frame to Core's `ScrollStitcher` on its
+own queue. The stitcher keeps only the picture and the last frame. Done, Return, or F10 stops
+the stream and opens the picture in an editor as any capture; Escape cancels.
+
+The stitcher reduces each row to 64 block brightnesses and finds the shift that best lines the
+frame's middle up with the last frame's: every fourth shift over every other row, then every
+shift within four of the one chosen. Among coarse shifts within half a level of the best it
+takes the one nearest the last move, since lists of rows alike fit at several. Rows within a
+level count as the same, a shift is believed below three levels, and it must keep a quarter of
+the middle overlapping. At the first move, the rows that stayed put at the top and bottom (a
+third of the frame at most) become bands: the top kept from the first frame, the bottom from the
+last, the middle stitched between. A band taken wrongly (a blank margin) costs nothing, since
+what passes under it is still taken in the middle. The bottom band is at least a twelfth of the
+frame: a window's rounded corners sit in its last rows over moving content, and rows taken from
+there carried the corners into the middle at every step. Shifts within a quarter of the middle
+of the last move are tried first, and the whole range only when none fits, which with every
+pixel fingerprinted (half of them left the prints too noisy to find a still header) makes an
+optimized frame of 3000 by 3200 pixels about 37 ms; it streams at up to 60 a second and drops
+what it cannot take. `--scroll-test out.png` (debug) scrolls a window of 300 numbered lines in
+code through the real capture and writes the picture beside the document drawn directly: with
+Core optimized (a debug build alone is too slow to keep up, and loses its place), 129 uneven
+steps came out 10,848 rows tall, the document's height, differing from it by 0.024 levels on
+average and nowhere in the body by more than 0.1. It is tested on generated pages: uneven
+scrolls, a still frame, scrolling back up, a jump too far then recovered, noise, a blinking
+cursor, and padded rows; real apps need trying by hand.
+
 ## The editor
 
 `EditorWindowController` builds its bar by hand: a segmented control of `Tool`s (single-key
@@ -500,7 +522,8 @@ build ignores its arguments.
 | `--render in.png out.png [--crop]` | Draws one of every annotation on a picture and writes the PNG. |
 | `--print-pdf in.png out.pdf [--crop]` | Writes the same sample's print page as a PDF, laid out as Command-P would print it. |
 | `--preview-style out.png` | Draws the style popover off screen. |
-| `--select out.txt` | Runs the picker alone over a drawn stand-in for each display and writes `selected x,y,w,h on <display>`, `window <id> at x,y on <display>`, `record x,y,w,h on <display>`, or `cancelled`. |
+| `--scroll-test out.png` | A scrolling capture of a window of numbered lines, scrolled in code, through ScreenCaptureKit and the stitcher; writes the picture and `out.expected.png`, the document drawn directly. Build ShottsCore optimized for it, or it falls behind. |
+| `--select out.txt` | Runs the picker alone over a drawn stand-in for each display and writes `selected x,y,w,h on <display>`, `window <id> at x,y on <display>`, `record x,y,w,h on <display>`, `scroll x,y,w,h on <display>`, or `cancelled`. |
 | `--preview-overlay out.png [--dragged] [--dim] [--corner]` | Draws the picker off screen with the pointer three pixels inside the corner of the stand-in's square at 1600,1600, so the magnifier's mapping can be checked (`--dim` shows only with `--dragged`). |
 | `--capture-window <id> out.png [--no-shadow]` | Captures one window through ScreenCaptureKit (needs Screen Recording). |
 | `--preview-recording out.png [--recording]` | Draws the recording frame and the setup panel, or with `--recording` the recording bar, off screen over a light page. |

@@ -138,7 +138,7 @@ public final class RecordingSetup {
     /// A frame just around the area, clear inside, that lets every click through: a red line
     /// two points wide a point off the area, in a dark band with a faint light edge, so the
     /// area reads as framed on any background.
-    private static func makeOutline(around area: CGRect, on screen: CGRect) -> NSWindow {
+    static func makeOutline(around area: CGRect, on screen: CGRect, color: NSColor = .systemRed) -> NSWindow {
         // Outside the area when the frame fits on its display; else, as for a whole display,
         // just inside its edge, where it is still left out of the recording.
         let outside = area.insetBy(dx: -OutlineView.width, dy: -OutlineView.width)
@@ -153,6 +153,7 @@ public final class RecordingSetup {
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         let view = OutlineView()
         view.inward = inward
+        view.color = color
         window.contentView = view
         return window
     }
@@ -174,10 +175,12 @@ final class OutlineView: NSView {
     static let width: CGFloat = 9
     /// The frame inside the area's edge, for an area with no room around it.
     var inward = false
+    /// Red while recording; blue while an area is scrolled.
+    var color: NSColor = .systemRed
 
     override func draw(_ dirtyRect: NSRect) {
         if inward {
-            NSColor.systemRed.setStroke()
+            color.setStroke()
             let line = NSBezierPath(rect: bounds.insetBy(dx: 1.5, dy: 1.5))
             line.lineWidth = 3
             line.stroke()
@@ -193,7 +196,7 @@ final class OutlineView: NSView {
         let edge = NSBezierPath(rect: outer.insetBy(dx: 0.5, dy: 0.5))
         edge.lineWidth = 1
         edge.stroke()
-        NSColor.systemRed.setStroke()
+        color.setStroke()
         let line = NSBezierPath(rect: inner.insetBy(dx: -2, dy: -2))
         line.lineWidth = 2
         line.stroke()
