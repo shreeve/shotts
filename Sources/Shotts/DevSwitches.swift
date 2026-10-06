@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import AVFoundation
+import ScreenCaptureKit
 import ShottsCore
 import ShottsUI
 
@@ -87,6 +88,33 @@ enum DevSwitches {
                     fputs("capture failed: \(error)\n", stderr)
                     exit(1)
                 }
+            }
+            return
+        }
+        if let v = value(after: "--cursor-check") {
+            // The picker over a stand-in for each display, the pointer left where it is: which
+            // cursor macOS shows a moment after it opens, and after another moment. Writes the
+            // cursor's image size each time (1×1 is the picker's blank one), then quits.
+            let out = URL(fileURLWithPath: v[0])
+            // `--live`: the real, see-through picker over the live screen, as F10 opens it.
+            let live = arguments.contains("--live") ? LiveDisplay.all() : []
+            selection = AreaSelection(displays: live.isEmpty ? NSScreen.screens.map(standIn) : live.map(\.display)) { _ in }
+            selection?.show()
+            Task {
+                if let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true), let selection {
+                    for display in live { try? await display.start(in: content, excluding: selection.windowNumbers) }
+                }
+                var lines: [String] = []
+                // Every tenth of a second for two seconds: when the cursor is blank, and when not.
+                for step in 1...20 {
+                    try? await Task.sleep(for: .milliseconds(100))
+                    let size = NSCursor.currentSystem?.image.size ?? .zero
+                    lines.append("\(step * 100) ms: \(Int(size.width))×\(Int(size.height))")
+                }
+                selection?.cancel()
+                live.forEach { $0.stop() }
+                try? lines.joined(separator: "\n").write(to: out, atomically: true, encoding: .utf8)
+                exit(0)
             }
             return
         }

@@ -544,6 +544,7 @@ build ignores its arguments.
 | `--render in.png out.png [--crop]` | Draws one of every annotation on a picture and writes the PNG. |
 | `--print-pdf in.png out.pdf [--crop]` | Writes the same sample's print page as a PDF, laid out as Command-P would print it. |
 | `--preview-style out.png` | Draws the style popover off screen. |
+| `--cursor-check out.txt [--live]` | Opens the picker over stand-ins (or, with `--live`, the live screen) without moving the pointer, and writes the cursor's size every tenth of a second for two seconds (1×1 is the blank one). |
 | `--scroll-test out.png` | A scrolling capture of a window of numbered lines, scrolled in code, through ScreenCaptureKit and the stitcher; writes the picture and `out.expected.png`, the document drawn directly. Build ShottsCore optimized for it, or it falls behind. |
 | `--select out.txt` | Runs the picker alone over a drawn stand-in for each display and writes `selected x,y,w,h on <display>`, `window <id> at x,y on <display>`, `record x,y,w,h on <display>`, `scroll x,y,w,h on <display>`, or `cancelled`. |
 | `--preview-overlay out.png [--dragged] [--dim] [--corner]` | Draws the picker off screen with the pointer three pixels inside the corner of the stand-in's square at 1600,1600, so the magnifier's mapping can be checked (`--dim` shows only with `--dragged`). |
@@ -566,6 +567,14 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
 
 ## Traps
 
+- The picker hides the pointer as a background app, and the app in front stays active: when
+  what is under the still pointer changes (a page loading, a list updating, the Claude app
+  streaming), that app sets its own cursor, which macOS lets the active app do, and an arrow sat
+  beside the crosshair until the mouse moved. Sometimes, because it depends on that app. Caught
+  with `--cursor-check out.txt --live` (debug), which writes the cursor macOS shows every tenth of
+  a second for two seconds after the picker opens: blank for 600 ms, then 28×40 and 23×22 in one
+  run of three. `AreaSelection.show` sets the blank cursor at once and thirty times a second until
+  the picker closes; the views also set it on every `cursorUpdate`, entry, and move.
 - AppKit's automatic termination ends a background app quietly once its last window closes,
   and the AppKit test process is one: a test that brings a real window on screen and closes it
   can end the whole run partway, with no crash and exit code 0. It happened when the recording

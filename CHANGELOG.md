@@ -13,6 +13,8 @@ Unreleased, whose heading becomes the version's when it ships.
   is what makes a window with still parts come out right. Return stops early.
 - Shotts no longer bobs up and down when it cannot follow an area: it stops and lets you scroll.
 - Option-click no longer starts a scrolling capture.
+- No arrow beside the crosshair. When what was under the pointer changed as F10 was pressed (a
+  page loading, a list updating), the app in front put its arrow back until the mouse moved.
 
 ## 0.8.1 — 2026-10-05
 
