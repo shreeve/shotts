@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.8.3 — 2026-10-05
 
 - Scrolling capture no longer leaves a row blank. Browsers draw what scrolls into view a moment
   late, and the row first seen blank stayed blank; rows are now taken again until they have

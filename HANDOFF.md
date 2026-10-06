@@ -32,7 +32,7 @@ the picker keeps the arrow away (Traps); and its hints are shorter. Auto-scrolli
 been tried by hand: that it reaches the bottom and opens the picture, and which way the posted
 steps scroll under the user's scrolling direction. The owner then captured a Google Drive list
 by Option-drag, auto-scrolled, whole but for one row left blank as Chrome drew it late; rows
-just come into view are now taken again until they scroll up (Unreleased).
+just come into view are now taken again until they scroll up (0.8.3).
 Still to try by hand: capture and record the whole display, Command-click a window,
 record with Clicks and with Keys (the first asks for Input Monitoring; check a password field
 shows nothing), and draw with a tool during a whole-display recording, the bar still in reach.
