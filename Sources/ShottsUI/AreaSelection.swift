@@ -766,12 +766,12 @@ final class OverlayView: NSView {
     }
 
     static let hints = [
-        "Drag an area, or click a window or the desktop, to capture it",
+        "Drag an area, or click a window or the desktop",
         "⇧ keeps it square, Space moves it",
-        "Arrow keys move a pixel, ⇧ ten",
-        "⌘ while dragging or clicking records instead",
-        "⌥ while dragging scrolls it, capturing it all",
+        "⌘ records video instead",
+        "⌥ scrolls a dragged area, capturing all of it",
         "⌘C copies the color under the crosshair",
+        "Arrow keys move a pixel, ⇧ ten",
         "Esc cancels",
     ]
     private var hints: [String] { Self.hints }
