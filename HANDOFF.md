@@ -574,7 +574,7 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   with `--cursor-check out.txt --live` (debug), which writes the cursor macOS shows every tenth of
   a second for two seconds after the picker opens: blank for 600 ms, then 28×40 and 23×22 in one
   run of three. `AreaSelection.show` sets the blank cursor at once and thirty times a second until
-  the picker closes; the views also set it on every `cursorUpdate`, entry, and move.
+  the picker closes, beside the views' cursor rects; that alone held in 120 samples of six runs.
 - AppKit's automatic termination ends a background app quietly once its last window closes,
   and the AppKit test process is one: a test that brings a real window on screen and closes it
   can end the whole run partway, with no crash and exit code 0. It happened when the recording

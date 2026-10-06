@@ -185,7 +185,7 @@ public final class AreaSelection {
         // The crosshair is the pointer while the picker is up; an arrow beside it would only
         // add a second, offset hotspot to look at. An app that is not active may not hide the
         // pointer, so the overlays also show a blank one (`OverlayView.resetCursorRects`), set at
-        // once and on every movement. And the app in front, which stays active, sets its own
+        // once here too. And the app in front, which stays active, sets its own
         // cursor whenever what is under the still pointer changes (a page loading, a list
         // updating), which put an arrow back beside the crosshair until the mouse moved: so the
         // blank cursor is set again thirty times a second while the picker is up.
@@ -347,27 +347,19 @@ final class OverlayView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .cursorUpdate, .activeAlways, .inVisibleRect],
-                                  owner: self)
+        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
         addTrackingArea(area)
         tracking = area
     }
 
     override func mouseMoved(with event: NSEvent) {
         takeKeys()
-        Self.blankCursor.set()
         pointerMoved(to: event.locationInWindow)
     }
 
     override func mouseEntered(with event: NSEvent) {
         takeKeys()
-        Self.blankCursor.set()
         pointerMoved(to: event.locationInWindow)
-    }
-
-    /// Whenever macOS asks what the pointer should be over the picker: nothing but the crosshair.
-    override func cursorUpdate(with event: NSEvent) {
-        Self.blankCursor.set()
     }
 
     override func mouseExited(with event: NSEvent) {
