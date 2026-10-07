@@ -5,6 +5,11 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Text starts where you click: the caret's foot is on the pixel clicked, rather than the text's
+  top-left corner, which put the caret below and to the right of the click.
+
 ## 0.8.4 — 2026-10-05
 
 - While Shotts scrolls a scrolling capture, the mouse is held: the pointer stays put and moving,

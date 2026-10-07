@@ -105,7 +105,7 @@ as the screen allows.
 | Arrow with text | N | An arrow with words at its tail, one object; see below. The tool a first capture starts with. |
 | Arrow | A | A tapered arrow with a broad head, or an even shaft when Tapered is off. |
 | Line | L | A straight line, round at both ends. Shift snaps it to horizontal, vertical, or 45°. Drag either end to reshape it, Shift snapping it again around the other end. |
-| Text | T | Click and type on the picture; the text appears in its final style as you go. Return starts a new line; Command-Return finishes, as do a click elsewhere or another tool, and Escape cancels the text. Clicking an existing text, or a callout's words, edits them. |
+| Text | T | Click and type on the picture; the caret stands on the pixel clicked, its foot there, and the text appears in its final style as you go. Return starts a new line; Command-Return finishes, as do a click elsewhere or another tool, and Escape cancels the text. Clicking an existing text, or a callout's words, edits them. |
 | Rectangle | R | A stroked rectangle. Shift for a square; Option for a solid one. |
 | Ellipse | E | A stroked ellipse. Shift for a circle; Option for a solid one. |
 | Pen | P | A smooth freehand stroke. |

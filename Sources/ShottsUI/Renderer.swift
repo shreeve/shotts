@@ -187,6 +187,15 @@ public enum Renderer {
         return size
     }
 
+    /// Where a new text's box goes for its caret, before any word, to stand with its foot on
+    /// `point`: the words' left edge there, and the bottom of their first line. Kept on the
+    /// picture's top and left edges.
+    public static func textOrigin(caretFoot point: CGPoint, style: Style, scale: Double) -> CGPoint {
+        let pad = outlineWidth(style, scale: scale)
+        let line = NSLayoutManager().defaultLineHeight(for: font(for: style, scale: scale))
+        return CGPoint(x: max(point.x - pad, 0), y: max(point.y - pad - line, 0))
+    }
+
     /// One line of text in this style, in pixels.
     public static func lineHeight(style: Style, scale: Double) -> Double {
         ceil(attributedText("Ag", style: style, scale: scale).size().height + outlineWidth(style, scale: scale) * 2)

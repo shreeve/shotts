@@ -468,7 +468,10 @@ words laid out again.
 
 Text is typed on the picture: `CanvasView.beginTextEntry` adds an invisible `TextEntry` (an
 `NSTextView` with clear text and a colored caret) whose `preview` the canvas draws through the
-renderer, so what is typed looks exactly like the export. The entry has its own undo manager, so
+renderer, so what is typed looks exactly like the export. A click with the text tool stands the
+caret on the pixel clicked (`Renderer.textOrigin(caretFoot:)`): the words' left edge there and
+the bottom of their first line, so the text goes above the click, not below it as when the click
+was the box's top-left corner. The entry has its own undo manager, so
 Command-Z while typing undoes keystrokes and nothing outlives it. Command-Return finishes (a
 Return pressed out of habit only adds a line), Return with or without Shift or Option breaks a
 line, and Escape cancels, restoring `base`: new words go, a new callout goes with its arrow, and

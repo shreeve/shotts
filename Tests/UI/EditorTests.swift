@@ -133,6 +133,24 @@ import Testing
         #expect(canvas.document.annotations.isEmpty)
     }
 
+    /// A click with the text tool stands the caret on the pixel clicked: its foot there, and
+    /// the first word starting there.
+    @Test func theCaretStandsOnTheClick() throws {
+        for outline in [false, true] {
+            let canvas = canvasInWindow()
+            canvas.style.outline = outline
+            canvas.tool = .text
+            let p = CGPoint(x: 120, y: 150)
+            Mouse(canvas: canvas).down(p)
+            let entry = try #require(canvas.textField)
+            let line = try #require(entry.layoutManager).extraLineFragmentRect
+            let picture = canvas.pictureRect
+            let foot = CGPoint(x: entry.frame.minX + line.minX, y: entry.frame.minY + line.maxY)
+            #expect(abs(foot.x - (picture.minX + p.x * canvas.zoom)) < 1, "outline \(outline)")
+            #expect(abs(foot.y - (picture.minY + p.y * canvas.zoom)) < 1, "outline \(outline): \(foot.y) vs \(picture.minY + p.y * canvas.zoom)")
+        }
+    }
+
     @Test func editingTextKeepsItsPlaceAndIsOneStep() throws {
         let canvas = canvasInWindow()
         let mouse = Mouse(canvas: canvas)

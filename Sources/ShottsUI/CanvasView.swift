@@ -325,9 +325,10 @@ public final class CanvasView: NSView {
                 base = document
             }
         case .text:
-            // Words start on the picture, even for a click in the field around it.
+            // Words start on the picture, even for a click in the field around it, with the
+            // caret standing on the pixel clicked.
             let inside = CGPoint(x: min(max(p.x, 0), Double(document.width - 1)), y: min(max(p.y, 0), Double(document.height - 1)))
-            beginTextEntry(at: inside, initial: "", style: style)
+            beginTextEntry(at: Renderer.textOrigin(caretFoot: inside, style: style, scale: document.scale), initial: "", style: style)
             dragAnchor = nil
         case .arrow, .callout:
             live = Annotation(shape: .arrow(from: p, to: p), style: style)
@@ -724,8 +725,9 @@ final class TextEntry: NSTextView {
         var width: CGFloat = 0
         // The caret sits a hair right of where the words end, clear of the outline that
         // strokes outside the last glyph; the whole view shifts, which moves nothing visible
-        // but the caret.
-        var x = origin.x * zoom + picture.minX + pad * 2 + 2
+        // but the caret. Before any word, it sits where the first will start.
+        let clear = string.isEmpty && layout == nil ? 0 : pad + 2
+        var x = origin.x * zoom + picture.minX + pad + clear
         if let layout {
             // Wrap where the renderer will: the full wrap width, never the measured box, whose
             // width at the zoomed font's rounding could be a hair short and fold the last word
