@@ -29,6 +29,8 @@ final class AutoScroller {
     private let pointer: CGPoint
     private var tap: CFMachPort?
     private var tapSource: CFRunLoopSource?
+    /// Whether the pointer is held, with or without the tap: it is let go either way.
+    private var holding = false
     /// Marks Shotts' own scroll steps, which the tap lets through.
     nonisolated private static let mark: Int64 = 0x5348_4F54
     private var height = 0, lost = false, full = false
@@ -75,6 +77,7 @@ final class AutoScroller {
     private func holdMouse() {
         CGWarpMouseCursorPosition(pointer)
         CGAssociateMouseAndMouseCursorPosition(0)
+        holding = true
         let types: [CGEventType] = [.mouseMoved, .leftMouseDown, .leftMouseUp, .leftMouseDragged, .rightMouseDown, .rightMouseUp,
                                     .rightMouseDragged, .otherMouseDown, .otherMouseUp, .otherMouseDragged, .scrollWheel]
         let mask = types.reduce(CGEventMask(0)) { $0 | CGEventMask(1) << $1.rawValue }
@@ -102,9 +105,11 @@ final class AutoScroller {
             CFMachPortInvalidate(tap)
         }
         if let tapSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), tapSource, .commonModes) }
-        guard tap != nil || tapSource != nil else { return }
         tap = nil
         tapSource = nil
+        // Even when no tap could be made: the pointer was held all the same.
+        guard holding else { return }
+        holding = false
         CGAssociateMouseAndMouseCursorPosition(1)
     }
 
