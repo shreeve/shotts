@@ -7,7 +7,8 @@ import UniformTypeIdentifiers
 /// and a timeline below it that plays, and trims what the files keep.
 /// The window always holds the file its settings make, made again in the background whenever
 /// they change, so its size shows exactly and Copy, Save, and a drag use it at once. Closing
-/// the window deletes the recording and every file made from it.
+/// the window deletes the recording and every file made from it: a recording not yet saved,
+/// copied, or dragged out is deleted only once the user says so.
 public final class RecordingWindowController: NSWindowController, NSWindowDelegate {
     public let recording: Recording
     public let contents: RecordingExport.Contents
@@ -34,6 +35,14 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     /// meanwhile, so the last of them removes it.
     private var saving = 0
     private var closed = false
+    /// Whether the recording has gone anywhere yet: saved, copied, or dragged out. Until it has,
+    /// closing the window asks first.
+    public private(set) var kept = false
+    /// Said yes to deleting it, so the window closes without asking again.
+    private var deleting = false
+    /// Asks whether to delete a recording not yet kept, answering true for Delete; the window's
+    /// own sheet unless a test answers.
+    var askToDelete: ((@escaping (Bool) -> Void) -> Void)?
     private var endObserver: NSObjectProtocol?
     let formats = NSPopUpButton()
     let sizes = NSPopUpButton()
@@ -373,6 +382,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
                 try FileManager.default.copyItem(at: url, to: copy)
                 pasteboard.clearContents()
                 pasteboard.writeObjects([copy as NSURL])
+                kept = true
             } catch {
                 NSSound.beep()
             }
@@ -395,6 +405,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
                 Task {
                     do {
                         try await Task.detached(priority: .userInitiated) { try Self.copy(url, to: destination) }.value
+                        self.kept = true
                     } catch {
                         if window.isVisible { NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil) } else { NSAlert(error: error).runModal() }
                     }
@@ -421,6 +432,32 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     }
 
     // MARK: - Closing
+
+    /// A drag of the file landed somewhere.
+    func draggedOut() { kept = true }
+
+    /// Escape, Command-W, and the red button: a recording that has gone nowhere yet is deleted
+    /// only once the user says so, in a sheet whose Cancel (and Escape) keeps it.
+    public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard !kept, !deleting else { return true }
+        guard sender.attachedSheet == nil else { return false }
+        let answer: (Bool) -> Void = { [weak self] delete in
+            guard delete, let self else { return }
+            deleting = true
+            window?.close()
+        }
+        if let askToDelete { askToDelete(answer) } else { ask(in: sender, answer) }
+        return false
+    }
+
+    private func ask(in window: NSWindow, _ answer: @escaping (Bool) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Delete this recording?"
+        alert.informativeText = "It hasn't been saved, copied, or dragged out."
+        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { answer($0 == .alertFirstButtonReturn) }
+    }
 
     public func windowWillClose(_ notification: Notification) {
         making?.cancel()
@@ -475,5 +512,9 @@ final class RecordingGrip: NSImageView {
 extension RecordingGrip: NSDraggingSource {
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
         .copy
+    }
+
+    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+        if operation != [] { controller?.draggedOut() }
     }
 }

@@ -168,6 +168,10 @@ and words being edited come back as they were. Undo covers annotations and the c
 capture itself. Drawing, moving, or typing an annotation is one step.
 
 The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.
+Quitting Shotts asks first only when it would lose something, saying what ("2 annotated
+captures and an unsaved recording will be lost."), with Quit and Cancel: an open capture with
+annotations or a crop, or a recording not yet saved, copied, or dragged out. With nothing to
+lose, it quits at once.
 Option-F10 brings the newest open editor to the front, or, when none is open, opens the one
 closed last again exactly as it was, annotations still editable; a minimized editor comes back
 too. Shotts keeps that one closed capture in memory until another editor closes and takes its
@@ -284,7 +288,8 @@ and a name like `Shotts Recording 2026-09-30 at 2.15.00 PM.mp4`, and replaces a 
 there only once the copy has worked; dragging the hand icon drags the file out. Each leaves the
 window open, so one recording can be saved several ways. Command-W, the red button, or Escape
 closes the window, which deletes the recording and every file made from it; saved and copied
-files stay. When the window you are working in closes, focus goes back to the app that was in
+files stay. Until the recording has been saved, copied, or dragged out, closing asks first:
+"Delete this recording?", with Delete and Cancel (Escape keeps it). When the window you are working in closes, focus goes back to the app that was in
 front when F10 was pressed.
 
 A GIF has one palette for the whole clip. Colors that cover much of the picture are kept

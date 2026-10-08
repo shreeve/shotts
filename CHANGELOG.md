@@ -7,6 +7,10 @@ Unreleased, whose heading becomes the version's when it ships.
 
 ## Unreleased
 
+- Closing a recording window asks "Delete this recording?" until the recording has been saved,
+  copied, or dragged out; Cancel, or Escape, keeps it. Before, Escape after playing it deleted it.
+- Quit asks first when it would lose something, saying what: an open capture with annotations or
+  a crop, or an unsaved recording. With nothing to lose, it quits at once, as before.
 - The pointer is always let go when Shotts stops scrolling, even when macOS refused the event
   tap that drops the mouse's own events; before, it could stay frozen.
 

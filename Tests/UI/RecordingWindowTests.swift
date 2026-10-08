@@ -142,6 +142,33 @@ import Testing
         #expect(try Data(contentsOf: there) == Data("new".utf8))
     }
 
+    /// Closing a recording that has gone nowhere asks first: Cancel keeps it, Delete closes the
+    /// window and deletes it. Once copied, closing asks nothing.
+    @Test func closingAnUnsavedRecordingAsks() async throws {
+        let recording = try await testRecording()
+        let controller = try await window(for: recording)
+        let window = try #require(controller.window)
+        var answers: [(Bool) -> Void] = []
+        controller.askToDelete = { answers.append($0) }
+        #expect(!controller.windowShouldClose(window) && answers.count == 1)
+        answers[0](false)
+        #expect(FileManager.default.fileExists(atPath: recording.folder.path))
+        answers[0](true)
+        #expect(!FileManager.default.fileExists(atPath: recording.folder.path))
+
+        let other = try await self.window(for: try await testRecording())
+        defer { other.close() }
+        let pasteboard = privatePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        other.pasteboard = pasteboard
+        other.askToDelete = { _ in Issue.record("asked") }
+        other.copyPressed()
+        _ = try await waitForFile(other)
+        for _ in 0..<200 where !other.kept { try await Task.sleep(for: .milliseconds(10)) }
+        let otherWindow = try #require(other.window)
+        #expect(other.kept && other.windowShouldClose(otherWindow))
+    }
+
     /// Closing the window takes the recording and every file made from it.
     @Test func closingDeletesTheRecording() async throws {
         let recording = try await testRecording()

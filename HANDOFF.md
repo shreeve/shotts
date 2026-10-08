@@ -88,13 +88,19 @@ Decided against, so they are not rebuilt:
   posting screenshots, not capture. Shotts stays a small capture utility; Include Window Shadow
   is the one finish it adds, and layout tools exist for the rest.
 
+- A self-timer in the picker (the Screenshot app's 5 and 10 seconds). The owner: fluff; `shotts
+  --delay` has one for scripts, and the rest is CleanShot's.
+- Bringing back more than one closed capture with Option-F10. With New Window per Capture off
+  there is one capture window, each capture replaces it, and Option-F10 brings back the one
+  before; a list of closed captures would make that one window a stack.
+
 - Wrapping plain text at the picture's edge. The user breaks lines with Return; text that
   wrapped on its own would either keep its line breaks when moved (a stranded narrow column) or
   reflow as it moves, and both are worse than lines that only change when the user says so.
 
 Deferred, with the reason each waits:
 
-- Configurable shortcuts. When F10 and Option-F10 become settable, also show that one is taken:
+- Configurable shortcuts: not for now, the owner says; F10 it is. When F10 and Option-F10 become settable, also show that one is taken:
   a small red dot on the menu bar icon whenever another app holds a Shotts shortcut (a failed
   `HotKey.registerF10`), and the menu naming which. Today only Capture Area's title says so, and
   Show Last Capture just loses its key glyph. The owner asked for this with the shortcut work.
@@ -129,6 +135,7 @@ Deferred, with the reason each waits:
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
+| | `Quitting.swift` | What quitting would lose (annotated captures, unsaved recordings), as the question Quit asks, or nil to quit at once. |
 | | `AutoScroll.swift` | How Shotts paces its scrolling: the step, backing up and slowing when a frame is not matched, giving up after five in a row, the bottom as where the picture stops growing, the other direction tried once. |
 | | `ScrollStitcher.swift` | A scrolling capture's picture from its frames: row fingerprints, the shift that fits (coarse, then fine, nearest the last move among near-ties), sticky bands kept once, new rows added and taken again until they scroll up, a size cap. |
 | | `Keystrokes.swift` | `KeystrokeLine`: which keys show (shortcuts and keys that act on their own, never typing) and as what (⇧⌘4, ↩), and how those within two seconds join one line (`⌘I  ⌃K  ↩`) that stays five seconds after the last. |

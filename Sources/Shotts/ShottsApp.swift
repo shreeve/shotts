@@ -69,12 +69,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     /// Quitting while recording would lose the recording: it stops instead and opens in its
-    /// window, and quitting again quits. Logging out or shutting down is not held up: macOS
-    /// says so first (`willPowerOffNotification`), and then Shotts quits as asked.
+    /// window, and quitting again quits. Quitting with annotated captures or unsaved recordings
+    /// open asks first, saying what would be lost; with nothing to lose, it quits at once.
+    /// Logging out or shutting down is not held up: macOS says so first
+    /// (`willPowerOffNotification`), and then Shotts quits as asked.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard flow.isRecording || script.isRecording, !poweringOff else { return .terminateNow }
-        stopRecording()
-        return .terminateCancel
+        guard !poweringOff else { return .terminateNow }
+        if flow.isRecording || script.isRecording {
+            stopRecording()
+            return .terminateCancel
+        }
+        let work = flow.unsavedWork
+        guard let warning = Quitting.warning(captures: work.captures, recordings: work.recordings) else { return .terminateNow }
+        Front.bringShotts()
+        let alert = NSAlert()
+        alert.messageText = "Quit Shotts?"
+        alert.informativeText = warning
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
     }
 
     private var poweringOff = false

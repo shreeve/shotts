@@ -483,6 +483,12 @@ final class CaptureFlow {
     /// Whether Option-F10 has anything to show.
     var hasLastCapture: Bool { !editors.isEmpty || lastClosed != nil }
 
+    /// What quitting now would lose: open captures annotated or cropped, and recordings not yet
+    /// saved, copied, or dragged out.
+    var unsavedWork: (captures: Int, recordings: Int) {
+        (editors.filter { $0.editor.canvas.document.isEdited }.count, recordings.filter { !$0.kept }.count)
+    }
+
     /// Option-F10: the newest open editor, brought to the front; else the editor closed last,
     /// opened again as it was, its annotations still editable.
     func showLast() {
