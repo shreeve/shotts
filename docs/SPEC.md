@@ -10,8 +10,8 @@ to paste: F10, drag out an area, mark it up, Command-C. Pressing Command while d
 the area instead, to save as an MP4 or an animated GIF. It runs on macOS 14 and later on Apple
 silicon. It captures and records only what the user selects, only when the user asks, and keeps
 nothing on disk that the user did not save or drag out, but for a recording's own files while
-its window is open. With Copy to Clipboard on, a capture is on the clipboard as soon as it is
-taken.
+its window is open and the last recording file copied, kept so it still pastes. With Copy to
+Clipboard on, a capture is on the clipboard as soon as it is taken.
 
 ## Installing
 
@@ -26,8 +26,8 @@ it uses the user's own. Not Now leaves it where it is, and "Don't ask again" sto
 F10 is the hot key, and Option-F10 brings the last capture back (see The editor). On a Mac
 keyboard whose top row controls the Mac, that is fn-F10, unless "Use F1, F2, etc. keys as
 standard function keys" is on. If another app already holds F10, the menu says so: Capture Area
-(another app has F10). F10 does nothing while a capture or a recording is being set up, and
-stops a recording under way.
+(another app has F10). F10 does nothing while a capture or a recording is being set up; it stops
+a recording under way, and ends a scrolling capture.
 
 | Action | Result |
 | --- | --- |
@@ -47,8 +47,8 @@ stops a recording under way.
 
 F10 leaves every window where it is, Shotts' editors included; Shotts itself comes to the front
 only when a capture's editor opens, or with Option-F10. A click on no window does nothing, so a
-stray click does not end the capture. Switching to
-another app, or a display being added, removed, or rearranged, cancels.
+stray click does not end the capture. Switching to another app, or a display being added,
+removed, or rearranged, cancels.
 
 The crosshair is a light line with a dark edge, visible on any background, and shows only on the
 display the pointer is on; the keys act on that display. The selection stays on one display.
@@ -82,9 +82,13 @@ the recording.
 | New Window per Capture | off | Each capture opens in an editor of its own. Off, a new capture takes the place of the open editor, where it was on screen, and the one it replaces becomes the last capture. |
 
 The first F10 asks macOS for Screen Recording permission with the system's own dialog. Until it
-is granted, later presses explain where to turn it on and capture nothing. The microphone is
-the only other permission Shotts asks for, the first time a recording uses it. Shotts checks for updates once a day without asking, and
-Check for Updates… checks at once.
+is granted, later presses explain where to turn it on and capture nothing. Shotts asks for three
+others, each with the system's own dialog and only the first time something needs it: the
+microphone, for a recording with Microphone on; Input Monitoring, for a recording with Keys on;
+and Accessibility, for a scrolling capture, so Shotts can scroll the area. Without any of them,
+the rest works (see Recording and Scrolling capture).
+
+Shotts checks for updates once a day without asking, and Check for Updates… checks at once.
 
 ## The editor
 
@@ -144,11 +148,11 @@ the tail:
 - A line runs to within 8 points of the picture's edge before it wraps; Return breaks a line
   sooner, and Command-Return finishes. The words keep that margin from every edge.
 
-An arrow and its words are one object. Pressed with the select tool, or any drawing tool but
-the pen, highlighter, and crop, dragging the shaft moves the whole; dragging the dot at the tail's end, or
-the words, moves the tail with the tip staying put; dragging the head moves the tip with the
-tail staying put. The words lay themselves out again after any reshape. Double-click the words
-to retype them; words left empty turn the callout into a plain arrow.
+An arrow and its words are one object. Pressed with the select tool, or any drawing tool but the
+pen, highlighter, and crop, dragging the shaft moves the whole; dragging the dot at the tail's
+end, or the words, moves the tail with the tip staying put; dragging the head moves the tip with
+the tail staying put. The words lay themselves out again after any reshape. Double-click the
+words to retype them; words left empty turn the callout into a plain arrow.
 
 ### Editing
 
@@ -161,8 +165,7 @@ to retype them; words left empty turn the callout into a plain arrow.
 
 Escape while typing cancels the text: new words go, a new arrow with text goes with its arrow,
 and words being edited come back as they were. Undo covers annotations and the crop, not the
-capture itself. Drawing, moving, or typing an
-annotation is one step.
+capture itself. Drawing, moving, or typing an annotation is one step.
 
 The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.
 Option-F10 brings the newest open editor to the front, or, when none is open, opens the one
@@ -214,14 +217,15 @@ scroll by hand, then press F10. F10 ends a scrolling capture as it ends a record
 
 Shotts adds only what comes into view below what it already has, so scrolling back up adds
 nothing; scrolled too far between two looks, the panel says to scroll a little slower, and it
-goes on from where it last matched.
+goes on from where it last matched. Rows just scrolled into view are taken again until they
+have scrolled well up, so a page that draws them a moment late (a browser scrolling fast) leaves
+none blank.
 
 A bar that stays put at the top or bottom while the rest scrolls, a sticky header or a toolbar,
-is kept once, not repeated down the picture. Scrolled too far between two looks, the panel says
-to scroll a little slower, and Shotts goes on from where it last matched. The picture stops
-growing at 256 MB (some 20,000 rows of a wide window), and the panel says so. Neither the
-outline, the panel, nor the pointer is in the picture. Shotts sends nothing but scroll-wheel
-steps, and only while a scrolling capture runs.
+is kept once, not repeated down the picture. The picture stops growing at 256 MB (some 20,000
+rows of a wide window), and the panel says so. Neither the outline, the panel, nor the pointer
+is in the picture. A display being added, removed, or rearranged cancels. Shotts sends nothing
+but scroll-wheel steps, and holds the mouse, only while it scrolls a capture.
 
 ## Recording
 
@@ -252,7 +256,8 @@ and the bar beside the area has:
 | Stop (F10) | Ends the recording, as F10 and a click on the menu bar item do. |
 
 Quitting Shotts while it records stops the recording and opens it instead; quitting again
-quits. Logging out or shutting down is not held up, and the recording goes with it. If the display being recorded goes, the recording stops there and opens.
+quits. Logging out or shutting down is not held up, and the recording goes with it. If the
+display being recorded goes, the recording stops there and opens.
 With the microphone on but turned off for Shotts in System Settings, Record asks: record
 without the microphone, open System Settings, or cancel.
 
@@ -270,15 +275,16 @@ dragged) and trims it: the bracket at either end drags in, the part left out is 
 every file made keeps only the part between, whatever its format.
 
 An MP4 starts at the recording's full size, 30 frames a second, with the microphone if it was
-on; a GIF at the size the area had on screen (50% from a Retina display), 10 frames a second. Each format keeps its own
-settings while the window is open. Whenever they change, the window makes the file again in the
-background and shows its size, or why it could not be made. Copy puts the file on the
-clipboard, as the Finder copies files, and it still pastes after the window closes (the last
-file copied is kept until the next); Save… asks where, suggesting the Desktop and a name like
-`Shotts Recording 2026-09-30 at 2.15.00 PM.mp4`, and replaces a file already there only once the
-copy has worked; dragging the hand icon drags the file out. Each leaves the window open, so one
-recording can be saved several ways. Command-W, the red button, or Escape closes the window,
-which deletes the recording and every file made from it; saved and copied files stay. When the window you are working in closes, focus goes back to the app that was in
+on; a GIF at the size the area had on screen (50% from a Retina display), 10 frames a second.
+Each format keeps its own settings while the window is open. Whenever they change, the window
+makes the file again in the background and shows its size, or why it could not be made. Copy
+puts the file on the clipboard, as the Finder copies files, and it still pastes after the window
+closes (the last file copied is kept until the next); Save… asks where, suggesting the Desktop
+and a name like `Shotts Recording 2026-09-30 at 2.15.00 PM.mp4`, and replaces a file already
+there only once the copy has worked; dragging the hand icon drags the file out. Each leaves the
+window open, so one recording can be saved several ways. Command-W, the red button, or Escape
+closes the window, which deletes the recording and every file made from it; saved and copied
+files stay. When the window you are working in closes, focus goes back to the app that was in
 front when F10 was pressed.
 
 A GIF has one palette for the whole clip. Colors that cover much of the picture are kept
@@ -304,8 +310,8 @@ with `--audio mic` record the microphone (macOS still shows its microphone light
 timer).
 **Install Command-Line Tool…** in the menu links `/usr/local/bin/shotts` (asking for an
 administrator's password); it is not shown once `shotts` is installed, as the Homebrew cask
-installs it. `shotts` alone or `shotts --help` sums up what follows under the version; a mistake is one line
-saying what is wrong.
+installs it. `shotts` alone or `shotts --help` sums up what follows under the version; a
+mistake is one line saying what is wrong.
 
 ```
 shotts shot   [file…] <target> [--delay t] [--width px] [--json]
@@ -347,7 +353,8 @@ shotts list   [--json]
   recording, it prints the last recording's answer. One recording at a time.
 - **Answers**: on a terminal, tables in rounded boxes (the files made, their size, frames, and
   bytes; for `list`, the displays and windows), in color unless `NO_COLOR` is set; piped or
-  redirected, the paths alone, one a line, and `list` as plain columns. With `--json`, one line of JSON: `ok`, `command`, `state`,
+  redirected, the paths alone, one a line, and `list` as plain columns. With `--json`, one line
+  of JSON: `ok`, `command`, `state`,
   `target` (`kind`, `id`, `app`, `bundle`, `title`, `frame`, `scale`, `display`), `started`,
   `duration`, and `files` (`path`, `format`, `width`, `height`, `fps`, `frames`, `bytes`); `list`
   gives `windows` and `displays`. A failure gives `error` (`code`, `message`, and for several
@@ -359,6 +366,7 @@ shotts list   [--json]
 
 ## Not built
 
-Full-screen capture, repeating the previous area, and delayed capture from the picker (`shotts`
-does these), recording a single window from the picker, clicks shown in a recording, uploads,
+Repeating the previous area, and a delay before capturing, from the picker (`shotts` does both);
+recording a window that is followed as it moves, from the picker (`shotts` does, and a
+Command-click records the window's area where it is); horizontal scrolling capture; uploads,
 cloud storage, and OCR.

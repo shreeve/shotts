@@ -94,7 +94,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     private func makeContent() -> NSView {
         formats.addItems(withTitles: ["MP4", "GIF"])
         formats.item(at: 0)?.toolTip = "H.264 video, which plays nearly everywhere"
-        formats.item(at: 1)?.toolTip = "An animated GIF: loops, silent, 256 colors"
+        formats.item(at: 1)?.toolTip = "An animated GIF: loops, silent, 255 colors"
         formats.target = self
         formats.action = #selector(formatChanged)
 
