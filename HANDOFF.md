@@ -100,10 +100,14 @@ Decided against, so they are not rebuilt:
 
 Deferred, with the reason each waits:
 
-- Configurable shortcuts: not for now, the owner says; F10 it is. When F10 and Option-F10 become settable, also show that one is taken:
-  a small red dot on the menu bar icon whenever another app holds a Shotts shortcut (a failed
-  `HotKey.registerF10`), and the menu naming which. Today only Capture Area's title says so, and
-  Show Last Capture just loses its key glyph. The owner asked for this with the shortcut work.
+- Configurable shortcuts: not for now, the owner says. F10 and ⇧⌘4 both work, with no setting:
+  F10 for a top row of F-keys (fn-F10 otherwise), ⇧⌘4 for everyone once macOS's own is off.
+  The Mission Control key (F3 without fn on a stock keyboard) was tried and cannot be had: a
+  Carbon hot key on its key code (160) registers but never fires, macOS keeping it. A red dot
+  for a key another app holds was asked for with shortcut work, but cannot be told reliably:
+  macOS lets two apps register one key (both answer it), and even an exclusive registration
+  succeeds while another app holds the key shared; registration fails only against one held
+  exclusively, and then only Capture Area's title says so.
 - The picker redraws its whole transparent overlay on each mouse move (the crosshair spans the
   display). Drawing the crosshair as two thin layers would leave only the magnifier to redraw.
 - Selecting an annotation does not show its style in the bar. Changing a style changes only what
@@ -135,6 +139,7 @@ Deferred, with the reason each waits:
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
+| | `SystemShortcuts.swift` | Whether macOS answers a key itself, from its Keyboard Shortcuts list (an entry missing is at its default): ⇧⌘4 is Shotts' only once macOS's is off. |
 | | `Quitting.swift` | What quitting would lose (annotated captures, unsaved recordings), as the question Quit asks, or nil to quit at once. |
 | | `AutoScroll.swift` | How Shotts paces its scrolling: the step, backing up and slowing when a frame is not matched, giving up after five in a row, the bottom as where the picture stops growing, the other direction tried once. |
 | | `ScrollStitcher.swift` | A scrolling capture's picture from its frames: row fingerprints, the shift that fits (coarse, then fine, nearest the last move among near-ties), sticky bands kept once, new rows added and taken again until they scroll up, a size cap. |
@@ -166,7 +171,7 @@ Deferred, with the reason each waits:
 | | `ScrollCapture.swift` | Streams the area for a scrolling capture and feeds each frame to `ScrollStitcher` off the main thread. |
 | | `InputWatcher.swift` | Clicks (a global mouse monitor) and keys (a listen-only event tap, needing Input Monitoring) while a recording that shows them runs. |
 | | `Recorder.swift` | Records an area through ScreenCaptureKit, the Mac's sound with it, and the microphone through AVFoundation. |
-| | `HotKey.swift` | The Carbon hot keys: F10 captures (or stops a recording), Option-F10 brings the last capture back. |
+| | `HotKey.swift` | The Carbon hot keys: F10 and ⇧⌘4 capture (or stop a recording), each with Option bringing the last capture back; ⇧⌘4 is answered only once macOS's own is off (`SystemShortcuts`). |
 | | `MoveToApplications.swift` | A release launched outside Applications offers to move itself there. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
 | ShottsCLI | `main.swift` | `shotts`: parses, connects (starting Shotts with `open -g -b` when nothing listens), prints, exits with the answer's code, and turns Control-C into `stop`, then `abort`. |

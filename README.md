@@ -51,7 +51,7 @@ and open Shotts: it offers to move itself into Applications, where it can keep i
 
 | Step | What happens |
 | --- | --- |
-| **Press F10** (fn-F10 on most Mac keyboards) | A crosshair follows the pointer over the live screen, with a magnifier that shows the pixels under it, their color in hex, and the selection's size. Command-C copies the color. |
+| **Press F10** (fn-F10 on most Mac keyboards), or ⇧⌘4 once macOS's own is off in Keyboard Shortcuts › Screenshots | A crosshair follows the pointer over the live screen, with a magnifier that shows the pixels under it, their color in hex, and the selection's size. Command-C copies the color. |
 | **Select** | Drag an area (Shift for a square, Space to move it), or click a window, outlined as the crosshair passes over it, to capture only that window, with the shadow macOS draws around it if you turn that on. Click the desktop for the whole display. Escape cancels. Press Option while dragging (the selection turns blue) and Shotts scrolls the area to the bottom and captures all of it. |
 | **Annotate** | Arrow with text, arrow, line, text, rectangle, ellipse, pen, highlighter, obscure, and crop, each on a single key. Undo and redo. A color and style popover remembers your choices. |
 | **Or record** | Press Command while dragging (the selection turns red), or Command-click a window or the desktop for its area or the whole display, then press Return, and it records. Turn on Clicks for a ripple where each click lands, and Keys to show the shortcuts you press (never your typing). Draw arrows and rectangles on it as it records; each fades after a few seconds. Pause when you like; F10 stops. Trim it, then save, copy, or drag it out as H.264 MP4 or a blue-noise-dithered GIF, as many ways as you like. |
