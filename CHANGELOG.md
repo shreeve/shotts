@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.9.1 — 2026-10-08
 
 - ⇧⌘4 captures too, for a keyboard whose top row controls the Mac, where F10 needs fn: turn
   macOS's own ⇧⌘4 off in System Settings › Keyboard › Keyboard Shortcuts › Screenshots, and
