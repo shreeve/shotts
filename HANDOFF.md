@@ -5,8 +5,8 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.9.0 is the latest release: tag `v0.9.0` on `main` (commit "Shotts 0.9.0"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#123),
+0.9.1 is the latest release: tag `v0.9.1` on `main` (commit "Shotts 0.9.1"), the GitHub release
+with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#145),
 which also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
 (shreeve/shotts#69) added `shotts`, the command line ("Command line" below; SPEC has the
 language). 0.6.1 made `record` show progress while saving and GIFs on-screen size, and took
