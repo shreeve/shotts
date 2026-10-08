@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.9.0 — 2026-10-07
 
 - Closing a recording window asks "Delete this recording?" until the recording has been saved,
   copied, or dragged out; Cancel, or Escape, keeps it. Before, Escape after playing it deleted it.
