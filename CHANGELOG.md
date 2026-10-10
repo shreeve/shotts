@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.9.2 — 2026-10-09
 
 - ⇧⌘2 captures, in place of 0.9.1's ⇧⌘4, and Option-⇧⌘2 brings the last capture back, on any
   keyboard and with nothing to set up: no fn, as F10 needs on a top row that controls the Mac,
