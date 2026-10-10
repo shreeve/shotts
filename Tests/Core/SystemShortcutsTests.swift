@@ -16,6 +16,15 @@ import Testing
         #expect(!SystemShortcuts.macOSAnswers(keyCode: four, modifiers: shiftCommand | SystemShortcuts.option, in: nil))
     }
 
+    /// ⇧⌘2 is no shortcut of macOS's out of the box, so Shotts has it; set to one by the user,
+    /// it is macOS's.
+    @Test func shiftCommand2IsFree() {
+        let two = SystemShortcuts.two
+        #expect(!SystemShortcuts.macOSAnswers(keyCode: two, modifiers: shiftCommand, in: nil))
+        #expect(!SystemShortcuts.macOSAnswers(keyCode: two, modifiers: shiftCommand | SystemShortcuts.option, in: nil))
+        #expect(SystemShortcuts.macOSAnswers(keyCode: two, modifiers: shiftCommand, in: ["30": entry(1, two, shiftCommand)]))
+    }
+
     /// Turned off in Keyboard Shortcuts, it is Shotts'; moved to another key, too; another of
     /// macOS's shortcuts set to it keeps it macOS's.
     @Test func offOrMovedItIsShottss() {

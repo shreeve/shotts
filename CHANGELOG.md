@@ -5,6 +5,12 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- ⇧⌘2 captures, in place of 0.9.1's ⇧⌘4, and Option-⇧⌘2 brings the last capture back, on any
+  keyboard and with nothing to set up: no fn, as F10 needs on a top row that controls the Mac,
+  and no turning off macOS's own ⇧⌘4. F10 works as before.
+
 ## 0.9.1 — 2026-10-08
 
 - ⇧⌘4 captures too, for a keyboard whose top row controls the Mac, where F10 needs fn: turn

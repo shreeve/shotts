@@ -58,12 +58,12 @@ read it before changing capture, the selection overlay, the editor, or export.
   and closing it asks nothing, because Option-F10 brings the last one back. Quitting asks only
   when it would lose something: an open capture annotated or cropped, or an unsaved recording. When the editor
   being worked in closes, focus returns to the app that was frontmost when the hot key fired.
-- F10 (or ⇧⌘4) never activates Shotts: activating an app brings all its windows forward, and that would
+- F10 (or ⇧⌘2) never activates Shotts: activating an app brings all its windows forward, and that would
   change the very screen being captured. Only a new editor or recording window opening, or
   Option-F10, brings Shotts to the front. While recording, F10 stops it.
-- The hot keys are Carbon hot keys, which need no Accessibility permission: F10, and ⇧⌘4 once
-  macOS's own ⇧⌘4 is turned off (until then macOS answers it, and Shotts lets it), each with
-  Option for the last capture. Screen Recording is
+- The hot keys are Carbon hot keys, which need no Accessibility permission: F10 and ⇧⌘2 (no
+  shortcut of macOS's; should the user make it one, macOS answers it, and Shotts lets it), each
+  with Option for the last capture. Screen Recording is
   the permission Shotts asks for, when the first capture needs it; the others are the
   microphone, asked the first time a recording uses it; Input Monitoring, asked the first
   time a recording shows the shortcuts pressed; and Accessibility, asked the first time a

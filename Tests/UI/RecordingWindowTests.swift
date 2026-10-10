@@ -122,6 +122,7 @@ import Testing
         let file = try await waitForFile(controller)
         let copied = try #require((pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL])?.first)
         #expect(copied.lastPathComponent == file.lastPathComponent && copied != file)
+        #expect(controller.kept)
         #expect(try Data(contentsOf: copied) == Data(contentsOf: file))
         controller.window?.close()
         #expect(FileManager.default.fileExists(atPath: copied.path))
@@ -143,7 +144,7 @@ import Testing
     }
 
     /// Closing a recording that has gone nowhere asks first: Cancel keeps it, Delete closes the
-    /// window and deletes it. Once copied, closing asks nothing.
+    /// window and deletes it. Once dragged out (or copied, below), closing asks nothing.
     @Test func closingAnUnsavedRecordingAsks() async throws {
         let recording = try await testRecording()
         let controller = try await window(for: recording)
@@ -156,15 +157,11 @@ import Testing
         answers[0](true)
         #expect(!FileManager.default.fileExists(atPath: recording.folder.path))
 
+        // Not a Copy here: the one copied file is kept in one place, which the copy test uses.
         let other = try await self.window(for: try await testRecording())
         defer { other.close() }
-        let pasteboard = privatePasteboard()
-        defer { pasteboard.releaseGlobally() }
-        other.pasteboard = pasteboard
         other.askToDelete = { _ in Issue.record("asked") }
-        other.copyPressed()
-        _ = try await waitForFile(other)
-        for _ in 0..<200 where !other.kept { try await Task.sleep(for: .milliseconds(10)) }
+        other.draggedOut()
         let otherWindow = try #require(other.window)
         #expect(other.kept && other.windowShouldClose(otherWindow))
     }

@@ -25,11 +25,11 @@ it uses the user's own. Not Now leaves it where it is, and "Don't ask again" sto
 
 F10 is the hot key, and Option-F10 brings the last capture back (see The editor). On a Mac
 keyboard whose top row controls the Mac, that is fn-F10, unless "Use F1, F2, etc. keys as
-standard function keys" is on. ⇧⌘4 does the same, and Option-⇧⌘4 brings the last capture back,
-once macOS's own ⇧⌘4 is turned off in System Settings › Keyboard › Keyboard Shortcuts ›
-Screenshots; until then it is macOS's, and Shotts leaves it alone, so the two never answer the
-same press. Shotts reads that setting at each press, so the change needs no restart. Below,
-F10 stands for either. Another app may answer F10 too: macOS lets two apps hold one key, and only
+standard function keys" is on. ⇧⌘2 does the same on any keyboard, with no fn and nothing to set
+up, and Option-⇧⌘2 brings the last capture back; it is no shortcut of macOS's (whose own are
+⇧⌘3, ⇧⌘4, and ⇧⌘5), and it takes the place of ⇧⌘2 in other apps, such as Xcode's Devices and
+Simulators. Should a macOS shortcut be set to it in Keyboard Shortcuts, macOS answers it and
+Shotts leaves it alone, so the two never answer the same press. Below, F10 stands for either. Another app may answer F10 too: macOS lets two apps hold one key, and only
 one that holds it exclusively stops Shotts having it, when the menu says so: Capture Area
 (another app has F10). F10 does nothing while a capture or a recording is being set up; it stops
 a recording under way, and ends a scrolling capture.

@@ -47,12 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         }
         let capture = HotKey.register { [weak self] in self?.captureArea() }
         let showLast = HotKey.register(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
-        // ⇧⌘4 and ⌥⇧⌘4 as well, for a keyboard whose top row controls the Mac, but only once
-        // macOS's own ⇧⌘4 is turned off: until then macOS answers it, and Shotts lets it.
-        _ = HotKey.register(kVK_ANSI_4, modifiers: cmdKey | shiftKey) { [weak self] in
+        // ⇧⌘2 and ⌥⇧⌘2 as well, for a keyboard whose top row controls the Mac, where F10 needs
+        // fn. No shortcut of macOS's out of the box; should the user make it one, macOS answers
+        // it, and Shotts lets it.
+        _ = HotKey.register(kVK_ANSI_2, modifiers: cmdKey | shiftKey) { [weak self] in
             if !Self.macOSAnswers(SystemShortcuts.shift | SystemShortcuts.command) { self?.captureArea() }
         }
-        _ = HotKey.register(kVK_ANSI_4, modifiers: cmdKey | shiftKey | optionKey) { [weak self] in
+        _ = HotKey.register(kVK_ANSI_2, modifiers: cmdKey | shiftKey | optionKey) { [weak self] in
             if !Self.macOSAnswers(SystemShortcuts.shift | SystemShortcuts.command | SystemShortcuts.option) { self?.flow.showLast() }
         }
         makeStatusItem(hasHotKey: capture, hasShowLastKey: showLast)
@@ -98,13 +99,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
     }
 
-    /// Whether macOS answers "4" with `modifiers` itself, read afresh at each press, so turning
-    /// its ⇧⌘4 off in System Settings hands the key to Shotts at once.
+    /// Whether macOS answers "2" with `modifiers` itself, read afresh at each press, so a change
+    /// in System Settings needs no restart.
     private static func macOSAnswers(_ modifiers: Int) -> Bool {
         let domain = "com.apple.symbolichotkeys" as CFString
         CFPreferencesAppSynchronize(domain)
         let shortcuts = CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, domain) as? [String: Any]
-        return SystemShortcuts.macOSAnswers(keyCode: SystemShortcuts.four, modifiers: modifiers, in: shortcuts)
+        return SystemShortcuts.macOSAnswers(keyCode: SystemShortcuts.two, modifiers: modifiers, in: shortcuts)
     }
 
     private var poweringOff = false

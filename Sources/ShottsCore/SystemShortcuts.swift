@@ -2,13 +2,13 @@ import Foundation
 
 /// macOS's own keyboard shortcuts, as System Settings › Keyboard › Keyboard Shortcuts keeps them
 /// (`AppleSymbolicHotKeys` in `com.apple.symbolichotkeys`), and whether one of them is a given
-/// key. Shotts answers ⇧⌘4 only once macOS no longer does: two apps holding a key both answer it,
-/// and two crosshairs at once would be worse than none.
+/// key. Shotts answers ⇧⌘2 only while macOS does not, which out of the box it never does: two
+/// apps holding a key both answer it, and two crosshairs at once would be worse than none.
 public enum SystemShortcuts {
     /// Modifiers as macOS writes them there (and as `NSEvent` has them).
     public static let shift = 0x2_0000, control = 0x4_0000, option = 0x8_0000, command = 0x10_0000
-    /// The key code of "4".
-    public static let four = 21
+    /// The key codes of "2" and "4".
+    public static let two = 19, four = 21
 
     /// The shortcuts on ⇧⌘4 and ⌃⇧⌘4 until the user changes them, which an entry missing from
     /// the list means: area to a file, and area to the clipboard.

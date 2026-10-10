@@ -100,8 +100,11 @@ Decided against, so they are not rebuilt:
 
 Deferred, with the reason each waits:
 
-- Configurable shortcuts: not for now, the owner says. F10 and ⇧⌘4 both work, with no setting:
-  F10 for a top row of F-keys (fn-F10 otherwise), ⇧⌘4 for everyone once macOS's own is off.
+- Configurable shortcuts: not for now, the owner says. F10 and ⇧⌘2 both work, with no setting:
+  F10 for a top row of F-keys (fn-F10 otherwise), ⇧⌘2 on any keyboard. 0.9.1's ⇧⌘4 needed
+  macOS's own turned off first (both answer a key two apps hold, so Shotts deferred to it), too
+  much to ask; ⇧⌘6 was too far for the left hand; ⇧⌘2 is no macOS shortcut, at the cost of
+  taking it from apps that use it (Xcode's Devices and Simulators).
   The Mission Control key (F3 without fn on a stock keyboard) was tried and cannot be had: a
   Carbon hot key on its key code (160) registers but never fires, macOS keeping it. A red dot
   for a key another app holds was asked for with shortcut work, but cannot be told reliably:
@@ -139,7 +142,7 @@ Deferred, with the reason each waits:
 | | `AppLocation.swift` | Whether to offer moving the app to Applications, and to which one. |
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
-| | `SystemShortcuts.swift` | Whether macOS answers a key itself, from its Keyboard Shortcuts list (an entry missing is at its default): ⇧⌘4 is Shotts' only once macOS's is off. |
+| | `SystemShortcuts.swift` | Whether macOS answers a key itself, from its Keyboard Shortcuts list (an entry missing is at its default): ⇧⌘2 is Shotts' unless a macOS shortcut is set to it. |
 | | `Quitting.swift` | What quitting would lose (annotated captures, unsaved recordings), as the question Quit asks, or nil to quit at once. |
 | | `AutoScroll.swift` | How Shotts paces its scrolling: the step, backing up and slowing when a frame is not matched, giving up after five in a row, the bottom as where the picture stops growing, the other direction tried once. |
 | | `ScrollStitcher.swift` | A scrolling capture's picture from its frames: row fingerprints, the shift that fits (coarse, then fine, nearest the last move among near-ties), sticky bands kept once, new rows added and taken again until they scroll up, a size cap. |
@@ -171,7 +174,7 @@ Deferred, with the reason each waits:
 | | `ScrollCapture.swift` | Streams the area for a scrolling capture and feeds each frame to `ScrollStitcher` off the main thread. |
 | | `InputWatcher.swift` | Clicks (a global mouse monitor) and keys (a listen-only event tap, needing Input Monitoring) while a recording that shows them runs. |
 | | `Recorder.swift` | Records an area through ScreenCaptureKit, the Mac's sound with it, and the microphone through AVFoundation. |
-| | `HotKey.swift` | The Carbon hot keys: F10 and ⇧⌘4 capture (or stop a recording), each with Option bringing the last capture back; ⇧⌘4 is answered only once macOS's own is off (`SystemShortcuts`). |
+| | `HotKey.swift` | The Carbon hot keys: F10 and ⇧⌘2 capture (or stop a recording), each with Option bringing the last capture back; ⇧⌘2 is left to macOS should one of its shortcuts be set to it (`SystemShortcuts`). |
 | | `MoveToApplications.swift` | A release launched outside Applications offers to move itself there. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
 | ShottsCLI | `main.swift` | `shotts`: parses, connects (starting Shotts with `open -g -b` when nothing listens), prints, exits with the answer's code, and turns Control-C into `stop`, then `abort`. |

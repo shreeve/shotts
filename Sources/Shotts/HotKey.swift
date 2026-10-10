@@ -1,7 +1,7 @@
 import AppKit
 import Carbon
 
-/// F10 and ⇧⌘4, and each with Option, system-wide, registered through Carbon so they need no
+/// F10 and ⇧⌘2, and each with Option, system-wide, registered through Carbon so they need no
 /// Accessibility permission. Only these keys reach Shotts; nothing else is observed. They live
 /// as long as the app: there is no unregistering, by design. Another app holding the same key
 /// does not stop it registering: both answer it.
