@@ -63,7 +63,9 @@ public nonisolated final class ScriptServer: @unchecked Sendable {
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: DispatchQueue(label: "com.github.shreeve.shotts.script"))
         let (handle, deadlines) = (handle, deadlines)
         source.setEventHandler {
-            while case let client = accept(fd, nil, nil), client >= 0 {
+            // Every connection waiting; one given up before it was taken is passed over.
+            while case let client = accept(fd, nil, nil), client >= 0 || errno == EINTR || errno == ECONNABORTED {
+                guard client >= 0 else { continue }
                 var uid: uid_t = 0, gid: gid_t = 0
                 guard getpeereid(client, &uid, &gid) == 0, uid == getuid() else {
                     close(client)

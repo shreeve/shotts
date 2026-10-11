@@ -12,10 +12,11 @@ import Testing
         return folder.appendingPathComponent("cli.sock").path
     }
 
-    /// Gives up reading after five seconds, so a server that never answers fails the test rather
-    /// than hanging the run; and a server gone first is an error to write to, not a signal.
+    /// Gives up reading after thirty seconds, so a server that never answers fails the test
+    /// rather than hanging the run, while one whose handler waits on a main thread other tests
+    /// keep busy still answers; and a server gone first is an error to write to, not a signal.
     private nonisolated static func prepare(_ fd: Int32) {
-        var limit = timeval(tv_sec: 5, tv_usec: 0)
+        var limit = timeval(tv_sec: 30, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &limit, socklen_t(MemoryLayout<timeval>.size))
         var on: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
@@ -137,8 +138,8 @@ import Testing
         }
         try server.start()
         defer { server.stop() }
-        let answers = await Self.exchange(path, ScriptRequest(command: .record).line(), pause: .milliseconds(500))
-        #expect(sending < .milliseconds(400))
+        let answers = await Self.exchange(path, ScriptRequest(command: .record).line(), pause: .seconds(2))
+        #expect(sending < .seconds(1))
         #expect(answers.last?.state == .done)
         #expect(answers.count < 200, "\(answers.count) lines: the progress lines waiting were not cut to the newest")
         #expect(answers.dropLast().last?.progress == 1999.0 / 2000)
