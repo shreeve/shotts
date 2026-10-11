@@ -154,7 +154,7 @@ Deferred, with the reason each waits:
 | | `RecordingWindow.swift` | `RecordingWindowController`: the player, the export settings, the file made in the background, Copy, Save, the drag grip, the question before deleting a recording that went nowhere, and deleting it all once the last Copy or Save is done. |
 | | `RecordingExport.swift` | `Recording` (the kept files) and `RecordingExport`: MP4 and GIF files from it, off the main thread. |
 | | `ScriptServer.swift` | The socket `shotts` talks to, on Dispatch: the user's own folder, the peer's uid, a request line in (with a deadline), result lines out without blocking, and a tool hanging up first. |
-| | `ScriptFiles.swift` | Where `shotts`' files go when none are named (never over another), stills written at a width, and every file made in a private folder beside its place and moved there once all are made. |
+| | `ScriptFiles.swift` | Where `shotts`' files go when none are named (never over another), stills written at a width, and every file made in a private folder on its place's volume and moved there once all are made. |
 | Shotts | `ShottsApp.swift` | `AppDelegate`: menu bar item and menu, main menu, the hot keys and whether macOS answers ⇧⌘2 itself, quitting, Start at Login, Install Command-Line Tool, Sparkle. |
 | | `CaptureFlow.swift` | One capture from hot key to editor, a recording and a scrolling capture from setup to window, whether Shotts is busy, what quitting would lose, which app gets focus back, and the capture closed last. |
 | | `ScreenCapture.swift` | Screen Recording permission and its one prompt, a clicked window through ScreenCaptureKit, and the window list; for `shotts`, the numbered displays, the windows it lists, and an area of a display. |
@@ -354,8 +354,9 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
   "recording" answer waits for the first frame (`firstFrame(within:)`, five seconds: a minimized
   window sends none). The menu bar timer shows it, and F10, the timer, and quitting stop it
   through `AppDelegate`, which asks `ScriptRunner` before `CaptureFlow`. F10 and `shotts` wait for
-  each other: the hot keys do nothing while a request is under way (`ScriptRunner.isBusy`, from
-  its countdown until its files are placed), and `shotts` answers `busy` while F10 has a picker,
+  each other: while a request is under way (`ScriptRunner.isBusy`, from its countdown until its
+  files are placed), F10 stops its recording or its countdown and otherwise beeps, and Option-F10
+  does nothing; `shotts` answers `busy` while F10 has a picker,
   recording, scrolling capture, or alert up (`CaptureFlow.isBusyHere`).
 - **The tool's threads.** Everything in `main.swift` happens on the main queue: Control-C
   arrives there, and each line read from Shotts is handed there. The main thread runs its run
@@ -386,11 +387,12 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
 - **Files.** `RecordingExport.write` with `RecordingSettings.width` (never wider than the
   recording), returning size and frame count; stills scaled by `ScriptRequest.stillSize` and
   encoded by `Export.encode`, so they carry the capture's resolution. Each is made in a private,
-  randomly named folder beside its place (`.shotts-…`, 0700), where nothing planted can redirect
-  the write, and moved into place once every file is made. A path the user named replaces what
+  randomly named folder on its place's volume (macOS's item-replacement folder in the user's
+  private temporary folder, which macOS clears; or `.shotts-…` beside the place, 0700, should
+  that fail), where nothing planted can redirect the write, and moved into place once every file
+  is made. A path the user named replaces what
   is there; a default name never does, but takes " 2", " 3"… as the Finder numbers. The
-  recording's folder goes once they are made, as a closed window's does; a Shotts quitting
-  mid-export can leave a private folder behind.
+  recording's folder goes once they are made, as a closed window's does.
 
 ## Scrolling capture
 

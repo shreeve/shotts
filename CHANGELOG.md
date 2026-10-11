@@ -49,7 +49,8 @@ The command line (`shotts`):
 - New exit code 6 (`unavailable`) when Shotts is not installed or does not answer.
 - `--audio system,mic` is gone: use `both`.
 - `shotts` opens the Shotts it is inside, and window titles with control characters print safely.
-- F10 and `shotts` wait for each other instead of capturing each other's windows.
+- F10 and `shotts` wait for each other instead of capturing each other's windows; F10 stops a
+  `shotts` countdown, and beeps while a request is otherwise busy.
 
 Smaller and safer builds:
 - The app is 16% smaller and `shotts` 41% smaller.

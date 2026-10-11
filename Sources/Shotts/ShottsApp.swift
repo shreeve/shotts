@@ -125,7 +125,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     /// F10: a capture, or while `shotts` is recording, the end of that recording.
     @objc private func captureArea() {
-        if script.isRecording { script.stopRecording() } else { flow.begin() }
+        // F10 stops what `shotts` started: a recording, or a countdown; while a request is busy
+        // otherwise (capturing, or making its files), it beeps rather than doing nothing.
+        if script.isRecording {
+            script.stopRecording()
+        } else if script.isCountingDown {
+            script.stopCountdowns()
+        } else if script.isBusy {
+            NSSound.beep()
+        } else {
+            flow.begin()
+        }
     }
 
     /// Open Image…: the editor, or a cancelled panel, gives focus back to the app in front when

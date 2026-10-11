@@ -28,6 +28,9 @@ final class ScriptRunner {
     private var last: ScriptResult?
     /// Stills being taken, from their countdown until their files are placed.
     private var stills = 0
+    /// Countdowns going, and how many times F10 has stopped them: a countdown that sees the count
+    /// change is given up.
+    private var countdowns = 0, countdownsStopped = 0
 
     private final class Session {
         let request: ScriptRequest
@@ -75,6 +78,12 @@ final class ScriptRunner {
     /// Whether a request is being carried out, from its countdown until its files are placed:
     /// the picker opened now would be in its capture, and a recording started now a second one.
     var isBusy: Bool { session != nil || stills > 0 }
+
+    /// Whether a request is counting down its `--delay`, which F10 stops.
+    var isCountingDown: Bool { countdowns > 0 }
+
+    /// F10 during a countdown: every request counting down is given up and answered so.
+    func stopCountdowns() { countdownsStopped += 1 }
 
     /// Recordings asked for by `shotts` whose files are not yet placed, which quitting would
     /// lose: at most one, since one records at a time.
@@ -141,24 +150,32 @@ final class ScriptRunner {
     private func wait(_ request: ScriptRequest, while going: () -> Bool) async -> Bool {
         guard request.delay > 0 else { return true }
         let end = Date.now.addingTimeInterval(request.delay)
-        defer { onCountdown?(nil) }
+        let stopped = countdownsStopped
+        countdowns += 1
+        defer {
+            countdowns -= 1
+            onCountdown?(nil)
+        }
         while case let left = end.timeIntervalSinceNow, left > 0 {
-            guard going() else { return false }
+            guard going(), countdownsStopped == stopped else { return false }
             onCountdown?(Int(exactly: left.rounded(.up)) ?? 0)
             try? await Task.sleep(for: .seconds(min(left, 0.1)))
         }
-        return going()
+        return going() && countdownsStopped == stopped
     }
 
     // MARK: - Stills
 
     private func shot(_ request: ScriptRequest, aim: ScriptAim, displays: [ScreenCapture.NumberedDisplay], connection: ScriptConnection) async {
         guard !isBusyElsewhere() else {
-            return answer(connection, .failure(request.command, ScriptError(.busy, "Shotts is busy with a capture from F10; try again once it is done")))
+            return answer(connection, .failure(request.command, ScriptError(.busy, "Shotts is busy with a capture, recording, or alert of its own; try again once it is done")))
         }
         stills += 1
         defer { stills -= 1 }
-        guard await wait(request, while: { !connection.isGone }) else { return }
+        guard await wait(request, while: { !connection.isGone }) else {
+            if !connection.isGone { answer(connection, .failure(request.command, ScriptError(.captureFailed, "Stopped with F10 before capturing."))) }
+            return
+        }
         let image: CGImage, scale: Double
         let started = Date.now
         do {
@@ -199,7 +216,7 @@ final class ScriptRunner {
             return answer(connection, .failure(request.command, ScriptError(.busy, "Shotts is already recording; `shotts stop` ends it")))
         }
         guard !isBusyElsewhere() else {
-            return answer(connection, .failure(request.command, ScriptError(.busy, "Shotts is busy with a capture from F10; try again once it is done")))
+            return answer(connection, .failure(request.command, ScriptError(.busy, "Shotts is busy with a capture, recording, or alert of its own; try again once it is done")))
         }
         let session = Session(request: request, aim: aim, outputs: ScriptFiles.outputs(for: request), asker: connection)
         self.session = session

@@ -30,11 +30,15 @@ standard function keys" is on. ⇧⌘2 does the same on any keyboard, with no fn
 up, and Option-⇧⌘2 brings the last capture back; it is no shortcut of macOS's (whose own are
 ⇧⌘3, ⇧⌘4, and ⇧⌘5), and it takes the place of ⇧⌘2 in other apps, such as Xcode's Devices and
 Simulators. Should a macOS shortcut be set to it in Keyboard Shortcuts, macOS answers it and
-Shotts leaves it alone, so the two never answer the same press. Below, F10 stands for either. Another app may answer F10 too: macOS lets two apps hold one key, and only
-one that holds it exclusively stops Shotts having it, when the menu says so: Capture Area
-(another app has F10). F10 does nothing while a capture or a recording is being set up; it stops
-a recording under way, and ends a scrolling capture. Option-F10 does nothing while any of these
-is up, and neither does anything while one of Shotts' alerts or its Print window is open.
+Shotts leaves it alone, so the two never answer the same press. Below, F10 stands for either.
+Another app may answer F10 too: macOS lets two apps hold one key, and only one that holds it
+exclusively stops Shotts having it, when the menu says so: Capture Area (another app has F10).
+
+F10 does nothing while a capture or a recording is being set up; it stops a recording under
+way, and ends a scrolling capture. Option-F10 does nothing while any of these is up, and neither
+does anything while one of Shotts' alerts or its Print window is open. With a `shotts` request
+under way, F10 stops its recording or its countdown, and otherwise beeps until its files are
+placed; Option-F10 waits for it too.
 
 | Action | Result |
 | --- | --- |
@@ -352,7 +356,7 @@ shotts list   [--json]
   folder beside its place and moved there once all are made: a file named replaces what was
   there, and one Shotts names never does, taking a number after its name as the Finder does.
 - **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`, `1h`, up to a day. `--delay` counts down in the
-  menu bar first.
+  menu bar first, and F10 stops the countdown, capturing nothing.
 - `--width` (16 to 16384 pixels) makes files narrower in proportion, never wider. Without it, a
   still and an MP4 are their full pixel size, and a GIF the size the area has on screen (half,
   from a Retina display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
@@ -387,7 +391,7 @@ shotts list   [--json]
 - **Exit status**: 0 done; 1 the capture or a file failed (`capture_failed`, `encode_failed`); 2
   a mistake in the command (`usage`); 3 no permission, or Allow Command-Line Capture is off
   (`permission`, `not_allowed`); 4 no such window or display, or several windows match
-  (`not_found`, `ambiguous_window`); 5 already recording (`busy`); 6 Shotts is not installed, did
+  (`not_found`, `ambiguous_window`); 5 already recording, or busy with a capture, recording, or alert from F10 (`busy`); 6 Shotts is not installed, did
   not answer, or stopped answering (`unavailable`).
 
 ## Not built

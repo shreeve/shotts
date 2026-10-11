@@ -69,9 +69,18 @@ public enum ScriptFiles {
         }
     }
 
-    /// A new folder beside `path` that only this user can open, named at random.
+    /// A new folder on `path`'s volume that only this user can open, named at random: macOS's own
+    /// for replacing an item there, in the user's private temporary folder, which it clears, so a
+    /// Shotts stopped mid-export leaves nothing beside the file; failing that, one beside it.
     static func folder(beside path: String) throws(Failure) -> URL {
-        var template = Array(((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(".shotts-XXXXXXXX").utf8CString)
+        let parent = URL(fileURLWithPath: (path as NSString).deletingLastPathComponent, isDirectory: true)
+        var isFolder: ObjCBool = false
+        // A place that is not there fails here, before anything is made, as the folder beside it does.
+        if FileManager.default.fileExists(atPath: parent.path, isDirectory: &isFolder), isFolder.boolValue,
+           let folder = try? FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: parent, create: true) {
+            return folder
+        }
+        var template = Array((parent.path as NSString).appendingPathComponent(".shotts-XXXXXXXX").utf8CString)
         guard let made = template.withUnsafeMutableBufferPointer({ mkdtemp($0.baseAddress).map { String(cString: $0) } }) else {
             throw Failure(String(cString: strerror(errno)))
         }

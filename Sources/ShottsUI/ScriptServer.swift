@@ -60,7 +60,8 @@ public nonisolated final class ScriptServer: @unchecked Sendable {
             close(fd)
             throw Failure.socket("bind: \(reason)")
         }
-        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: DispatchQueue(label: "com.github.shreeve.shotts.script"))
+        let queue = DispatchQueue(label: "com.github.shreeve.shotts.script")
+        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
         let (handle, deadlines) = (handle, deadlines)
         source.setEventHandler {
             // Every connection waiting; one given up before it was taken is passed over.
@@ -72,6 +73,12 @@ public nonisolated final class ScriptServer: @unchecked Sendable {
                     continue
                 }
                 ScriptConnection(client, deadlines: deadlines).begin(handle)
+            }
+            // Out of descriptors, the connection stays waiting and the source would fire again at
+            // once: it rests a moment instead of spinning.
+            if errno == EMFILE || errno == ENFILE {
+                source.suspend()
+                queue.asyncAfter(deadline: .now() + 0.1) { source.resume() }
             }
         }
         // Closed only once the source is done with it, so nothing ever waits on a number that

@@ -44,15 +44,18 @@ import Testing
         #expect(FileManager.default.fileExists(atPath: ScriptFiles.screenshotFolder().path, isDirectory: &folder) == folder.boolValue)
     }
 
-    /// A file is made in a new folder beside its place, only the user's and named at random, and
-    /// nothing is at the place until it is put there; the folder goes with it.
+    /// A file is made in a new folder on its place's volume, only the user's and named at random,
+    /// not beside its place, so a Shotts stopped mid-export leaves nothing there; nothing is at
+    /// the place until it is put there, and the folder goes with it.
     @Test func madeBesideThenPlaced() async throws {
         let dir = try folder()
         let output = ScriptFiles.Output(path: dir.appendingPathComponent("a.png").path, format: .png, replaces: true)
         let first = try await make(output, "one")
         let second = try await make(output, "two")
         #expect(first.partial.deletingLastPathComponent() != second.partial.deletingLastPathComponent())
-        #expect(first.partial.deletingLastPathComponent().deletingLastPathComponent().standardizedFileURL == dir.standardizedFileURL)
+        let volume = { (url: URL) in try url.resourceValues(forKeys: [.volumeIdentifierKey]).volumeIdentifier as? NSObject }
+        #expect(try volume(first.partial.deletingLastPathComponent()) == volume(dir))
+        #expect(!first.partial.path.hasPrefix(dir.standardizedFileURL.path + "/") && !first.partial.path.hasPrefix(dir.path + "/"))
         let mode = try FileManager.default.attributesOfItem(atPath: first.partial.deletingLastPathComponent().path)[.posixPermissions] as? Int
         #expect(mode == 0o700)
         #expect(!FileManager.default.fileExists(atPath: output.path))

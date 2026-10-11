@@ -17,8 +17,8 @@ import Testing
         #expect(ScriptParser.seconds("1m30") == nil && ScriptParser.seconds("5x") == nil && ScriptParser.seconds("") == nil && ScriptParser.seconds("-1") == nil)
     }
 
-    /// Times, widths, and file counts have bounds: a delay of 1e19 seconds once reached a
-    /// conversion that stopped Shotts, and every open capture with it.
+    /// Times, widths, and file counts have bounds: a delay of 1e19 seconds overflows the
+    /// conversion to whole seconds, which would stop Shotts and every open capture with it.
     @Test func valuesAreBounded() throws {
         for line in ["shot a.png --display 1 --delay 1e19", "shot a.png --display 1 --delay 25h", "record --display 1 --duration 1e19",
                      "record --display 1 --duration 24h1s", "shot a.png --display 1 --width 16385", "shot a.png --display 1 --width 15",
