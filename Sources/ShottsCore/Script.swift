@@ -83,15 +83,13 @@ public struct ScriptRequest: ScriptLine, Codable, Equatable, Sendable {
 
     public init(command: ScriptCommand) { self.command = command }
 
-    /// `system`, `mic`, or `both`; `system,mic` (in either order), which 0.6.2 took, still means both.
+    /// `system`, `mic`, or `both`.
     public static func audio(_ text: String) -> RecordingSettings.Sound? {
-        if text.lowercased() == "both" { return .both }
-        let parts = Set(text.lowercased().split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
-        guard !parts.isEmpty, parts.isSubset(of: ["system", "mic"]) else { return nil }
-        switch (parts.contains("system"), parts.contains("mic")) {
-        case (true, true): return .both
-        case (true, false): return .system
-        default: return .microphone
+        switch text.lowercased() {
+        case "system": .system
+        case "mic": .microphone
+        case "both": .both
+        default: nil
         }
     }
 

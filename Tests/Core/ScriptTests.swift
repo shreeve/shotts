@@ -310,14 +310,12 @@ import Testing
         try ScriptParser.parse(args.split(separator: " ").map(String.init), workingDirectory: "/w")
     }
 
-    /// System, mic, or both, in either order; none unless asked.
+    /// System, mic, or both; none unless asked.
     @Test func values() throws {
         #expect(ScriptRequest.audio("system") == .system)
         #expect(ScriptRequest.audio("mic") == .microphone)
         #expect(ScriptRequest.audio("both") == .both && ScriptRequest.audio("Both") == .both)
-        // What 0.6.2 took still works.
-        #expect(ScriptRequest.audio("system,mic") == .both && ScriptRequest.audio("MIC, system") == .both)
-        #expect(ScriptRequest.audio("system,speakers") == nil && ScriptRequest.audio("all") == nil && ScriptRequest.audio("") == nil)
+        #expect(ScriptRequest.audio("system,mic") == nil && ScriptRequest.audio("system,speakers") == nil && ScriptRequest.audio("all") == nil && ScriptRequest.audio("") == nil)
         #expect(try parse("record a.mp4 --window 1").audio == nil)
         #expect(try parse("record a.mp4 a.gif --window 1 --audio mic").audio == .microphone)
         // No file named makes an MP4, which can have sound.
