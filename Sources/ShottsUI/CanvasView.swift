@@ -199,10 +199,8 @@ public final class CanvasView: NSView {
         commit(d)
     }
 
-
     /// Escape: typing, then a drag in progress, then the selection, each put back as it was
-    /// before. False when there was
-    /// nothing to cancel.
+    /// before. False when there was nothing to cancel.
     public func cancelCurrent() -> Bool {
         if let entry = textField {
             // Typing is undone whole: new words go, a new callout goes with its arrow, and words

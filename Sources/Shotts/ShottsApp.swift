@@ -263,8 +263,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         button.setAccessibilityLabel("Capturing in \(seconds) seconds")
     }
 
-    // MARK: - The command line
-
     // MARK: - Start at Login
 
     /// Shotts as a login item, through macOS itself, which keeps the setting: it shows in System
