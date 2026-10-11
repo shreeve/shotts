@@ -281,6 +281,19 @@ import Testing
         #expect(colored.contains("\u{1B}[1mTITLE\u{1B}[0m               │") && colored.contains("\u{1B}[2m2 windows\u{1B}[0m"))
     }
 
+    /// A window's title and app name are any app's or web page's to set: what a terminal would
+    /// take as a command, or as reordering, shows as U+FFFD, boxed or plain.
+    @Test func titlesCannotCommandTheTerminal() {
+        let window = ScriptWindow(id: 1, app: "Evil\u{1B}]0;title\u{07}", bundle: "e", title: "a\u{1B}[2Jb\u{202E}c\u{9B}d\r\n",
+                                  frame: [0, 0, 1, 1], display: 1)
+        let table = ScriptListing.windows([window])
+        let tabbed = TextTable(title: "x\u{1B}y", columns: [.init("A")], rows: [["1"]], notes: ["n\u{2066}"])
+        for text in [table.plain(), table.boxed(color: false), tabbed.boxed(color: false)] {
+            #expect(!text.unicodeScalars.contains { [0x1B, 0x07, 0x9B, 0x202E, 0x2066, 0x0D].contains($0.value) }, "\(text.debugDescription)")
+        }
+        #expect(table.plain().contains("a\u{FFFD}[2Jb\u{FFFD}c\u{FFFD}d\u{FFFD}\n"))
+    }
+
     /// Wide characters take two columns, and are never split.
     @Test func wideCharacters() {
         #expect(TextTable.width(of: "日本語") == 6 && TextTable.width(of: "a🎉b") == 4)
