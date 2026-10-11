@@ -24,6 +24,8 @@ final class ScriptRunner {
     private var session: Session?
     /// The last recording's answer, which `stop` gives when nothing is recording.
     private var last: ScriptResult?
+    /// Stills being taken, from their countdown until their files are placed.
+    private var stills = 0
 
     private final class Session {
         let request: ScriptRequest
@@ -67,6 +69,14 @@ final class ScriptRunner {
 
     /// Whether a recording asked for by `shotts` is under way, which F10 and quitting stop.
     var isRecording: Bool { session?.recorder != nil && session?.finishing == false }
+
+    /// Whether a request is being carried out, from its countdown until its files are placed:
+    /// the picker opened now would be in its capture, and a recording started now a second one.
+    var isBusy: Bool { session != nil || stills > 0 }
+
+    /// Recordings asked for by `shotts` whose files are not yet placed, which quitting would
+    /// lose: at most one, since one records at a time.
+    var unsavedRecordings: Int { session?.recorder != nil ? 1 : 0 }
 
     /// F10, the menu bar timer, or quitting: the recording ends and its files are made.
     func stopRecording() {
@@ -145,6 +155,8 @@ final class ScriptRunner {
     // MARK: - Stills
 
     private func shot(_ request: ScriptRequest, aim: ScriptAim, displays: [ScreenCapture.NumberedDisplay], connection: ScriptConnection) async {
+        stills += 1
+        defer { stills -= 1 }
         guard await wait(request, while: { !connection.isGone }) else { return }
         let image: CGImage, scale: Double
         let started = Date.now
