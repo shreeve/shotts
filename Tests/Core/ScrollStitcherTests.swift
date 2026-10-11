@@ -66,10 +66,13 @@ struct ScrollTestPage {
     }
 }
 
-private extension ScrollStitcher {
-    mutating func add(_ frame: [UInt8], width: Int) -> Step {
+extension ScrollStitcher {
+    func add(_ frame: [UInt8], width: Int) -> Step {
         frame.withUnsafeBytes { add($0, bytesPerRow: width * 4) }
     }
+
+    /// The picture so far, copied.
+    func picture() -> [UInt8] { withPicture { Array($0) } }
 }
 
 @Suite struct ScrollStitcherTests {
@@ -78,7 +81,7 @@ private extension ScrollStitcher {
     /// Scrolled by uneven amounts, still for a frame, and back up a little: the picture is the
     /// page, header and footer once each, every row in its place.
     @Test func scrollingBuildsThePage() {
-        var stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
         let offsets = [0, 30, 75, 75, 141, 120, 263, 400, 512]
         var steps: [ScrollStitcher.Step] = []
         for o in offsets { steps.append(stitcher.add(page.frame(at: o), width: page.width)) }
@@ -92,7 +95,7 @@ private extension ScrollStitcher {
     /// once at the bottom of the picture, not at every step down it.
     @Test func cornersComeOnce() {
         let page = ScrollTestPage(rows: 2000, footerRows: 0, corners: true)
-        var stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
         for o in [0, 30, 75, 141, 263, 400] { _ = stitcher.add(page.frame(at: o), width: page.width) }
         #expect(stitcher.picture() == page.expected(through: 400))
     }
@@ -100,7 +103,7 @@ private extension ScrollStitcher {
     /// A blinking cursor and a little noise in every frame still match, and the rows kept are
     /// the frames' own.
     @Test func smallChangesStillMatch() {
-        var stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
         var moves: [ScrollStitcher.Step] = []
         for (i, o) in [0, 24, 61, 100, 158].enumerated() {
             moves.append(stitcher.add(page.frame(at: o, noise: true, cursor: i % 2 == 1, seed: UInt64(i + 1)), width: page.width))
@@ -112,7 +115,7 @@ private extension ScrollStitcher {
     /// Too far in one frame to overlap enough: not believed, and the next frame that does
     /// overlap the last one taken goes on from there.
     @Test func aJumpIsLostAndRecovered() {
-        var stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
         #expect(stitcher.add(page.frame(at: 0), width: page.width) == .started)
         #expect(stitcher.add(page.frame(at: 20), width: page.width) == .moved(20))
         #expect(stitcher.add(page.frame(at: 20 + page.middleRows), width: page.width) == .lost)
@@ -122,16 +125,38 @@ private extension ScrollStitcher {
 
     /// Never scrolled: the picture is the one frame.
     @Test func noScrollIsTheFrame() {
-        var stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
         let frame = page.frame(at: 0)
         #expect(stitcher.add(frame, width: page.width) == .started)
         #expect(stitcher.add(frame, width: page.width) == .unmoved)
         #expect(stitcher.picture() == frame && stitcher.pictureHeight == page.window)
     }
 
+    /// The picture stops growing at the cap: what it has is kept, and nothing more is added.
+    @Test func thePictureStopsAtTheCap() {
+        let stitcher = ScrollStitcher(width: page.width, height: page.window, maxBytes: (page.window + 100) * page.width * 4)
+        var steps: [ScrollStitcher.Step] = []
+        for o in stride(from: 0, through: 175, by: 25) { steps.append(stitcher.add(page.frame(at: o), width: page.width)) }
+        #expect(steps == [.started, .moved(25), .moved(25), .moved(25), .moved(25), .full, .full, .full])
+        #expect(stitcher.isFull && stitcher.pictureHeight == page.window + 100)
+        #expect(stitcher.picture() == page.expected(through: 100))
+    }
+
+    /// The picture is handed over as it is, its bytes the caller's; nothing is added after.
+    @Test func thePictureIsHandedOver() throws {
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
+        #expect(stitcher.takePicture() == nil)
+        for o in [0, 50] { _ = stitcher.add(page.frame(at: o), width: page.width) }
+        let picture = try #require(stitcher.takePicture())
+        defer { picture.deallocate() }
+        #expect(Array(picture) == page.expected(through: 50))
+        #expect(stitcher.add(page.frame(at: 80), width: page.width) == .full)
+        #expect(stitcher.takePicture() == nil)
+    }
+
     /// A frame's rows may be padded past its width, as a pixel buffer's are.
     @Test func paddedRows() {
-        var stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
         func padded(_ frame: [UInt8]) -> [UInt8] {
             (0..<page.window).flatMap { y in Array(frame[y * page.width * 4..<(y + 1) * page.width * 4]) + [UInt8](repeating: 7, count: 64) }
         }
@@ -194,7 +219,7 @@ struct ScrollTestList {
     /// Rows still blank where they came into view are taken again once drawn, in a frame that
     /// moved on or in one that did not: none is left blank.
     @Test func rowsDrawnLateComeIn() {
-        var stitcher = ScrollStitcher(width: list.width, height: list.window)
+        let stitcher = ScrollStitcher(width: list.width, height: list.window)
         let frames = [(0, 0), (40, 50), (90, 50), (140, 50), (140, 0)]
         var steps: [ScrollStitcher.Step] = []
         for (o, undrawn) in frames { steps.append(stitcher.add(list.frame(at: o, undrawn: undrawn), width: list.width)) }
@@ -205,7 +230,7 @@ struct ScrollTestList {
     /// Scrolled back up a little at the end: the bottom continues the picture, from the frame
     /// that went furthest, not the last.
     @Test func theBottomIsTheFurthest() {
-        var stitcher = ScrollStitcher(width: list.width, height: list.window)
+        let stitcher = ScrollStitcher(width: list.width, height: list.window)
         for o in [0, 50, 100, 150, 130] { _ = stitcher.add(list.frame(at: o), width: list.width) }
         #expect(stitcher.picture() == list.expected(through: 150))
     }
@@ -220,7 +245,7 @@ struct ScrollTestList {
             return Int(rng >> 33) % n
         }
         for run in 0..<8 {
-            var stitcher = ScrollStitcher(width: list.width, height: list.window)
+            let stitcher = ScrollStitcher(width: list.width, height: list.window)
             var offsets = [0], speed = 10 + random(60)
             while offsets.count < 12 {
                 speed = max(1, speed + random(41) - 20)
@@ -230,5 +255,120 @@ struct ScrollTestList {
             if stitcher.picture() != list.expected(through: offsets.max()!) { failures.append("\(run): \(offsets)") }
         }
         #expect(failures.isEmpty, "\(failures)")
+    }
+}
+
+/// A page under a sticky header, above a composer, as a chat or mail window has: a footer with a
+/// border, a flat body, and a placeholder line, where a caret blinks or a spinner turns.
+struct ScrollTestComposer {
+    let width = 160, window = 240, headerRows = 20, footerRows = 48
+    var middleRows: Int { window - headerRows - footerRows }
+    let page = ScrollTestPage(rows: 2000)
+
+    func footer(_ y: Int, _ x: Int) -> UInt8 { y < 2 ? 180 : ((14..<24).contains(y) && (20..<100).contains(x) ? 150 : 235) }
+
+    /// The window scrolled to `offset` rows into the page, with `mark` drawn dark in the footer:
+    /// its left edge, width, and height, standing 4 rows above the window's bottom.
+    func frame(at offset: Int, mark: (x: Int, width: Int, height: Int)? = nil) -> [UInt8] {
+        var out = [UInt8](repeating: 255, count: width * window * 4)
+        for y in 0..<window {
+            for x in 0..<width {
+                var g = y < headerRows ? page.header(y, x)
+                    : (y >= window - footerRows ? footer(y - (window - footerRows), x) : page.gray(row: offset + y - headerRows, x: x))
+                if let mark, (window - 4 - mark.height)..<(window - 4) ~= y, mark.x..<(mark.x + mark.width) ~= x { g = 0 }
+                let p = (y * width + x) * 4
+                out[p] = g; out[p + 1] = g; out[p + 2] = g
+            }
+        }
+        return out
+    }
+
+    func expected(through offset: Int) -> [UInt8] {
+        let total = headerRows + offset + middleRows + footerRows
+        var out = [UInt8](repeating: 255, count: width * total * 4)
+        for y in 0..<total {
+            for x in 0..<width {
+                let g = y < headerRows ? page.header(y, x)
+                    : (y >= total - footerRows ? footer(y - (total - footerRows), x) : page.gray(row: y - headerRows, x: x))
+                let p = (y * width + x) * 4
+                out[p] = g; out[p + 1] = g; out[p + 2] = g
+            }
+        }
+        return out
+    }
+}
+
+/// A sparse page: white, with one short line of "text", a quarter of the width, every `gap` rows.
+struct ScrollTestSparsePage {
+    let width = 200, window = 400, gap = 200
+
+    func gray(row: Int, x: Int) -> UInt8 {
+        guard row % gap < 14, (10..<60).contains(x) else { return 255 }
+        var h = UInt64((row / gap) &* 2_654_435_761 &+ (x / 2) &* 40_503) &* 0x9E37_79B9_7F4A_7C15
+        h ^= h >> 29
+        return h % 3 == 0 ? 255 : (h % 3 == 1 ? 30 : 120)
+    }
+
+    func frame(at offset: Int) -> [UInt8] { rows(offset..<offset + window) }
+    func expected(through offset: Int) -> [UInt8] { rows(0..<offset + window) }
+
+    private func rows(_ rows: Range<Int>) -> [UInt8] {
+        var out = [UInt8](repeating: 255, count: width * rows.count * 4)
+        for (y, row) in rows.enumerated() {
+            for x in 0..<width {
+                let g = gray(row: row, x: x), p = (y * width + x) * 4
+                out[p] = g; out[p + 1] = g; out[p + 2] = g
+            }
+        }
+        return out
+    }
+}
+
+@Suite struct ScrollStitcherBandTests {
+    let composer = ScrollTestComposer()
+
+    /// A caret blinking, a spinner turning, or a line of status appearing in a sticky footer
+    /// before anything scrolls is not a move: the bands wait for one, and the footer is whole.
+    @Test func aBarChangingBeforeTheFirstMoveDecidesNothing() {
+        for mark in [(x: 60, width: 2, height: 10), (x: 60, width: 24, height: 24), (x: 20, width: 30, height: 10)] {
+            let stitcher = ScrollStitcher(width: composer.width, height: composer.window)
+            var steps = [stitcher.add(composer.frame(at: 0), width: composer.width),
+                         stitcher.add(composer.frame(at: 0, mark: mark), width: composer.width)]
+            for i in 1...10 { steps.append(stitcher.add(composer.frame(at: i * 20, mark: i % 2 == 1 ? mark : nil), width: composer.width)) }
+            #expect(steps == [.started, .unmoved] + Array(repeating: .moved(20), count: 10), "\(mark)")
+            #expect(stitcher.picture() == composer.expected(through: 200), "\(mark)")
+        }
+    }
+
+    /// A spinner turning in the footer at the very frame the page first moves: the rows it
+    /// changed count as still, as the rest of the footer, and every later frame matches.
+    @Test func aBarChangingAtTheFirstMoveIsStillABar() {
+        let stitcher = ScrollStitcher(width: composer.width, height: composer.window)
+        let spinner = (x: 60, width: 24, height: 24)
+        var steps = [stitcher.add(composer.frame(at: 0), width: composer.width)]
+        for i in 1...10 { steps.append(stitcher.add(composer.frame(at: i * 20, mark: i % 2 == 1 ? spinner : nil), width: composer.width)) }
+        #expect(steps == [.started] + Array(repeating: .moved(20), count: 10))
+        #expect(stitcher.footer >= composer.footerRows)
+        #expect(stitcher.picture() == composer.expected(through: 200))
+    }
+
+    /// A first move too far to match decides nothing: the next frame is matched with the one
+    /// before it, and the bands come from that move.
+    @Test func aFirstMoveTooFarIsLost() {
+        let page = ScrollTestPage(rows: 2000)
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let steps = [0, page.middleRows + 20, 30].map { stitcher.add(page.frame(at: $0), width: page.width) }
+        #expect(steps == [.started, .lost, .moved(30)])
+        #expect(stitcher.picture() == page.expected(through: 30))
+    }
+
+    /// A few short lines moving over a page mostly blank: each frame moved, though most of its
+    /// rows are alike, and every row is in its place.
+    @Test func sparseLinesMove() {
+        let page = ScrollTestSparsePage()
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let steps = (0..<20).map { stitcher.add(page.frame(at: $0 * 4), width: page.width) }
+        #expect(steps == [.started] + Array(repeating: .moved(4), count: 19))
+        #expect(stitcher.picture() == page.expected(through: 76))
     }
 }
