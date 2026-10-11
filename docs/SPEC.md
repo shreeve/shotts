@@ -359,18 +359,21 @@ shotts list   [--json]
   at Control-C, at `shotts stop`, at F10 or the menu bar timer (it shows like any recording), or
   when its terminal closes; then it makes the files, saying on a terminal which and how far
   along, prints them, and exits. A second Control-C, even while the files are being made, stops
-  it and keeps nothing: no file it was making or had made (exit 130).
+  it and keeps nothing: no file is placed, and one it was to replace stays as it was (exit 130).
 - **`start`** returns once recording; it ends as `record` does, and after ten minutes unless
   `--duration` says otherwise. **`stop`** ends it and waits for the files; with nothing
-  recording, it prints the last recording's answer. One recording at a time.
+  recording, it prints the last recording's answer. One recording at a time. With Allow
+  Command-Line Capture turned off, `stop` and a second Control-C still end a recording under
+  way, since stopping captures nothing; nothing else is taken.
 - **Answers**: on a terminal, tables in rounded boxes (the files made, their size, frames, and
   bytes; for `list`, the displays and windows), in color unless `NO_COLOR` is set; piped or
   redirected, the paths alone, one a line, and `list` as plain columns. With `--json`, one line
-  of JSON: `ok`, `command`, `state`,
+  of JSON: `ok`, `command` (absent when Shotts could not read the request), `state`,
   `target` (`kind`, `id`, `app`, `bundle`, `title`, `frame`, `scale`, `display`), `started`,
   `duration`, and `files` (`path`, `format`, `width`, `height`, `fps`, `frames`, `bytes`); `list`
   gives `windows` and `displays`. A failure gives `error` (`code`, `message`, and for several
-  matching windows `candidates`) and a line on stderr.
+  matching windows `candidates`) and a line on stderr. In a table, a window's title or app name
+  shows any control character, or mark that reorders text, as �: they are any app's to set.
 - **Exit status**: 0 done; 1 the capture or a file failed (`capture_failed`, `encode_failed`); 2
   a mistake in the command (`usage`); 3 no permission, or Allow Command-Line Capture is off
   (`permission`, `not_allowed`); 4 no such window or display, or several windows match
