@@ -206,9 +206,9 @@ One tall picture of something longer than its window. Press Option while draggin
 to scroll, the part that scrolls (the message list, say, without its sidebar or toolbar), so the
 selection turns blue and reads "■ Scroll", as Command turns it red to record. Letting go
 outlines the area in blue, with a small panel beside it, and capturing starts at once: Shotts
-puts the pointer in the middle of the area and scrolls it down, in steady steps as fast as it
-can stitch, until the picture stops growing (the bottom), and then opens it in an editor, as
-any capture is (and copies it, with Copy to Clipboard on).
+puts the pointer in the middle of the area and, from the first frame, scrolls it down, in steady
+steps as fast as it can stitch, until the picture stops growing (the bottom), and then opens it
+in an editor, as any capture is (and copies it, with Copy to Clipboard on).
 
 | Control | Effect |
 | --- | --- |
@@ -219,10 +219,12 @@ Scrolling another app needs Accessibility: the first scrolling capture asks macO
 until it is allowed the panel says to scroll yourself and press F10. While Shotts scrolls, the
 mouse is held: the pointer stays in the middle of the area, and moving, clicking, or scrolling
 does nothing, since scrolling goes to what is under the pointer and a click would land in what
-is being captured. The keys still work, and the mouse comes back when scrolling stops: at the
-bottom, or after 30 seconds at most, when the picture opens with what it has. If frames keep not
-matching (an area that does not all scroll together), Shotts stops scrolling and says so;
-scroll by hand, then press F10. F10 ends a scrolling capture as it ends a recording.
+is being captured. The keys still work, and the mouse comes back, the pointer where it was,
+when scrolling stops: at the bottom, or after 30 seconds at most, when the picture opens with
+what it has. If Shotts cannot follow the area (frames keep not matching, as in an area that does
+not all scroll together; no frame comes; or the area is under 24 points tall), it stops
+scrolling and says so; scroll by hand, then press F10. F10 ends a scrolling capture as it ends a
+recording.
 
 Shotts adds only what comes into view below what it already has, so scrolling back up adds
 nothing; scrolled too far between two looks, the panel says to scroll a little slower, and it
@@ -233,8 +235,9 @@ none blank.
 A bar that stays put at the top or bottom while the rest scrolls, a sticky header or a toolbar,
 is kept once, not repeated down the picture. The picture stops growing at 256 MB (some 20,000
 rows of a wide window), and the panel says so. Neither the outline, the panel, nor the pointer
-is in the picture. A display being added, removed, or rearranged cancels. Shotts sends nothing
-but scroll-wheel steps, and holds the mouse, only while it scrolls a capture.
+is in the picture. Should the area's display go or move, the capture ends as Done does, with
+what it has; other display changes leave it going. Shotts sends nothing but scroll-wheel steps,
+and holds the mouse, only while it scrolls a capture.
 
 ## Recording
 
