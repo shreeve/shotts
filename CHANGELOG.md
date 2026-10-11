@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.10.0 — 2026-10-11
 
 Scrolling capture:
 - Memory at the largest picture is about a fifth of what it was (291 MB, not 1.4 GB), and the
