@@ -647,4 +647,15 @@ public enum ScriptSocket {
     public static func path(home: String) -> String {
         (home as NSString).appendingPathComponent("Library/Caches/com.github.shreeve.shotts/cli.sock")
     }
+
+    /// The address of the socket at `path`; nil when the path is too long to be one, never a
+    /// shorter path in its place.
+    public static func address(_ path: String) -> sockaddr_un? {
+        var address = sockaddr_un()
+        address.sun_family = sa_family_t(AF_UNIX)
+        let bytes = Array(path.utf8)
+        guard bytes.count < MemoryLayout.size(ofValue: address.sun_path) else { return nil }
+        withUnsafeMutableBytes(of: &address.sun_path) { $0.copyBytes(from: bytes) }
+        return address
+    }
 }
