@@ -4,8 +4,8 @@ import ShottsCore
 
 /// While a recording that shows them runs: each click anywhere, and each shortcut pressed. Clicks
 /// come from a global mouse monitor, which needs no permission. Keys come from a listen-only
-/// event tap, which needs Input Monitoring: macOS asks for it the first time a recording shows
-/// keys, and while a password is typed it sends a tap no keys at all. Nothing is kept: each
+/// event tap, which needs Input Monitoring: macOS asks for it the first time Keys is turned on,
+/// and while a password is typed it sends a tap no keys at all. Nothing is kept: each
 /// click or key goes straight to the recording's drawing layer, and all of it stops with the
 /// recording.
 final class InputWatcher {

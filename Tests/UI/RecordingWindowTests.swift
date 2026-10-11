@@ -164,7 +164,8 @@ import Testing
     }
 
     /// A Save chosen while the file is still being made counts from then: closing the window
-    /// asks nothing and lets it finish, and the recording goes only once it is saved.
+    /// still asks, as the Save could fail with the window gone, and Delete lets it finish, the
+    /// recording going only once it is saved.
     @Test func aSaveOutlivesItsWindow() async throws {
         let recording = try await testRecording()
         let controller = try await window(for: recording)
@@ -172,12 +173,13 @@ import Testing
         try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: elsewhere) }
         let destination = elsewhere.appendingPathComponent("Saved.mp4")
-        controller.askToDelete = { _ in Issue.record("asked") }
+        var answers: [(Bool) -> Void] = []
+        controller.askToDelete = { answers.append($0) }
         controller.save(to: destination)
         #expect(controller.file == nil && controller.isBusy)
         let window = try #require(controller.window)
-        #expect(controller.windowShouldClose(window))
-        window.close()
+        #expect(!controller.windowShouldClose(window) && answers.count == 1)
+        answers[0](true)
         // Quitting now would cut it off, though the window is gone.
         #expect(RecordingWindowController.closedWhileBusy == 1)
         #expect(FileManager.default.fileExists(atPath: recording.folder.path))

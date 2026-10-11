@@ -100,7 +100,9 @@ Deferred, with the reason each waits:
   capture replaces, what Option-F10 brings back, focus return (an `EditorStack` in ShottsUI
   would host them), and `shotts`' recording lifecycle in `ScriptRunner` (stop and abort before
   and after the first frame, hang-up, `last`, the `start` cap).
-- Scrolling capture: overlay scroll bars are taken with the rows (a dev check with a visible
+- Scrolling capture: on a nearly blank area, a changing spinner reads as small moves (the
+  stitcher grows the picture with copies of it and never sees the bottom); deciding between
+  still and a move from the rows that changed alone would fix it. Overlay scroll bars are taken with the rows (a dev check with a visible
   scroller would show it), and `CGAssociateMouseAndMouseCursorPosition` is documented to work
   only for the app in front, which Shotts is not while it scrolls; the tap's warp holds the
   pointer either way. Both need a spare screen.
@@ -435,7 +437,7 @@ more candidate, so a few lines moving over a blank page still count as a move. A
 nonzero shift that fits, the rows that stayed put at the top and bottom (a third of the frame at
 most) become bands, or, if strict bands leave no shift that fits, the rows that mostly stayed:
 a spinner or a status line in a sticky bar changing before the first move does not cut the bar
-short. The top band is kept from the first frame, the bottom from the last frame to reach the
+short. The top band is kept from the frame before the first move, the bottom from the last frame to reach the
 picture's end (not simply the last, which may have backed up), the middle stitched between. The
 bottom band is at least a twelfth of the frame: a window's rounded corners sit in its last rows
 over moving content. The last third of the middle is not final: each frame showing it, moved or

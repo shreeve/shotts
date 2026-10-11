@@ -537,11 +537,13 @@ final class CaptureFlow {
 
     /// Says what went wrong; whoever failed has already ended what it was doing.
     private func fail(_ message: String, _ error: Error) {
+        let front = NSWorkspace.shared.frontmostApplication
         Front.bringShotts()
         let alert = NSAlert()
         alert.messageText = message
         alert.informativeText = error.localizedDescription
         alert.runModal()
+        Front.giveBack(to: front)
     }
 
     /// Without Screen Recording permission, the first press shows only the system's own prompt,

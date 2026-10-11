@@ -471,7 +471,9 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     /// Escape, Command-W, and the red button: a recording that has gone nowhere yet is deleted
     /// only once the user says so, in a sheet whose Cancel (and Escape) keeps it.
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
-        guard !kept, pending == 0, !deleting else { return true }
+        // A Save still running does not count: should it fail once the window is gone, the
+        // recording would go with nothing saved. Only a recording that went somewhere goes unasked.
+        guard !kept, !deleting else { return true }
         guard sender.attachedSheet == nil else { return false }
         let answer: (Bool) -> Void = { [weak self] delete in
             guard delete, let self else { return }

@@ -22,7 +22,8 @@ Recording:
   Shift alone show only with keys that act on their own (arrows, Return, Tab, Escape, F-keys).
   A held key shows once.
 - A Save or Copy chosen while the file is still being made finishes even if the window is
-  closed, and Save never leaves a cut-off file under your name.
+  closed, and Save never leaves a cut-off file under your name. Closing still asks until the
+  recording has really been saved, copied, or dragged out.
 - The quiet calibration tone plays only on a device's first recording with the Mac's sound,
   and again after a month, not every time; stopping no longer waits for it.
 - Turning Keys on asks for Input Monitoring then, not over the recording. Recording without

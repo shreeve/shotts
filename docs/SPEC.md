@@ -305,10 +305,10 @@ there only once the copy has worked; dragging the hand icon drags the file out. 
 window open, so one recording can be saved several ways. Command-W, the red button, or Escape
 closes the window, which deletes the recording and every file made from it; saved and copied
 files stay, and a Save or Copy chosen before closing, even while the file is still being made,
-still finishes. Until the recording has been saved, copied, or dragged out, or a Save or Copy is
-on its way, closing asks first:
-"Delete this recording?", with Delete and Cancel (Escape keeps it). When the window you are working in closes, focus goes back to the app that was in
-front when F10 was pressed.
+still finishes. Until the recording has been saved, copied, or dragged out, closing asks first,
+even with a Save on its way, which could still fail: "Delete this recording?", with Delete and
+Cancel (Escape keeps it). When the window you are working in closes, focus goes back to the app
+that was in front when F10 was pressed.
 
 A GIF has one palette for the whole clip. Colors that cover much of the picture are kept
 exactly, so text and flat backgrounds stay crisp; colors between the palette's are dithered with

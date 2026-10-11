@@ -70,7 +70,7 @@ read it before changing capture, the selection overlay, the editor, or export.
   with Option for the last capture. Screen Recording is
   the permission Shotts asks for, when the first capture needs it; the others are the
   microphone, asked the first time a recording uses it; Input Monitoring, asked the first
-  time a recording shows the shortcuts pressed; and Accessibility, asked the first time a
+  time Keys is turned on for a recording, to show the shortcuts pressed; and Accessibility, asked the first time a
   scrolling capture starts, used only while Shotts scrolls one: to send scroll-wheel steps, and
   to hold the pointer still and drop the mouse's own events until it stops (without it, the
   user scrolls). Keys are watched only while such a recording

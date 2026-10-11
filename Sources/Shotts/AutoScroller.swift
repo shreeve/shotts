@@ -53,8 +53,9 @@ final class AutoScroller {
         self.pointer = pointer
     }
 
-    deinit {
-        MainActor.assumeIsolated { stop() }
+    /// On the main actor, wherever the last reference goes, so the mouse is always let go.
+    isolated deinit {
+        stop()
     }
 
     /// The stitching's progress: the picture's height, whether the last frame was not matched,
