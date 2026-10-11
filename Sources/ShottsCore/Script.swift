@@ -9,6 +9,12 @@ public enum ScriptCommand: String, Codable, Sendable, CaseIterable {
     case shot, record, start, stop, list
     /// What a second Control-C sends: stop a recording and keep nothing.
     case abort
+
+    /// Whether Shotts carries this out: anything while Allow Command-Line Capture is on (`allowed`);
+    /// with it off, only stopping a recording already under way, since stopping captures nothing.
+    public func isTaken(allowed: Bool, recording: Bool) -> Bool {
+        allowed || (self == .stop || self == .abort) && recording
+    }
 }
 
 /// A file's format, from its extension.

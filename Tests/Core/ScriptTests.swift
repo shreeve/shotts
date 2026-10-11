@@ -86,6 +86,14 @@ import Testing
         #expect(throws: ScriptUsageError.self) { try ScriptParser.parse([], workingDirectory: "/") }
     }
 
+    /// With Allow Command-Line Capture off, Shotts still stops a recording under way, and
+    /// does nothing else.
+    @Test func stoppingNeedsNoSwitch() {
+        #expect(ScriptCommand.allCases.allSatisfy { $0.isTaken(allowed: true, recording: false) })
+        #expect(ScriptCommand.allCases.filter { $0.isTaken(allowed: false, recording: true) } == [.stop, .abort])
+        #expect(ScriptCommand.allCases.filter { $0.isTaken(allowed: false, recording: false) }.isEmpty)
+    }
+
     @Test func stopAndListTakeOnlyJSON() throws {
         #expect(try parse("stop").command == .stop)
         #expect(try parse("list --json").json)

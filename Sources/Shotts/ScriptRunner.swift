@@ -36,8 +36,8 @@ final class ScriptRunner {
         var recorder: Recorder?
         var started: Date?
         var limit: Timer?
-        /// Stopped (true) or aborted (false) before it began recording.
-        var ended: Bool?
+        /// Stopped or aborted before it began recording.
+        var ended = false
         var finishing = false
         /// The files being made, which `abort` cancels.
         var saving: Task<Void, Never>?
@@ -83,7 +83,7 @@ final class ScriptRunner {
         } catch {
             return answer(connection, .failure(request.command, ScriptError(.usage, error.message)))
         }
-        guard Self.isAllowed else {
+        guard request.command.isTaken(allowed: Self.isAllowed, recording: session != nil) else {
             return answer(connection, .failure(request.command, ScriptError(.notAllowed,
                 "Shotts does not take requests from the command line until Allow Command-Line Capture is on in its menu")))
         }
@@ -206,7 +206,7 @@ final class ScriptRunner {
             return failed(session, ScriptError(.permission,
                 "Shotts may not use the microphone: turn it on under System Settings › Privacy & Security › Microphone"))
         }
-        guard await wait(request, while: { session.ended == nil }) else { return gaveUp(session) }
+        guard await wait(request, while: { !session.ended }) else { return gaveUp(session) }
         let recorder = Recorder()
         recorder.onInterrupted = { [weak self, weak session] in
             guard let self, let session else { return }
@@ -226,7 +226,7 @@ final class ScriptRunner {
             if let made = try? await recorder.stop() { Recording.removeFolder(made.folder) }
             return failed(session, ScriptError(.captureFailed, error.localizedDescription))
         }
-        guard session.ended == nil else {
+        guard !session.ended else {
             if let made = try? await recorder.stop() { Recording.removeFolder(made.folder) }
             return gaveUp(session)
         }
@@ -242,15 +242,21 @@ final class ScriptRunner {
             session.asker?.send(ready)
         }
         if let limit = request.duration ?? (request.command == .start ? ScriptRequest.startCap : nil) {
-            let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self, weak session, weak recorder] _ in
-                MainActor.assumeIsolated {
-                    guard let self, let session, let recorder, recorder.elapsed >= limit else { return }
-                    self.end(session, keeping: true)
-                }
-            }
-            RunLoop.main.add(timer, forMode: .common)
-            session.limit = timer
+            end(session, after: limit, of: recorder)
         }
+    }
+
+    /// Ends the recording once `recorder` has run `limit` seconds, pauses not counted: one timer
+    /// for what is left, set again should a pause have made it early.
+    private func end(_ session: Session, after limit: Double, of recorder: Recorder) {
+        let timer = Timer(timeInterval: max(limit - recorder.elapsed, 0.01), repeats: false) { [weak self, weak session, weak recorder] _ in
+            MainActor.assumeIsolated {
+                guard let self, let session, let recorder, self.session === session, !session.finishing else { return }
+                if recorder.elapsed >= limit { self.end(session, keeping: true) } else { self.end(session, after: limit, of: recorder) }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        session.limit = timer
     }
 
     private enum Failure: LocalizedError {
@@ -296,7 +302,7 @@ final class ScriptRunner {
         }
         guard let recorder = session.recorder else {
             // Not yet recording: `begin` sees this and gives up.
-            if session.ended == nil { session.ended = keep }
+            session.ended = true
             return
         }
         session.finishing = true
