@@ -62,7 +62,9 @@ public struct KeystrokeLine: Equatable, Sendable {
     /// A key as it shows, or nil for typing, which does not. `base` is what the key gives with no
     /// modifiers ("4"). With Control or Command any key shows; with neither, only a key that acts
     /// on its own (↩, ⎋, arrows) does, by its symbol. Its modifiers go first, in the Mac's order.
-    public static func key(code: UInt16, base: String, modifiers: Modifiers) -> String? {
+    /// A key held down shows once: its `repeated` presses would push the rest out of the line.
+    public static func key(code: UInt16, base: String, modifiers: Modifiers, repeated: Bool = false) -> String? {
+        guard !repeated else { return nil }
         let symbol = named[code]
         let actsOnItsOwn = symbol != nil && !typingKeys.contains(code)
         guard actsOnItsOwn || !modifiers.isDisjoint(with: [.control, .command]) else { return nil }

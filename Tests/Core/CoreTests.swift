@@ -522,6 +522,13 @@ import Testing
         #expect(key(123, "", [.option]) == "⌥←" && key(124, "", [.option, .shift]) == "⌥⇧→" && key(109, "", [.option]) == "⌥F10")
     }
 
+    /// A key held down shows once, not again with each repeat.
+    @Test func aHeldKeyShowsOnce() {
+        #expect(Line.key(code: 124, base: "", modifiers: [], repeated: true) == nil)
+        #expect(Line.key(code: 6, base: "z", modifiers: [.command], repeated: true) == nil)
+        #expect(Line.key(code: 6, base: "z", modifiers: [.command], repeated: false) == "⌘Z")
+    }
+
     /// Shortcuts within two seconds of each other join one line; a pause of two starts afresh;
     /// a line shows for five seconds after its last key.
     @Test func aSequenceReadsAsOne() {

@@ -85,6 +85,7 @@ final class InputWatcher {
         if flags.contains(.command) { modifiers.insert(.command) }
         // The key's own character, as without modifiers ("4" for Shift-Command-4). Typing is not shown.
         let base = key.characters(byApplyingModifiers: []) ?? key.charactersIgnoringModifiers ?? ""
-        if let shortcut = KeystrokeLine.key(code: key.keyCode, base: base, modifiers: modifiers) { onKey(shortcut) }
+        let repeated = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+        if let shortcut = KeystrokeLine.key(code: key.keyCode, base: base, modifiers: modifiers, repeated: repeated) { onKey(shortcut) }
     }
 }
