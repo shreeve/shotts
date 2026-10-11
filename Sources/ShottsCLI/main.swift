@@ -9,7 +9,6 @@ import ShottsCore
 // background.
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-let wantsJSON = arguments.contains("--json")
 
 /// Where output goes: a terminal gets boxes and, unless NO_COLOR says otherwise, color; a pipe
 /// or a file gets plain text for scripts.
@@ -30,7 +29,9 @@ struct Terminal {
 
     var handle: FileHandle { fd == STDERR_FILENO ? .standardError : .standardOutput }
 
-    func write(_ text: String) { handle.write(Data(text.utf8)) }
+    func write(_ data: Data) { try? handle.write(contentsOf: data) }
+
+    func write(_ text: String) { write(Data(text.utf8)) }
 
     func write(_ tables: [TextTable]) {
         write(tables.map { isTerminal ? $0.boxed(width: width, color: hasColor) : $0.plain(width: width) }.joined(separator: "\n"))
@@ -40,11 +41,11 @@ struct Terminal {
     func styled(_ text: String, _ code: String) -> String { hasColor ? "\u{1B}[\(code)m\(text)\u{1B}[0m" : text }
 }
 
-let stdout = Terminal(fd: STDOUT_FILENO), stderr = Terminal(fd: STDERR_FILENO)
+let out = Terminal(fd: STDOUT_FILENO), err = Terminal(fd: STDERR_FILENO)
 
-/// The version of the Shotts this tool is inside (Contents/Helpers/shotts, beside
-/// Contents/Info.plist), wherever it is linked from.
-let version: String? = {
+/// The Shotts this tool is inside (Shotts.app/Contents/Helpers/shotts), wherever it is linked
+/// from; nil for a tool that is in none.
+let app: Bundle? = {
     // Where this executable really is: run by name from the PATH, the first argument is only
     // "shotts", and Homebrew's or the menu's link stands in front of it.
     var size: UInt32 = 0
@@ -52,27 +53,28 @@ let version: String? = {
     var executable = [CChar](repeating: 0, count: Int(size))
     guard _NSGetExecutablePath(&executable, &size) == 0, let path = realpath(executable, nil) else { return nil }
     defer { free(path) }
-    let plist = URL(fileURLWithPath: String(cString: path)).deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("Info.plist")
-    return (NSDictionary(contentsOf: plist)?["CFBundleShortVersionString"] as? String)
+    let bundle = URL(fileURLWithPath: String(cString: path)).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    return bundle.pathExtension == "app" ? Bundle(url: bundle) : nil
 }()
 
-/// Prints the failure as the request asked (JSON on stdout, a line on stderr, and the windows
+let version = app?.infoDictionary?["CFBundleShortVersionString"] as? String
+
+/// Prints the failure as asked (JSON on stdout if `json`, a line on stderr, and the windows
 /// that matched or how to get help) and exits with its code.
-func fail(_ command: ScriptCommand?, _ error: ScriptError) -> Never {
-    if wantsJSON { FileHandle.standardOutput.write(ScriptResult.failure(command, error).line()) }
-    stderr.write(stderr.styled("shotts:", "1;31") + " \(error.message)\n")
+func fail(_ command: ScriptCommand?, _ error: ScriptError, json: Bool = request.json) -> Never {
+    if json { out.write(ScriptResult.failure(command, error).line()) }
+    err.write(err.styled("shotts:", "1;31") + " \(error.message)\n")
     if let candidates = error.candidates, !candidates.isEmpty {
-        stderr.write("\n")
-        stderr.write([ScriptListing.windows(candidates, showingDisplay: Set(candidates.map(\.display)).count > 1)])
+        err.write("\n")
+        err.write([ScriptListing.windows(candidates, showingDisplay: Set(candidates.map(\.display)).count > 1)])
     } else if error.code == .usage {
-        stderr.write(stderr.styled(ScriptParser.helpHint, "2") + "\n")
+        err.write(err.styled(ScriptParser.helpHint, "2") + "\n")
     }
     exit(error.code.exitCode)
 }
 
 if ScriptParser.wantsVersion(arguments) {
-    stdout.write("shotts \(version ?? "(not inside Shotts)")\n")
+    out.write("shotts \(version ?? "(not inside Shotts)")\n")
     exit(0)
 }
 
@@ -81,9 +83,9 @@ if ScriptParser.wantsHelp(arguments) {
     let lines = ScriptParser.help(version: version).split(separator: "\n", omittingEmptySubsequences: false)
     // The name and version bold, and the headings: the lines that start at the margin and end in a colon.
     let help = lines.enumerated().map { n, line in
-        n == 0 || (!line.hasPrefix(" ") && line.hasSuffix(":")) ? stdout.styled(String(line), "1") : String(line)
+        n == 0 || (!line.hasPrefix(" ") && line.hasSuffix(":")) ? out.styled(String(line), "1") : String(line)
     }.joined(separator: "\n")
-    stdout.write(help)
+    out.write(help)
     exit(0)
 }
 
@@ -91,7 +93,8 @@ let request: ScriptRequest
 do {
     request = try ScriptParser.parse(arguments, workingDirectory: FileManager.default.currentDirectoryPath)
 } catch {
-    fail(ScriptCommand(rawValue: arguments.first ?? ""), ScriptError(.usage, error.message))
+    // Not yet read, the arguments ask for JSON if --json is anywhere in them.
+    fail(ScriptCommand(rawValue: arguments.first ?? ""), ScriptError(.usage, error.message), json: arguments.contains("--json"))
 }
 
 #if DEBUG
@@ -101,15 +104,23 @@ let socketPath = ProcessInfo.processInfo.environment["SHOTTS_SOCKET"] ?? ScriptS
 let socketPath = ScriptSocket.path(home: NSHomeDirectory())
 #endif
 
+let address: sockaddr_un
+if let fits = ScriptSocket.address(socketPath) {
+    address = fits
+} else {
+    fail(request.command, ScriptError(.unavailable, "\(socketPath) is too long a path for a socket"))
+}
+
+// Shotts gone mid-request is an error to write to, said as such, never a silent end by SIGPIPE.
+signal(SIGPIPE, SIG_IGN)
+
 /// A connection to Shotts, or nil when nothing listens.
 func connectOnce() -> Int32? {
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else { return nil }
-    var address = sockaddr_un()
-    address.sun_family = sa_family_t(AF_UNIX)
-    withUnsafeMutableBytes(of: &address.sun_path) { buffer in
-        socketPath.utf8CString.withUnsafeBytes { buffer.copyMemory(from: UnsafeRawBufferPointer(rebasing: $0.prefix(buffer.count - 1))) }
-    }
+    var on: Int32 = 1
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+    var address = address
     let connected = withUnsafePointer(to: &address) {
         $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
     }
@@ -118,30 +129,41 @@ func connectOnce() -> Int32? {
     return nil
 }
 
-/// Connects, starting Shotts in the background first if need be.
+/// Connects, starting Shotts in the background first if need be: the Shotts this tool is in,
+/// else whichever macOS knows by its bundle id.
 func connect(_ command: ScriptCommand) -> Int32 {
     if let fd = connectOnce() { return fd }
     let open = Process()
     open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    open.arguments = ["-g", "-b", "com.github.shreeve.shotts"]
+    open.arguments = ["-g"] + (app.map { [$0.bundlePath] } ?? ["-b", "com.github.shreeve.shotts"])
     try? open.run()
     open.waitUntilExit()
-    guard open.terminationStatus == 0 else { fail(command, ScriptError(.captureFailed, "Shotts is not installed")) }
+    guard open.terminationStatus == 0 else { fail(command, ScriptError(.unavailable, "Shotts is not installed")) }
     for _ in 0..<100 {
         if let fd = connectOnce() { return fd }
         usleep(100_000)
     }
-    // A Shotts that takes no requests still answers, to say so: one that never answers is older.
-    fail(command, ScriptError(.notAllowed, "Shotts did not answer: update it (Check for Updates… in its menu) and try again"))
+    // A Shotts that takes no requests still answers, to say so: one that never answers is older,
+    // or not listening.
+    fail(command, ScriptError(.unavailable, "Shotts did not answer: quit and reopen it, or update it (Check for Updates… in its menu)"))
 }
 
-func send(_ request: ScriptRequest, to fd: Int32) {
-    let line = request.line()
-    _ = line.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+/// Sends the request whole; false if Shotts has gone.
+func send(_ request: ScriptRequest, to fd: Int32) -> Bool {
+    request.line().withUnsafeBytes { bytes in
+        var sent = 0
+        while sent < bytes.count {
+            let n = write(fd, bytes.baseAddress! + sent, bytes.count - sent)
+            if n < 0, errno == EINTR { continue }
+            guard n > 0 else { return false }
+            sent += n
+        }
+        return true
+    }
 }
 
 /// The next line from Shotts; nil when it hangs up.
-func readLine(_ fd: Int32, _ buffer: inout Data) -> Data? {
+func nextLine(_ fd: Int32, _ buffer: inout Data) -> Data? {
     while true {
         if let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
             let line = buffer[buffer.startIndex..<newline]
@@ -160,7 +182,7 @@ var showingProgress = false
 
 @MainActor func clearProgress() {
     guard showingProgress else { return }
-    stderr.write("\r\u{1B}[K")
+    err.write("\r\u{1B}[K")
     showingProgress = false
 }
 
@@ -170,18 +192,18 @@ var showingProgress = false
     clearProgress()
     guard result.ok else { fail(result.command, result.error ?? ScriptError(.captureFailed, "Shotts could not do it")) }
     if request.json {
-        FileHandle.standardOutput.write(line + Data("\n".utf8))
+        out.write(line + Data("\n".utf8))
     } else if result.command == .list {
-        stdout.write(ScriptListing.tables(windows: result.windows ?? [], displays: result.displays ?? [], version: version))
+        out.write(ScriptListing.tables(windows: result.windows ?? [], displays: result.displays ?? [], version: version))
     } else if let files = result.files, !files.isEmpty {
         // A person sees what was made; a script gets the paths, one a line.
-        if stdout.isTerminal {
-            stdout.write([ScriptListing.files(result, home: NSHomeDirectory())])
+        if out.isTerminal {
+            out.write([ScriptListing.files(result, home: NSHomeDirectory())])
         } else {
-            stdout.write(files.map { $0.path + "\n" }.joined())
+            out.write(files.map { $0.path + "\n" }.joined())
         }
-    } else if result.command == .start, stdout.isTerminal {
-        stdout.write(stdout.styled("●", "31") + " recording" + stdout.styled(" · `shotts stop` ends it and makes the files", "2") + "\n")
+    } else if result.command == .start, out.isTerminal {
+        out.write(out.styled("●", "31") + " recording" + out.styled(" · `shotts stop` ends it and makes the files", "2") + "\n")
     }
     exit(0)
 }
@@ -193,14 +215,14 @@ var showingProgress = false
     guard result.ok else { finish(result, line: line) }
     switch result.state {
     case .recording where request.command == .record:
-        stderr.write(stderr.isTerminal
-            ? stderr.styled("●", "31") + " recording" + stderr.styled(" · Control-C or `shotts stop` ends it", "2") + "\n"
+        err.write(err.isTerminal
+            ? err.styled("●", "31") + " recording" + err.styled(" · Control-C or `shotts stop` ends it", "2") + "\n"
             : "recording\n")
     case .saving:
-        guard stderr.isTerminal, let saving = result.saving else { return }
+        guard err.isTerminal, let saving = result.saving else { return }
         let percent = Int(((result.progress ?? 0) * 100).rounded(.down))
-        stderr.write("\r\u{1B}[K" + stderr.styled("■", "2") + " making \((saving as NSString).lastPathComponent)"
-            + stderr.styled(" · \(percent)%", "2"))
+        err.write("\r\u{1B}[K" + err.styled("■", "2") + " making \((saving as NSString).lastPathComponent)"
+            + err.styled(" · \(percent)%", "2"))
         showingProgress = true
     default:
         finish(result, line: line)
@@ -220,20 +242,20 @@ for source in interruptions {
     source.setEventHandler {
         interrupts += 1
         guard request.command == .record, let fd = connectOnce() else { clearProgress(); exit(130) }
-        send(ScriptRequest(command: interrupts == 1 ? .stop : .abort), to: fd)
+        _ = send(ScriptRequest(command: interrupts == 1 ? .stop : .abort), to: fd)
         if interrupts > 1 { clearProgress(); exit(130) }
     }
     source.resume()
 }
 
 let fd = connect(request.command)
-send(request, to: fd)
+guard send(request, to: fd) else { fail(request.command, ScriptError(.unavailable, "Shotts closed the connection before taking the request")) }
 Thread.detachNewThread {
     var buffer = Data()
-    while let line = readLine(fd, &buffer) {
+    while let line = nextLine(fd, &buffer) {
         DispatchQueue.main.async { MainActor.assumeIsolated { received(line) } }
     }
-    DispatchQueue.main.async { fail(request.command, ScriptError(.captureFailed, "Shotts stopped answering")) }
+    DispatchQueue.main.async { fail(request.command, ScriptError(.unavailable, "Shotts stopped answering")) }
 }
 // The main thread's run loop, not `dispatchMain`: after that, the main queue runs on another
 // thread, and the main actor's work would not be on the main thread. A port keeps the loop from

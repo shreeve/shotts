@@ -524,6 +524,8 @@ public struct ScriptAim: Equatable, Sendable {
 public enum ScriptErrorCode: String, Codable, Sendable {
     case usage, permission, notAllowed = "not_allowed", notFound = "not_found", ambiguousWindow = "ambiguous_window", busy
     case captureFailed = "capture_failed", encodeFailed = "encode_failed"
+    /// Shotts is not installed, or did not answer.
+    case unavailable
 
     /// The tool's exit status.
     public var exitCode: Int32 {
@@ -533,6 +535,7 @@ public enum ScriptErrorCode: String, Codable, Sendable {
         case .notFound, .ambiguousWindow: 4
         case .busy: 5
         case .captureFailed, .encodeFailed: 1
+        case .unavailable: 6
         }
     }
 }

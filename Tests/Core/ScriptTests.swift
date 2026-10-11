@@ -123,8 +123,8 @@ import Testing
 @Suite struct ScriptResultTests {
     /// Exit codes follow the error, and the answer is one line of JSON.
     @Test func codesAndLines() throws {
-        #expect([ScriptErrorCode.usage, .permission, .notAllowed, .notFound, .ambiguousWindow, .busy, .captureFailed, .encodeFailed].map(\.exitCode)
-            == [2, 3, 3, 4, 4, 5, 1, 1])
+        #expect([ScriptErrorCode.usage, .permission, .notAllowed, .notFound, .ambiguousWindow, .busy, .captureFailed, .encodeFailed, .unavailable]
+            .map(\.exitCode) == [2, 3, 3, 4, 4, 5, 1, 1, 6])
         let failure = ScriptResult.failure(.shot, ScriptError(.ambiguousWindow, "two windows match", candidates: []))
         let line = failure.line()
         #expect(line.last == UInt8(ascii: "\n") && !line.dropLast().contains(UInt8(ascii: "\n")))
@@ -136,6 +136,9 @@ import Testing
         let words = String(decoding: live.line(), as: UTF8.self)
         #expect(words.contains(#""state":"recording""#) && words.contains(#""kind":"window""#))
         #expect(!String(decoding: ScriptResult.failure(nil, ScriptError(.usage, "?")).line(), as: UTF8.self).contains("command"))
+        // A path too long for a socket has no address, rather than a shorter path's.
+        #expect(ScriptSocket.address("/" + String(repeating: "a", count: 103)) == nil)
+        #expect(ScriptSocket.address("/" + String(repeating: "a", count: 102)) != nil)
         var request = ScriptRequest(command: .record)
         request.outputs = ["/a.mp4"]
         #expect(try JSONDecoder().decode(ScriptRequest.self, from: request.line()) == request)

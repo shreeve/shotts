@@ -374,7 +374,8 @@ shotts list   [--json]
 - **Exit status**: 0 done; 1 the capture or a file failed (`capture_failed`, `encode_failed`); 2
   a mistake in the command (`usage`); 3 no permission, or Allow Command-Line Capture is off
   (`permission`, `not_allowed`); 4 no such window or display, or several windows match
-  (`not_found`, `ambiguous_window`); 5 already recording (`busy`).
+  (`not_found`, `ambiguous_window`); 5 already recording (`busy`); 6 Shotts is not installed, did
+  not answer, or stopped answering (`unavailable`).
 
 ## Not built
 
