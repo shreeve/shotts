@@ -510,6 +510,18 @@ import Testing
         }
     }
 
+    /// Option types characters on most keyboards: ⌥L is @ and ⌥8 is { on a German one, ⌥E an
+    /// accent on any. With Option or Shift alone, only keys that act on their own show; with
+    /// Control or Command, Option shows too.
+    @Test func optionTypingNeverShows() {
+        for typing in [key(37, "l", [.option]), key(28, "8", [.option]), key(37, "l", [.option, .shift]), key(14, "e", [.option]),
+                       key(32, "u", [.option]), key(49, " ", [.option]), key(51, "\u{7f}", [.option])] {
+            #expect(typing == nil)
+        }
+        #expect(key(7, "x", [.option, .command]) == "⌥⌘X" && key(37, "l", [.control, .option]) == "⌃⌥L")
+        #expect(key(123, "", [.option]) == "⌥←" && key(124, "", [.option, .shift]) == "⌥⇧→" && key(109, "", [.option]) == "⌥F10")
+    }
+
     /// Shortcuts within two seconds of each other join one line; a pause of two starts afresh;
     /// a line shows for five seconds after its last key.
     @Test func aSequenceReadsAsOne() {

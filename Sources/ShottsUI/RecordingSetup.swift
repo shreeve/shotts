@@ -324,7 +324,7 @@ final class SetupPanel: NSPanel {
         clicks.toolTip = "Show a ripple where each click lands"
         keys.onFill = Self.on
         keys.state = choices.keys ? .on : .off
-        keys.toolTip = "Show the shortcuts you press, such as ⌘C or Return; typing never shows"
+        keys.toolTip = "Show the shortcuts you press, such as ⌘C, ⌥←, or Return; typing never shows, with Shift or Option either"
         cancel.keyEquivalent = "\u{1b}"
         cancel.target = self
         cancel.action = #selector(cancelPressed)

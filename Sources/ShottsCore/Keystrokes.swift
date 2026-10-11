@@ -1,10 +1,11 @@
 import Foundation
 
-/// The shortcuts a recording shows as they are pressed: keys with Control, Option, or Command
-/// ("⇧⌘4"), and the keys that act on their own (↩, ⎋, ⇥, arrows, F-keys). Typing does not show,
-/// letters, numbers, punctuation, and space, with or without Shift, nor the Delete keys that
-/// correct it: a viewer needs to see what was done, not what was written, and what is typed
-/// stays private. As CleanShot X's and Screen Studio's "shortcuts only". Everything pressed
+/// The shortcuts a recording shows as they are pressed: keys with Control or Command ("⇧⌘4"),
+/// and the keys that act on their own (↩, ⎋, ⇥, arrows, F-keys), with Option or Shift if held
+/// ("⌥←"). Typing does not show, letters, numbers, punctuation, and space, with or without Shift
+/// or Option, which types characters on most keyboards (⌥L is @ on a German one, ⌥E an accent
+/// on any), nor the Delete keys that correct it: a viewer needs to see what was done, not what
+/// was written, and what is typed stays private. As CleanShot X's and Screen Studio's "shortcuts only". Everything pressed
 /// within `joinGap` of the key before joins one line ("⌘I  ⌃K  ↩"), and the line shows until
 /// `linger` after its last key, as KeyCastr's line-break delay and linger work.
 public struct KeystrokeLine: Equatable, Sendable {
@@ -59,19 +60,17 @@ public struct KeystrokeLine: Equatable, Sendable {
     static let typingKeys: Set<UInt16> = [51, 117, 49]
 
     /// A key as it shows, or nil for typing, which does not. `base` is what the key gives with no
-    /// modifiers ("4"). With Control, Option, or Command it shows, its modifiers first in the
-    /// Mac's order; a key that acts on its own (↩, ⎋, arrows) shows its symbol, with ⇧ if held.
+    /// modifiers ("4"). With Control or Command any key shows; with neither, only a key that acts
+    /// on its own (↩, ⎋, arrows) does, by its symbol. Its modifiers go first, in the Mac's order.
     public static func key(code: UInt16, base: String, modifiers: Modifiers) -> String? {
         let symbol = named[code]
-        if !modifiers.isDisjoint(with: [.control, .option, .command]) {
-            var prefix = ""
-            if modifiers.contains(.control) { prefix += "⌃" }
-            if modifiers.contains(.option) { prefix += "⌥" }
-            if modifiers.contains(.shift) { prefix += "⇧" }
-            if modifiers.contains(.command) { prefix += "⌘" }
-            return prefix + (symbol ?? base.uppercased())
-        }
-        guard let symbol, !typingKeys.contains(code) else { return nil }
-        return (modifiers.contains(.shift) ? "⇧" : "") + symbol
+        let actsOnItsOwn = symbol != nil && !typingKeys.contains(code)
+        guard actsOnItsOwn || !modifiers.isDisjoint(with: [.control, .command]) else { return nil }
+        var prefix = ""
+        if modifiers.contains(.control) { prefix += "⌃" }
+        if modifiers.contains(.option) { prefix += "⌥" }
+        if modifiers.contains(.shift) { prefix += "⇧" }
+        if modifiers.contains(.command) { prefix += "⌘" }
+        return prefix + (symbol ?? base.uppercased())
     }
 }
