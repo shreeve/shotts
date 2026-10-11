@@ -352,6 +352,16 @@ struct ScrollTestSparsePage {
         #expect(stitcher.picture() == composer.expected(through: 200))
     }
 
+    /// A first move too far to match decides nothing: the next frame is matched with the one
+    /// before it, and the bands come from that move.
+    @Test func aFirstMoveTooFarIsLost() {
+        let page = ScrollTestPage(rows: 2000)
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let steps = [0, page.middleRows + 20, 30].map { stitcher.add(page.frame(at: $0), width: page.width) }
+        #expect(steps == [.started, .lost, .moved(30)])
+        #expect(stitcher.picture() == page.expected(through: 30))
+    }
+
     /// A few short lines moving over a page mostly blank: each frame moved, though most of its
     /// rows are alike, and every row is in its place.
     @Test func sparseLinesMove() {
