@@ -257,3 +257,108 @@ struct ScrollTestList {
         #expect(failures.isEmpty, "\(failures)")
     }
 }
+
+/// A page under a sticky header, above a composer, as a chat or mail window has: a footer with a
+/// border, a flat body, and a placeholder line, where a caret blinks or a spinner turns.
+struct ScrollTestComposer {
+    let width = 160, window = 240, headerRows = 20, footerRows = 48
+    var middleRows: Int { window - headerRows - footerRows }
+    let page = ScrollTestPage(rows: 2000)
+
+    func footer(_ y: Int, _ x: Int) -> UInt8 { y < 2 ? 180 : ((14..<24).contains(y) && (20..<100).contains(x) ? 150 : 235) }
+
+    /// The window scrolled to `offset` rows into the page, with `mark` drawn dark in the footer:
+    /// its left edge, width, and height, standing 4 rows above the window's bottom.
+    func frame(at offset: Int, mark: (x: Int, width: Int, height: Int)? = nil) -> [UInt8] {
+        var out = [UInt8](repeating: 255, count: width * window * 4)
+        for y in 0..<window {
+            for x in 0..<width {
+                var g = y < headerRows ? page.header(y, x)
+                    : (y >= window - footerRows ? footer(y - (window - footerRows), x) : page.gray(row: offset + y - headerRows, x: x))
+                if let mark, (window - 4 - mark.height)..<(window - 4) ~= y, mark.x..<(mark.x + mark.width) ~= x { g = 0 }
+                let p = (y * width + x) * 4
+                out[p] = g; out[p + 1] = g; out[p + 2] = g
+            }
+        }
+        return out
+    }
+
+    func expected(through offset: Int) -> [UInt8] {
+        let total = headerRows + offset + middleRows + footerRows
+        var out = [UInt8](repeating: 255, count: width * total * 4)
+        for y in 0..<total {
+            for x in 0..<width {
+                let g = y < headerRows ? page.header(y, x)
+                    : (y >= total - footerRows ? footer(y - (total - footerRows), x) : page.gray(row: y - headerRows, x: x))
+                let p = (y * width + x) * 4
+                out[p] = g; out[p + 1] = g; out[p + 2] = g
+            }
+        }
+        return out
+    }
+}
+
+/// A sparse page: white, with one short line of "text", a quarter of the width, every `gap` rows.
+struct ScrollTestSparsePage {
+    let width = 200, window = 400, gap = 200
+
+    func gray(row: Int, x: Int) -> UInt8 {
+        guard row % gap < 14, (10..<60).contains(x) else { return 255 }
+        var h = UInt64((row / gap) &* 2_654_435_761 &+ (x / 2) &* 40_503) &* 0x9E37_79B9_7F4A_7C15
+        h ^= h >> 29
+        return h % 3 == 0 ? 255 : (h % 3 == 1 ? 30 : 120)
+    }
+
+    func frame(at offset: Int) -> [UInt8] { rows(offset..<offset + window) }
+    func expected(through offset: Int) -> [UInt8] { rows(0..<offset + window) }
+
+    private func rows(_ rows: Range<Int>) -> [UInt8] {
+        var out = [UInt8](repeating: 255, count: width * rows.count * 4)
+        for (y, row) in rows.enumerated() {
+            for x in 0..<width {
+                let g = gray(row: row, x: x), p = (y * width + x) * 4
+                out[p] = g; out[p + 1] = g; out[p + 2] = g
+            }
+        }
+        return out
+    }
+}
+
+@Suite struct ScrollStitcherBandTests {
+    let composer = ScrollTestComposer()
+
+    /// A caret blinking, a spinner turning, or a line of status appearing in a sticky footer
+    /// before anything scrolls is not a move: the bands wait for one, and the footer is whole.
+    @Test func aBarChangingBeforeTheFirstMoveDecidesNothing() {
+        for mark in [(x: 60, width: 2, height: 10), (x: 60, width: 24, height: 24), (x: 20, width: 30, height: 10)] {
+            let stitcher = ScrollStitcher(width: composer.width, height: composer.window)
+            var steps = [stitcher.add(composer.frame(at: 0), width: composer.width),
+                         stitcher.add(composer.frame(at: 0, mark: mark), width: composer.width)]
+            for i in 1...10 { steps.append(stitcher.add(composer.frame(at: i * 20, mark: i % 2 == 1 ? mark : nil), width: composer.width)) }
+            #expect(steps == [.started, .unmoved] + Array(repeating: .moved(20), count: 10), "\(mark)")
+            #expect(stitcher.picture() == composer.expected(through: 200), "\(mark)")
+        }
+    }
+
+    /// A spinner turning in the footer at the very frame the page first moves: the rows it
+    /// changed count as still, as the rest of the footer, and every later frame matches.
+    @Test func aBarChangingAtTheFirstMoveIsStillABar() {
+        let stitcher = ScrollStitcher(width: composer.width, height: composer.window)
+        let spinner = (x: 60, width: 24, height: 24)
+        var steps = [stitcher.add(composer.frame(at: 0), width: composer.width)]
+        for i in 1...10 { steps.append(stitcher.add(composer.frame(at: i * 20, mark: i % 2 == 1 ? spinner : nil), width: composer.width)) }
+        #expect(steps == [.started] + Array(repeating: .moved(20), count: 10))
+        #expect(stitcher.footer >= composer.footerRows)
+        #expect(stitcher.picture() == composer.expected(through: 200))
+    }
+
+    /// A few short lines moving over a page mostly blank: each frame moved, though most of its
+    /// rows are alike, and every row is in its place.
+    @Test func sparseLinesMove() {
+        let page = ScrollTestSparsePage()
+        let stitcher = ScrollStitcher(width: page.width, height: page.window)
+        let steps = (0..<20).map { stitcher.add(page.frame(at: $0 * 4), width: page.width) }
+        #expect(steps == [.started] + Array(repeating: .moved(4), count: 19))
+        #expect(stitcher.picture() == page.expected(through: 76))
+    }
+}

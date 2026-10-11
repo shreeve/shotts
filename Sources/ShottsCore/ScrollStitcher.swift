@@ -17,10 +17,12 @@ import Foundation
 /// the one nearest the last move, since scrolling is smooth from frame to frame.
 ///
 /// Bands that stay put at the top and bottom while the rest moves, sticky headers and footers,
-/// are found at the first move and kept once: the top from the frame before it, the bottom from
-/// the last frame to reach the picture's end. A band taken for one that is not (blank margin)
-/// costs nothing: what passes under it is still taken while it is in the middle, and that
-/// frame's bottom band continues the middle.
+/// are found at the first move, the first frame whose middle fits a shift other than none, and
+/// kept once: the top from the frame before it, the bottom from the last frame to reach the
+/// picture's end. Something changing in a bar before then (a caret, a spinner, a line of status)
+/// is not a move, so it decides nothing. A band taken for one that is not (blank margin) costs
+/// nothing: what passes under it is still taken while it is in the middle, and that frame's
+/// bottom band continues the middle.
 ///
 /// The picture is built in place, in one buffer reserved at `maxBytes` (memory is taken only as
 /// rows are written): the top band, the middle, and the bottom band right after it. Until the
@@ -107,18 +109,17 @@ public final class ScrollStitcher {
             guard let found = shift() else { return .lost }
             d = found
         } else {
-            guard let (t, b) = bands() else {
+            guard let (found, t, b) = firstMove() else {
                 // Still: the latest frame, which may show what the first had not drawn yet.
                 keep(frame, bytesPerRow: bytesPerRow, in: buffer)
                 return .unmoved
             }
+            guard let found else { return .lost }
             // The frame before is the picture so far, laid out as the bands make it.
-            (header, footer) = (t, b)
+            (header, footer, d) = (t, b, found)
             bandsKnown = true
             middleRows = span
             settled = max(0, middleRows - fresh)
-            guard let found = shift() else { return .lost }
-            d = found
         }
         let start = position + d, end = start + span
         if (max(end, middleRows) + header + footer) * rowBytes > maxBytes {
@@ -215,18 +216,47 @@ public final class ScrollStitcher {
         prints.withUnsafeBufferPointer { after in lastPrints.withUnsafeBufferPointer { before in body(after.baseAddress!, before.baseAddress!) } }
     }
 
+    /// The first move: the bands that stayed put since the last frame and how far the middle
+    /// between them moved, or a nil shift when no shift fits it. Nil when nothing moved, or
+    /// when what changed did not move (a caret, a spinner).
+    ///
+    /// The rows that stayed put are those alike; should those leave no shift fitting, as when
+    /// something changing in a bar cut it short and left its still rows in the middle, those
+    /// mostly alike. A band taken too big costs nothing; one taken too small would leave every
+    /// later frame unmatched.
+    private func firstMove() -> (Int?, Int, Int)? {
+        guard let (t, b) = bands(lenient: false) else { return nil }
+        (header, footer) = (t, b)
+        defer { (header, footer) = (0, 0) }
+        if let d = shift() { return d == 0 ? nil : (d, t, b) }
+        if let (lt, lb) = bands(lenient: true), (lt, lb) != (t, b) {
+            (header, footer) = (lt, lb)
+            if let d = shift() { return d == 0 ? nil : (d, lt, lb) }
+        }
+        return (nil, t, b)
+    }
+
     /// The bands that stayed put between the last frame and this one: the rows alike at the top
     /// and at the bottom, each a third of the frame at most, or none when the middle between
-    /// them would be too short to match. Nil when nothing moved.
+    /// them would be too short to match. Nil when nothing changed.
     ///
     /// The bottom band is at least `bottomMargin` of the frame: a window's rounded corners sit
     /// in its last rows, over content that moves, and rows taken from there would carry them
     /// into the middle of the picture at every step. Taken only from the last frame, they come
     /// once, at the bottom, where they were; what scrolls through that margin is taken higher up.
-    private func bands() -> (Int, Int)? {
+    ///
+    /// `lenient`, a row is still unless more than a quarter of its blocks changed by more than
+    /// `changed`: a spinner or a line of status changes a few blocks of a bar's rows, a move
+    /// changes most of a row.
+    private func bands(lenient: Bool) -> (Int, Int)? {
         let blocks = blocks
         let same = withPrints { after, before in
-            (0..<height).map { Self.unlike(after + $0 * blocks, before + $0 * blocks, blocks) < Self.alike }
+            (0..<height).map { y -> Bool in
+                let a = after + y * blocks, b = before + y * blocks
+                if Self.unlike(a, b, blocks) < Self.alike { return true }
+                guard lenient else { return false }
+                return (0..<blocks).count { abs(a[$0] - b[$0]) > Self.changed } * 4 <= blocks
+            }
         }
         guard same.contains(false) else { return nil }
         let margin = max(1, Int(Double(height) * Self.bottomMargin))
@@ -240,6 +270,8 @@ public final class ScrollStitcher {
 
     /// Rows this alike count as the same.
     static let alike: Float = 1
+    /// A block that changed by more than this, in levels, changed.
+    static let changed: Float = 8
     /// A shift whose rows differ by more than this on average is not believed.
     static let fits: Float = 3
 
@@ -265,12 +297,14 @@ public final class ScrollStitcher {
                 }
                 return n > 0 ? sum / Float(n) : .infinity
             }
-            if cost(0, step: 1) < Self.alike { return 0 }
+            // Still only when every row is: a mean over the rows misses a few lines of text
+            // moving over a blank page. Otherwise not moving is one more shift to try.
+            if (low..<high).allSatisfy({ Self.unlike(after + $0 * blocks, before + $0 * blocks, blocks) < Self.alike }) { return 0 }
             // Every fourth shift, every other row; then every shift near the one chosen. Shifts
             // near the last move first, since scrolling is smooth; all of them when none of
             // those fits.
             func coarse(_ range: ClosedRange<Int>) -> [(Int, Float)] {
-                stride(from: range.lowerBound / 4 * 4, through: range.upperBound, by: 4).map { ($0, cost($0, step: 2)) }
+                ([0] + stride(from: range.lowerBound / 4 * 4, through: range.upperBound, by: 4)).map { ($0, cost($0, step: 2)) }
             }
             let likely = coarse(max(-reach, lastMove - rows / 4)...min(reach, lastMove + rows / 4))
             let coarse = (likely.min(by: { $0.1 < $1.1 })?.1 ?? .infinity) <= Self.fits ? likely : coarse(-reach...reach)
