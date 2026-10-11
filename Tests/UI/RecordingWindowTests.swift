@@ -43,6 +43,21 @@ import Testing
         #expect(cancelled)
     }
 
+    /// Turning Keys on says so at once, before Record, so macOS's question about Input
+    /// Monitoring can come then; turning it off says nothing.
+    @Test func turningKeysOnSaysSo() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let setup = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), choices: RecordingSetup.Choices()) { _ in }
+        defer { setup.close() }
+        var turnedOn = 0
+        setup.onKeysTurnedOn = { turnedOn += 1 }
+        let panel = try #require(setup.setupPanel)
+        panel.keys.performClick(nil)
+        #expect(panel.keys.state == .on && turnedOn == 1)
+        panel.keys.performClick(nil)
+        #expect(panel.keys.state == .off && turnedOn == 1)
+    }
+
     /// The area is where the picker put it, flipped into screen coordinates.
     @Test func theAreaIsInScreenCoordinates() throws {
         let screen = try #require(NSScreen.screens.first)

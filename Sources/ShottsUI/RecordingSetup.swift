@@ -35,6 +35,9 @@ public final class RecordingSetup {
     }
 
     public var onControl: ((Control) -> Void)?
+    /// The Keys switch turned on, before anything records: the moment to ask macOS for Input
+    /// Monitoring, whose dialog would otherwise come up as recording starts.
+    public var onKeysTurnedOn: (() -> Void)?
 
     /// The area in screen coordinates.
     public let area: CGRect
@@ -56,6 +59,7 @@ public final class RecordingSetup {
         self.panel = panel
         panel.onFinish = { [weak self] outcome in self?.finish(outcome) }
         panel.onControl = { [weak self] control in self?.onControl?(control) }
+        panel.onKeysOn = { [weak self] in self?.onKeysTurnedOn?() }
         panel.onTool = { [weak self] tool in self?.drawing.tool = tool }
         drawing.onToolChange = { [weak panel] tool in panel?.showTool(tool) }
         panel.setFrameOrigin(Self.panelOrigin(size: panel.frame.size, beside: area, on: screen.visibleFrame))
@@ -282,6 +286,7 @@ final class SetupPanel: NSPanel {
     var onFinish: ((RecordingSetup.Outcome) -> Void)?
     var onControl: ((RecordingSetup.Control) -> Void)?
     var onTool: ((DrawingTool?) -> Void)?
+    var onKeysOn: (() -> Void)?
     let record = PillButton(title: "Record", symbol: "record.circle", fill: .systemRed)
     let microphone = PillButton(title: "Microphone", symbol: "mic.slash.fill", fill: SetupPanel.plain, toggles: true)
     let clicks = PillButton(title: "Clicks", symbol: "cursorarrow.click", fill: SetupPanel.plain, toggles: true)
@@ -324,6 +329,8 @@ final class SetupPanel: NSPanel {
         clicks.toolTip = "Show a ripple where each click lands"
         keys.onFill = Self.on
         keys.state = choices.keys ? .on : .off
+        keys.target = self
+        keys.action = #selector(keysPressed)
         keys.toolTip = "Show the shortcuts you press, such as ⌘C, ⌥←, or Return; typing never shows, with Shift or Option either"
         cancel.keyEquivalent = "\u{1b}"
         cancel.target = self
@@ -376,6 +383,7 @@ final class SetupPanel: NSPanel {
         onFinish?(.record(RecordingSetup.Choices(microphone: microphone.state == .on, clicks: clicks.state == .on, keys: keys.state == .on)))
     }
     @objc func cancelPressed() { onFinish?(.cancelled) }
+    @objc func keysPressed() { if keys.state == .on { onKeysOn?() } }
 
     /// Escape: before recording, Cancel; while recording, the tool off.
     override func cancelOperation(_ sender: Any?) {
