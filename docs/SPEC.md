@@ -344,14 +344,16 @@ shotts list   [--json]
   match one window. `--display <n>`: 1 is the main display. `--region x,y,w,h`: points from the
   window's or display's top-left corner (the main display's alone), cut to the display. `shotts
   list` shows the windows, front to back, and the displays.
-- **Files** are as many as listed, each in the format its extension names: `.png`, `.jpg`, or
-  `.heic` from `shot`; `.mp4` or `.gif` from `record` and `start`. With none, one PNG or MP4 goes
-  where the Screenshot app saves, named as Shotts names it. Each is made under a hidden name
-  beside it and renamed into place, replacing what was there.
-- **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`. `--delay` counts down in the menu bar first.
-- `--width` makes files narrower in proportion, never wider. Without it, a still and an MP4 are
-  their full pixel size, and a GIF the size the area has on screen (half, from a Retina
-  display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
+- **Files** are as many as listed, up to 16, each in the format its extension names: `.png`,
+  `.jpg`, or `.heic` from `shot`; `.mp4` or `.gif` from `record` and `start`. With none, one PNG
+  or MP4 goes where the Screenshot app saves, named as Shotts names it. Each is made in a hidden
+  folder beside its place and moved there once all are made: a file named replaces what was
+  there, and one Shotts names never does, taking a number after its name as the Finder does.
+- **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`, `1h`, up to a day. `--delay` counts down in the
+  menu bar first.
+- `--width` (16 to 16384 pixels) makes files narrower in proportion, never wider. Without it, a
+  still and an MP4 are their full pixel size, and a GIF the size the area has on screen (half,
+  from a Retina display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
   5, or 1 (30 unless asked); GIF 30, 20, 10, 5, or 1 (20).
 - **Sound** goes only in an MP4, and only with `--audio`: `system` (the Mac's sound; recording a
   window, only its app's), `mic` (the microphone), or `both`, mixed into one track. A GIF
@@ -365,22 +367,26 @@ shotts list   [--json]
   at Control-C, at `shotts stop`, at F10 or the menu bar timer (it shows like any recording), or
   when its terminal closes; then it makes the files, saying on a terminal which and how far
   along, prints them, and exits. A second Control-C, even while the files are being made, stops
-  it and keeps nothing: no file it was making or had made (exit 130).
+  it and keeps nothing: no file is placed, and one it was to replace stays as it was (exit 130).
 - **`start`** returns once recording; it ends as `record` does, and after ten minutes unless
   `--duration` says otherwise. **`stop`** ends it and waits for the files; with nothing
-  recording, it prints the last recording's answer. One recording at a time.
+  recording, it prints the last recording's answer. One recording at a time. With Allow
+  Command-Line Capture turned off, `stop` and a second Control-C still end a recording under
+  way, since stopping captures nothing; nothing else is taken.
 - **Answers**: on a terminal, tables in rounded boxes (the files made, their size, frames, and
   bytes; for `list`, the displays and windows), in color unless `NO_COLOR` is set; piped or
   redirected, the paths alone, one a line, and `list` as plain columns. With `--json`, one line
-  of JSON: `ok`, `command`, `state`,
+  of JSON: `ok`, `command` (absent when Shotts could not read the request), `state`,
   `target` (`kind`, `id`, `app`, `bundle`, `title`, `frame`, `scale`, `display`), `started`,
   `duration`, and `files` (`path`, `format`, `width`, `height`, `fps`, `frames`, `bytes`); `list`
   gives `windows` and `displays`. A failure gives `error` (`code`, `message`, and for several
-  matching windows `candidates`) and a line on stderr.
+  matching windows `candidates`) and a line on stderr. In a table, a window's title or app name
+  shows any control character, or mark that reorders text, as �: they are any app's to set.
 - **Exit status**: 0 done; 1 the capture or a file failed (`capture_failed`, `encode_failed`); 2
   a mistake in the command (`usage`); 3 no permission, or Allow Command-Line Capture is off
   (`permission`, `not_allowed`); 4 no such window or display, or several windows match
-  (`not_found`, `ambiguous_window`); 5 already recording (`busy`).
+  (`not_found`, `ambiguous_window`); 5 already recording (`busy`); 6 Shotts is not installed, did
+  not answer, or stopped answering (`unavailable`).
 
 ## Not built
 

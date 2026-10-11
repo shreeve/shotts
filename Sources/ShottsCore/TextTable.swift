@@ -43,7 +43,7 @@ public struct TextTable: Sendable {
         return ([columns.map(\.head)] + rows).enumerated().map { n, row in
             // Headings start at the left, over numbers too.
             let cells = row.indices.map { i in Self.pad(Self.cut(row[i], to: widths[i]), widths[i], n == 0 ? .left : columns[i].align) }
-            return cells.joined(separator: "  ").replacing(/\s+$/, with: "") + "\n"
+            return Self.trimmed(cells.joined(separator: "  ")) + "\n"
         }.joined()
     }
 
@@ -62,10 +62,10 @@ public struct TextTable: Sendable {
         }
         // Each column is "│ cell " wide, and one "│" closes the row.
         var widths = fitted(to: width, overhead: 3 * columns.count + 1)
-        let tab = title.map { " \($0) " }
+        let tab = title.map { " \(Self.printable($0)) " }
         if let tab {
             // The table is at least as wide as its tab.
-            let short = Self.columns(tab) + 2 - (widths.reduce(0, +) + 3 * columns.count + 1)
+            let short = Self.width(of: tab) + 2 - (widths.reduce(0, +) + 3 * columns.count + 1)
             if short > 0 { widths[widths.count - 1] += short }
         }
         var stops = [0]
@@ -89,7 +89,7 @@ public struct TextTable: Sendable {
                 let padded = Self.pad(text, widths[i], heading ? .left : column.align)
                 let lead = String(padded.prefix { $0 == " " })
                 let body = padded.dropFirst(lead.count)
-                let trimmed = String(body.replacing(/\s+$/, with: ""))
+                let trimmed = Self.trimmed(body)
                 let trail = String(repeating: " ", count: body.count - trimmed.count)
                 line += " " + lead + paint(trimmed, heading ? .bold : column.tint) + trail + " │"
             }
@@ -98,7 +98,7 @@ public struct TextTable: Sendable {
 
         var out = ""
         if let tab {
-            let edge = Self.columns(tab) + 1
+            let edge = Self.width(of: tab) + 1
             out += "╭" + String(repeating: "─", count: edge - 1) + "╮\n"
             out += "│" + paint(tab, .bold) + "│\n"
             out += rule("├", "┬", "╮", tabEdge: edge)
@@ -109,7 +109,7 @@ public struct TextTable: Sendable {
         for r in rows { out += row(r, heading: false) }
         out += rule("╰", "┴", "╯")
         if !notes.isEmpty {
-            out += "\n" + notes.map { "  " + paint($0, .dim) + "\n" }.joined()
+            out += "\n" + notes.map { "  " + paint(Self.printable($0), .dim) + "\n" }.joined()
         }
         return out
     }
@@ -119,7 +119,7 @@ public struct TextTable: Sendable {
     /// Each column's width, the flexible one narrowed so the table fits `width` with
     /// `overhead` columns of borders and gaps, but never below eight.
     private func fitted(to width: Int?, overhead: Int) -> [Int] {
-        var widths = columns.indices.map { i in ([columns[i].head] + rows.map { $0[i] }).map(Self.columns).max() ?? 0 }
+        var widths = columns.indices.map { i in ([columns[i].head] + rows.map { $0[i] }).map(Self.width(of:)).max() ?? 0 }
         if let width, let flexible = columns.firstIndex(where: \.flexible) {
             let over = widths.reduce(0, +) + overhead - width
             if over > 0 { widths[flexible] = max(widths[flexible] - over, min(widths[flexible], 8)) }
@@ -128,7 +128,7 @@ public struct TextTable: Sendable {
     }
 
     /// How many terminal columns `text` takes: two for wide characters (CJK, emoji), else one.
-    public static func columns(_ text: String) -> Int {
+    public static func width(of text: String) -> Int {
         text.reduce(0) { $0 + (isWide($1) ? 2 : 1) }
     }
 
@@ -144,9 +144,10 @@ public struct TextTable: Sendable {
         }
     }
 
-    /// `text` cut to `width` columns, ending in an ellipsis when cut.
+    /// `text` cut to `width` columns, ending in an ellipsis when cut, and printable.
     static func cut(_ text: String, to width: Int) -> String {
-        guard columns(text) > width else { return text }
+        let text = printable(text)
+        guard Self.width(of: text) > width else { return text }
         var out = ""
         var used = 0
         for c in text {
@@ -158,8 +159,29 @@ public struct TextTable: Sendable {
         return out + "…"
     }
 
+    /// `text` safe to show on a terminal, which takes control characters (an escape sequence
+    /// starts with one) as commands and marks that reverse text as ordering: each becomes U+FFFD.
+    /// A window's title is any app's or web page's to set.
+    static func printable(_ text: String) -> String {
+        String(text.map { c in
+            c.unicodeScalars.contains {
+                switch $0.value {
+                case 0...0x1F, 0x7F...0x9F, 0x202A...0x202E, 0x2066...0x2069: true
+                default: false
+                }
+            } ? "\u{FFFD}" : c
+        })
+    }
+
+    /// `text` without the white space it ends in.
+    private static func trimmed(_ text: some StringProtocol) -> String {
+        var text = Substring(text)
+        while text.last?.isWhitespace == true { text.removeLast() }
+        return String(text)
+    }
+
     static func pad(_ text: String, _ width: Int, _ align: Align) -> String {
-        let room = String(repeating: " ", count: max(width - columns(text), 0))
+        let room = String(repeating: " ", count: max(width - Self.width(of: text), 0))
         return align == .left ? text + room : room + text
     }
 }

@@ -13,7 +13,52 @@ import Testing
         #expect(ScriptParser.seconds("1.5s") == 1.5)
         #expect(ScriptParser.seconds("2m") == 120)
         #expect(ScriptParser.seconds("1m30s") == 90)
+        #expect(ScriptParser.seconds("1h") == 3600)
         #expect(ScriptParser.seconds("1m30") == nil && ScriptParser.seconds("5x") == nil && ScriptParser.seconds("") == nil && ScriptParser.seconds("-1") == nil)
+    }
+
+    /// Times, widths, and file counts have bounds: a delay of 1e19 seconds once reached a
+    /// conversion that stopped Shotts, and every open capture with it.
+    @Test func valuesAreBounded() throws {
+        for line in ["shot a.png --display 1 --delay 1e19", "shot a.png --display 1 --delay 25h", "record --display 1 --duration 1e19",
+                     "record --display 1 --duration 24h1s", "shot a.png --display 1 --width 16385", "shot a.png --display 1 --width 15",
+                     "record --display 1 --fps 9223372036854775807",
+                     "shot " + (0...ScriptRequest.mostFiles).map { "\($0).png" }.joined(separator: " ") + " --display 1"] {
+            #expect(throws: ScriptUsageError.self, "\(line)") { try parse(line) }
+        }
+        #expect(try parse("shot a.png --display 1 --delay 24h --width 16384").delay == 86_400)
+        #expect(try parse("record --display 1 --duration 1h").duration == 3600)
+    }
+
+    /// With no file named, `--fps` must suit the MP4 made then.
+    @Test func frameRateFitsTheDefaultFile() throws {
+        #expect(throws: ScriptUsageError(".mp4 takes --fps 60, 30, 20, 10, 5, 1")) { try parse("record --display 1 --fps 7") }
+        #expect(try parse("start --display 1 --fps 60").fps == 60)
+    }
+
+    /// Shotts checks what comes over the socket as the tool does, and more: anything of the
+    /// user's can write there, with paths no shell made absolute and values no parser read.
+    @Test func requestsFromTheSocketAreChecked() {
+        func refused(_ change: (inout ScriptRequest) -> Void) -> Bool {
+            var r = ScriptRequest(command: .shot)
+            r.target.display = 1
+            r.outputs = ["/tmp/a.png"]
+            change(&r)
+            do { try ScriptParser.check(r); return false } catch { return true }
+        }
+        #expect(!refused { _ in })
+        #expect(refused { $0.outputs = ["a.png"] })
+        #expect(refused { $0.outputs = ["~/Documents/a.png"] })
+        #expect(refused { $0.outputs = ["/Users/me/Documents/thesis.docx"] })
+        #expect(refused { $0.delay = -1 })
+        #expect(refused { $0.delay = 9.3e18 })
+        #expect(refused { $0.width = -5 })
+        #expect(refused { $0.target.display = 0 })
+        #expect(refused { $0.target.region = CGRect(x: 0, y: 0, width: -10, height: 10) })
+        #expect(refused { $0.target.region = CGRect(x: 0, y: 0, width: CGFloat.infinity, height: 10) })
+        #expect(refused { $0.command = .record; $0.outputs = []; $0.fps = 0 })
+        #expect(refused { $0.command = .record; $0.outputs = []; $0.duration = -1 })
+        #expect(refused { $0.command = .stop })
     }
 
     /// Each file's format comes from its extension, and every one listed is made; paths are
@@ -39,6 +84,14 @@ import Testing
             #expect(throws: ScriptUsageError.self, "\(line)") { try parse(line) }
         }
         #expect(throws: ScriptUsageError.self) { try ScriptParser.parse([], workingDirectory: "/") }
+    }
+
+    /// With Allow Command-Line Capture off, Shotts still stops a recording under way, and
+    /// does nothing else.
+    @Test func stoppingNeedsNoSwitch() {
+        #expect(ScriptCommand.allCases.allSatisfy { $0.isTaken(allowed: true, recording: false) })
+        #expect(ScriptCommand.allCases.filter { $0.isTaken(allowed: false, recording: true) } == [.stop, .abort])
+        #expect(ScriptCommand.allCases.filter { $0.isTaken(allowed: false, recording: false) }.isEmpty)
     }
 
     @Test func stopAndListTakeOnlyJSON() throws {
@@ -70,14 +123,22 @@ import Testing
 @Suite struct ScriptResultTests {
     /// Exit codes follow the error, and the answer is one line of JSON.
     @Test func codesAndLines() throws {
-        #expect([ScriptErrorCode.usage, .permission, .notAllowed, .notFound, .ambiguousWindow, .busy, .captureFailed, .encodeFailed].map(\.exitCode)
-            == [2, 3, 3, 4, 4, 5, 1, 1])
+        #expect([ScriptErrorCode.usage, .permission, .notAllowed, .notFound, .ambiguousWindow, .busy, .captureFailed, .encodeFailed, .unavailable]
+            .map(\.exitCode) == [2, 3, 3, 4, 4, 5, 1, 1, 6])
         let failure = ScriptResult.failure(.shot, ScriptError(.ambiguousWindow, "two windows match", candidates: []))
         let line = failure.line()
         #expect(line.last == UInt8(ascii: "\n") && !line.dropLast().contains(UInt8(ascii: "\n")))
         let text = String(decoding: line, as: UTF8.self)
         #expect(text.contains(#""code":"ambiguous_window""#) && text.contains(#""ok":false"#))
         #expect(try JSONDecoder().decode(ScriptResult.self, from: line) == failure)
+        // States and kinds are words on the wire.
+        let live = ScriptResult(command: .record, state: .recording, target: ScriptTargetInfo(kind: .window, frame: [0, 0, 1, 1], scale: 1, display: 1))
+        let words = String(decoding: live.line(), as: UTF8.self)
+        #expect(words.contains(#""state":"recording""#) && words.contains(#""kind":"window""#))
+        #expect(!String(decoding: ScriptResult.failure(nil, ScriptError(.usage, "?")).line(), as: UTF8.self).contains("command"))
+        // A path too long for a socket has no address, rather than a shorter path's.
+        #expect(ScriptSocket.address("/" + String(repeating: "a", count: 103)) == nil)
+        #expect(ScriptSocket.address("/" + String(repeating: "a", count: 102)) != nil)
         var request = ScriptRequest(command: .record)
         request.outputs = ["/a.mp4"]
         #expect(try JSONDecoder().decode(ScriptRequest.self, from: request.line()) == request)
@@ -102,6 +163,13 @@ import Testing
         #expect(mp4.size(recorded: (6016, 3384)).width <= 4096)
     }
 
+    /// A file beside one of the same name is numbered as the Finder numbers a copy.
+    @Test func numberedNames() {
+        #expect(ScriptFile.numbered("/d/Shotts at 10.12.34 AM.png", 2) == "/d/Shotts at 10.12.34 AM 2.png")
+        #expect(ScriptFile.numbered("/d/a.b.mp4", 3) == "/d/a.b 3.mp4")
+        #expect(ScriptFile.numbered("/d/plain", 2) == "/d/plain 2")
+    }
+
     @Test func filesWhenNoneAreNamed() {
         #expect(ScriptRequest(command: .shot).defaultFormat == .png)
         #expect(ScriptRequest(command: .record).defaultFormat == .mp4)
@@ -122,7 +190,7 @@ import Testing
     @Test func windowsAndDisplays() throws {
         let window = try aim(ScriptTarget(window: "notes")).get()
         #expect(window.source == .window(9))
-        #expect(window.info.kind == "window" && window.info.scale == 1 && window.info.display == 2)
+        #expect(window.info.kind == .window && window.info.scale == 1 && window.info.display == 2)
         let whole = try aim(ScriptTarget(display: 2)).get()
         #expect(whole.source == .area(display: 2, rect: CGRect(x: 0, y: 0, width: 1920, height: 1080)))
         #expect(whole.info.frame == [1512, 0, 1920, 1080])
@@ -132,7 +200,7 @@ import Testing
     @Test func regions() throws {
         let inWindow = try aim(ScriptTarget(window: "7", region: CGRect(x: 10, y: 20, width: 100, height: 50))).get()
         #expect(inWindow.source == .area(display: 1, rect: CGRect(x: 110, y: 70, width: 100, height: 50)))
-        #expect(inWindow.info.kind == "region" && inWindow.info.frame == [110, 70, 100, 50])
+        #expect(inWindow.info.kind == .region && inWindow.info.frame == [110, 70, 100, 50])
         let onSecond = try aim(ScriptTarget(display: 2, region: CGRect(x: 1800, y: 1000, width: 400, height: 400))).get()
         #expect(onSecond.source == .area(display: 2, rect: CGRect(x: 1800, y: 1000, width: 120, height: 80)))
         #expect(onSecond.info.frame == [3312, 1000, 120, 80])
@@ -210,22 +278,35 @@ import Testing
         let narrow = TextTable(title: "a", columns: [.init("A"), .init("B")], rows: [["1", "2"]])
         #expect(narrow.boxed(color: false).split(separator: "\n")[2] == "├───┼───╮")
         #expect(TextTable(title: "a much longer tab", columns: [.init("A")], rows: [["1"]]).boxed(color: false)
-            .split(separator: "\n").map { TextTable.columns(String($0)) }.allSatisfy { $0 == 21 })
+            .split(separator: "\n").map { TextTable.width(of: String($0)) }.allSatisfy { $0 == 21 })
         // Color is on the text, never on the padding, so columns still line up.
         let colored = table.boxed(width: 30, color: true)
         #expect(colored.contains("\u{1B}[1mTITLE\u{1B}[0m               │") && colored.contains("\u{1B}[2m2 windows\u{1B}[0m"))
     }
 
+    /// A window's title and app name are any app's or web page's to set: what a terminal would
+    /// take as a command, or as reordering, shows as U+FFFD, boxed or plain.
+    @Test func titlesCannotCommandTheTerminal() {
+        let window = ScriptWindow(id: 1, app: "Evil\u{1B}]0;title\u{07}", bundle: "e", title: "a\u{1B}[2Jb\u{202E}c\u{9B}d\r\n",
+                                  frame: [0, 0, 1, 1], display: 1)
+        let table = ScriptListing.windows([window])
+        let tabbed = TextTable(title: "x\u{1B}y", columns: [.init("A")], rows: [["1"]], notes: ["n\u{2066}"])
+        for text in [table.plain(), table.boxed(color: false), tabbed.boxed(color: false)] {
+            #expect(!text.unicodeScalars.contains { [0x1B, 0x07, 0x9B, 0x202E, 0x2066, 0x0D].contains($0.value) }, "\(text.debugDescription)")
+        }
+        #expect(table.plain().contains("a\u{FFFD}[2Jb\u{FFFD}c\u{FFFD}d\u{FFFD}\n"))
+    }
+
     /// Wide characters take two columns, and are never split.
     @Test func wideCharacters() {
-        #expect(TextTable.columns("日本語") == 6 && TextTable.columns("a🎉b") == 4)
+        #expect(TextTable.width(of: "日本語") == 6 && TextTable.width(of: "a🎉b") == 4)
         #expect(TextTable.cut("日本語のタイトル", to: 7) == "日本語…")
         let table = TextTable(columns: [.init("T"), .init("X")], rows: [["日本", "1"], ["abcd", "2"]])
         #expect(table.plain() == "T     X\n日本  1\nabcd  2\n")
     }
 
     @Test func files() {
-        var result = ScriptResult(command: .record, state: "done", target: ScriptTargetInfo(kind: "window", id: 4211, app: "Safari", frame: [0, 0, 10, 10], scale: 2, display: 1),
+        var result = ScriptResult(command: .record, state: .done, target: ScriptTargetInfo(kind: .window, id: 4211, app: "Safari", frame: [0, 0, 10, 10], scale: 2, display: 1),
                                   duration: 4.96, files: [
             ScriptFile(path: "/Users/me/Desktop/demo.mp4", format: .mp4, width: 1600, height: 1000, fps: 30, frames: 149, bytes: 1_234_567),
             ScriptFile(path: "/tmp/demo.gif", format: .gif, width: 800, height: 500, fps: 20, frames: 99, bytes: 999),
@@ -234,7 +315,7 @@ import Testing
         #expect(table.title == "window 4211 · Safari")
         #expect(table.rows == [["~/Desktop/demo.mp4", "1600×1000", "30", "149", "1.2 MB"], ["/tmp/demo.gif", "800×500", "20", "99", "999 bytes"]])
         #expect(table.notes == ["recorded 5.0s"])
-        result.target = ScriptTargetInfo(kind: "region", frame: [10, 20, 300, 200], scale: 1, display: 2)
+        result.target = ScriptTargetInfo(kind: .region, frame: [10, 20, 300, 200], scale: 1, display: 2)
         #expect(ScriptListing.files(result, home: "/Users/me").title == "region 10,20 300×200 · display 2")
         #expect(ScriptListing.bytes(12_345_678) == "12 MB")
     }
@@ -245,14 +326,12 @@ import Testing
         try ScriptParser.parse(args.split(separator: " ").map(String.init), workingDirectory: "/w")
     }
 
-    /// System, mic, or both, in either order; none unless asked.
+    /// System, mic, or both; none unless asked.
     @Test func values() throws {
         #expect(ScriptRequest.audio("system") == .system)
         #expect(ScriptRequest.audio("mic") == .microphone)
         #expect(ScriptRequest.audio("both") == .both && ScriptRequest.audio("Both") == .both)
-        // What 0.6.2 took still works.
-        #expect(ScriptRequest.audio("system,mic") == .both && ScriptRequest.audio("MIC, system") == .both)
-        #expect(ScriptRequest.audio("system,speakers") == nil && ScriptRequest.audio("all") == nil && ScriptRequest.audio("") == nil)
+        #expect(ScriptRequest.audio("system,mic") == nil && ScriptRequest.audio("system,speakers") == nil && ScriptRequest.audio("all") == nil && ScriptRequest.audio("") == nil)
         #expect(try parse("record a.mp4 --window 1").audio == nil)
         #expect(try parse("record a.mp4 a.gif --window 1 --audio mic").audio == .microphone)
         // No file named makes an MP4, which can have sound.
