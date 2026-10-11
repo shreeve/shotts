@@ -41,6 +41,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         script.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
         script.onCountdown = { [weak self] seconds in self?.showCountdown(seconds) }
         script.isRecordingElsewhere = { [weak self] in self?.flow.isBusyRecording ?? false }
+        #if DEBUG
+        // A developer check runs without the updater, whose alerts would hold it up, and without
+        // the hot keys or the menu bar item: the installed Shotts may be running beside it, and
+        // two apps holding F10 both answer it.
+        if CommandLine.arguments.contains(where: { $0.hasPrefix("--") }) {
+            DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
+            return
+        }
+        #endif
         let capture = HotKey.register { [weak self] in self?.captureArea() }
         let showLast = HotKey.register(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
         // ⇧⌘2 and ⌥⇧⌘2 as well, for a keyboard whose top row controls the Mac, where F10 needs
@@ -53,13 +62,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             if !Self.macOSAnswers(SystemShortcuts.shift | SystemShortcuts.command | SystemShortcuts.option) { self?.flow.showLast() }
         }
         makeStatusItem(hasHotKey: capture, hasShowLastKey: showLast)
-        #if DEBUG
-        // A developer check runs without the updater, whose alerts would hold it up.
-        if CommandLine.arguments.contains(where: { $0.hasPrefix("--") }) {
-            DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
-            return
-        }
-        #endif
         // Recordings live only while their windows are open: what no running Shotts holds is
         // from a crash. Not under a developer switch, which another Shotts may be running beside.
         Recording.removeLeftovers()

@@ -32,7 +32,8 @@ Simulators. Should a macOS shortcut be set to it in Keyboard Shortcuts, macOS an
 Shotts leaves it alone, so the two never answer the same press. Below, F10 stands for either. Another app may answer F10 too: macOS lets two apps hold one key, and only
 one that holds it exclusively stops Shotts having it, when the menu says so: Capture Area
 (another app has F10). F10 does nothing while a capture or a recording is being set up; it stops
-a recording under way, and ends a scrolling capture.
+a recording under way, and ends a scrolling capture. Option-F10 does nothing while any of these
+is up, and neither does anything while one of Shotts' alerts or its Print window is open.
 
 | Action | Result |
 | --- | --- |
