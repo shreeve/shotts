@@ -6,8 +6,11 @@
 # Every build, local ones included, is signed with the Developer ID (SIGN names another
 # identity; SIGN=- signs ad hoc). Screen Recording permission is granted to a code signature:
 # a stable identity keeps one grant across rebuilds, where ad-hoc signatures would ask again
-# after every build and pile up entries in System Settings. A release build also signs with a
-# secure timestamp, which notarization requires and which needs the network.
+# after every build and pile up entries in System Settings. A debug build is its own app,
+# com.github.shreeve.shotts.debug, with its own grants and settings: it acts on developer
+# switches, so it must never hold the release's Screen Recording grant, which any program could
+# then borrow through it. A release build also signs with a secure timestamp, which
+# notarization requires and which needs the network.
 set -euo pipefail
 
 scratch="${SCRATCH:-}"
@@ -17,8 +20,13 @@ cd "$root"
 scratch="${scratch:-$root/.build}"
 
 config="${CONFIG:-debug}"
-swift build -c "$config" --scratch-path "$scratch" >&2
-bin_dir="$(swift build -c "$config" --scratch-path "$scratch" --show-bin-path)"
+# A release links each binary with only the public code it calls: without this, ShottsCore's
+# and ShottsUI's public symbols are kept whole, so the app would carry the command line's parser
+# and tables, and `shotts` the GIF encoder, the stitcher, and the annotation model.
+flags=()
+if [ "$config" = release ]; then flags=(-Xswiftc -Xfrontend -Xswiftc -internalize-at-link); fi
+swift build -c "$config" --scratch-path "$scratch" ${flags[@]+"${flags[@]}"} >&2
+bin_dir="$(swift build -c "$config" --scratch-path "$scratch" ${flags[@]+"${flags[@]}"} --show-bin-path)"
 app="$scratch/Shotts.app"
 
 rm -rf "$app"
@@ -29,6 +37,9 @@ cp "$bin_dir/Shotts" "$app/Contents/MacOS/Shotts"
 # ignores case.
 cp "$bin_dir/ShottsCLI" "$app/Contents/Helpers/shotts"
 cp "$root/Support/Info.plist" "$app/Contents/Info.plist"
+if [ "$config" != release ]; then
+    plutil -replace CFBundleIdentifier -string com.github.shreeve.shotts.debug "$app/Contents/Info.plist"
+fi
 cp "$root/Support/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 # Open Sans and its license; ATSApplicationFontsPath in Info.plist makes it Shotts' own font.
 cp -R "$root/Support/Fonts" "$app/Contents/Resources/Fonts"
@@ -51,12 +62,13 @@ done
 rm -rf "$framework/Headers" "$framework/PrivateHeaders" "$framework/Modules" \
        "$framework/Versions/B/Headers" "$framework/Versions/B/PrivateHeaders" "$framework/Versions/B/Modules"
 
-# A release ships without local symbols, about a third of the binary; the dSYM made first, kept
-# beside the app and never shipped, turns a crash log's addresses back into names.
+# A release ships without symbols, which nothing in an executable needs; the dSYMs made first,
+# kept beside the app and never shipped, turn a crash log's addresses back into names.
 if [ "$config" = release ]; then
     dsymutil "$app/Contents/MacOS/Shotts" -o "$scratch/Shotts.app.dSYM" >&2
-    strip -x "$app/Contents/MacOS/Shotts"
-    strip -x "$app/Contents/Helpers/shotts"
+    dsymutil "$app/Contents/Helpers/shotts" -o "$scratch/shotts.dSYM" >&2
+    strip "$app/Contents/MacOS/Shotts"
+    strip "$app/Contents/Helpers/shotts"
 fi
 
 # Every piece is signed with the same identity, inner components first, with the hardened
