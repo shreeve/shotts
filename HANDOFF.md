@@ -8,7 +8,8 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 0.9.2 is the latest release: tag `v0.9.2` on `main`, the GitHub release with its notarized zip
 and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#148), which also links
 `shotts`; installed copies are offered each release through Sparkle. `CHANGELOG.md` has every
-release, and its Unreleased section the third revamp, on branch `revamp` from b07764d. The build
+release, and its Unreleased section the third revamp, merged into `main` as shreeve/shotts#71
+(c9f1c3b) and not yet released. The build
 has no warnings (warnings are errors) and `swift test` passes: 157 Core tests and 129 AppKit
 tests. Shotts has only ever run on macOS 27.
 
