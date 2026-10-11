@@ -40,8 +40,8 @@ final class InputWatcher {
         tapSource = nil
     }
 
-    deinit {
-        MainActor.assumeIsolated { stop() }
+    isolated deinit {
+        stop()
     }
 
     private func startTap() {
