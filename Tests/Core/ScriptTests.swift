@@ -13,7 +13,52 @@ import Testing
         #expect(ScriptParser.seconds("1.5s") == 1.5)
         #expect(ScriptParser.seconds("2m") == 120)
         #expect(ScriptParser.seconds("1m30s") == 90)
+        #expect(ScriptParser.seconds("1h") == 3600)
         #expect(ScriptParser.seconds("1m30") == nil && ScriptParser.seconds("5x") == nil && ScriptParser.seconds("") == nil && ScriptParser.seconds("-1") == nil)
+    }
+
+    /// Times, widths, and file counts have bounds: a delay of 1e19 seconds once reached a
+    /// conversion that stopped Shotts, and every open capture with it.
+    @Test func valuesAreBounded() throws {
+        for line in ["shot a.png --display 1 --delay 1e19", "shot a.png --display 1 --delay 25h", "record --display 1 --duration 1e19",
+                     "record --display 1 --duration 24h1s", "shot a.png --display 1 --width 16385", "shot a.png --display 1 --width 15",
+                     "record --display 1 --fps 9223372036854775807",
+                     "shot " + (0...ScriptRequest.mostFiles).map { "\($0).png" }.joined(separator: " ") + " --display 1"] {
+            #expect(throws: ScriptUsageError.self, "\(line)") { try parse(line) }
+        }
+        #expect(try parse("shot a.png --display 1 --delay 24h --width 16384").delay == 86_400)
+        #expect(try parse("record --display 1 --duration 1h").duration == 3600)
+    }
+
+    /// With no file named, `--fps` must suit the MP4 made then.
+    @Test func frameRateFitsTheDefaultFile() throws {
+        #expect(throws: ScriptUsageError(".mp4 takes --fps 60, 30, 20, 10, 5, 1")) { try parse("record --display 1 --fps 7") }
+        #expect(try parse("start --display 1 --fps 60").fps == 60)
+    }
+
+    /// Shotts checks what comes over the socket as the tool does, and more: anything of the
+    /// user's can write there, with paths no shell made absolute and values no parser read.
+    @Test func requestsFromTheSocketAreChecked() {
+        func refused(_ change: (inout ScriptRequest) -> Void) -> Bool {
+            var r = ScriptRequest(command: .shot)
+            r.target.display = 1
+            r.outputs = ["/tmp/a.png"]
+            change(&r)
+            do { try ScriptParser.check(r); return false } catch { return true }
+        }
+        #expect(!refused { _ in })
+        #expect(refused { $0.outputs = ["a.png"] })
+        #expect(refused { $0.outputs = ["~/Documents/a.png"] })
+        #expect(refused { $0.outputs = ["/Users/me/Documents/thesis.docx"] })
+        #expect(refused { $0.delay = -1 })
+        #expect(refused { $0.delay = 9.3e18 })
+        #expect(refused { $0.width = -5 })
+        #expect(refused { $0.target.display = 0 })
+        #expect(refused { $0.target.region = CGRect(x: 0, y: 0, width: -10, height: 10) })
+        #expect(refused { $0.target.region = CGRect(x: 0, y: 0, width: CGFloat.infinity, height: 10) })
+        #expect(refused { $0.command = .record; $0.outputs = []; $0.fps = 0 })
+        #expect(refused { $0.command = .record; $0.outputs = []; $0.duration = -1 })
+        #expect(refused { $0.command = .stop })
     }
 
     /// Each file's format comes from its extension, and every one listed is made; paths are

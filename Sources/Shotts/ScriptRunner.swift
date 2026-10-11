@@ -77,6 +77,12 @@ final class ScriptRunner {
     // MARK: - Requests
 
     private func handle(_ request: ScriptRequest, from connection: ScriptConnection) {
+        // Checked as the tool checks it: anything of the user's can write to the socket.
+        do {
+            try ScriptParser.check(request)
+        } catch {
+            return answer(connection, .failure(request.command, ScriptError(.usage, error.message)))
+        }
         guard Self.isAllowed else {
             return answer(connection, .failure(request.command, ScriptError(.notAllowed,
                 "Shotts does not take requests from the command line until Allow Command-Line Capture is on in its menu")))
@@ -130,8 +136,8 @@ final class ScriptRunner {
         defer { onCountdown?(nil) }
         while case let left = end.timeIntervalSinceNow, left > 0 {
             guard going() else { return false }
-            onCountdown?(Int(left.rounded(.up)))
-            try? await Task.sleep(for: .milliseconds(Int(min(left, 0.1) * 1000)))
+            onCountdown?(Int(exactly: left.rounded(.up)) ?? 0)
+            try? await Task.sleep(for: .seconds(min(left, 0.1)))
         }
         return going()
     }

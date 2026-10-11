@@ -336,14 +336,15 @@ shotts list   [--json]
   match one window. `--display <n>`: 1 is the main display. `--region x,y,w,h`: points from the
   window's or display's top-left corner (the main display's alone), cut to the display. `shotts
   list` shows the windows, front to back, and the displays.
-- **Files** are as many as listed, each in the format its extension names: `.png`, `.jpg`, or
-  `.heic` from `shot`; `.mp4` or `.gif` from `record` and `start`. With none, one PNG or MP4 goes
-  where the Screenshot app saves, named as Shotts names it. Each is made under a hidden name
+- **Files** are as many as listed, up to 16, each in the format its extension names: `.png`,
+  `.jpg`, or `.heic` from `shot`; `.mp4` or `.gif` from `record` and `start`. With none, one PNG
+  or MP4 goes where the Screenshot app saves, named as Shotts names it. Each is made under a hidden name
   beside it and renamed into place, replacing what was there.
-- **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`. `--delay` counts down in the menu bar first.
-- `--width` makes files narrower in proportion, never wider. Without it, a still and an MP4 are
-  their full pixel size, and a GIF the size the area has on screen (half, from a Retina
-  display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
+- **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`, `1h`, up to a day. `--delay` counts down in the
+  menu bar first.
+- `--width` (16 to 16384 pixels) makes files narrower in proportion, never wider. Without it, a
+  still and an MP4 are their full pixel size, and a GIF the size the area has on screen (half,
+  from a Retina display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
   5, or 1 (30 unless asked); GIF 30, 20, 10, 5, or 1 (20).
 - **Sound** goes only in an MP4, and only with `--audio`: `system` (the Mac's sound; recording a
   window, only its app's), `mic` (the microphone), or `both`, mixed into one track. A GIF

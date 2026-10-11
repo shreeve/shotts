@@ -92,6 +92,15 @@ public struct ScriptRequest: Codable, Equatable, Sendable {
     /// A recording started with `start` stops itself after this long, should `stop` never come.
     public static let startCap: Double = 600
 
+    /// The longest `--delay` or `--duration`: a day.
+    public static let longest: Double = 86_400
+
+    /// The widest `--width`: more than any display has, since a file is never made wider.
+    public static let widest = 16_384
+
+    /// The most files one request makes: each file from a recording is made from all of it.
+    public static let mostFiles = 16
+
     /// Each video format's frame rate when none is asked for: smooth video, a lighter GIF.
     public static func defaultFrameRate(for format: RecordingSettings.Format) -> Int { format == .gif ? 20 : 30 }
 
@@ -156,7 +165,8 @@ public enum ScriptParser {
 
         Files are made in the format their names end in: .png .jpg .heic from shot,
         .mp4 .gif from record and start, as many as are named. With none, a .png or
-        .mp4 goes where the Screenshot app saves. Times: 5, 500ms, 1.5s, 2m, 1m30s.
+        .mp4 goes where the Screenshot app saves. Times: 5, 500ms, 1.5s, 2m, 1m30s,
+        1h, up to a day.
 
         Examples:
           shotts list
@@ -200,25 +210,25 @@ public enum ScriptParser {
             case "--json": request.json = true
             case "--window": request.target.window = try value(argument)
             case "--display":
-                guard let n = Int(try value(argument)), n >= 1 else { throw ScriptUsageError("--display takes a number, 1 being the main display") }
+                guard let n = Int(try value(argument)) else { throw Self.displayUsage }
                 request.target.display = n
             case "--region":
-                guard let r = region(try value(argument)) else { throw ScriptUsageError("--region takes x,y,w,h in points") }
+                guard let r = region(try value(argument)) else { throw Self.regionUsage }
                 request.target.region = r
             case "--delay":
-                guard let t = seconds(try value(argument)) else { throw ScriptUsageError("--delay takes a time: 5, 500ms, 1.5s, 2m, 1m30s") }
+                guard let t = seconds(try value(argument)) else { throw Self.delayUsage }
                 request.delay = t
             case "--duration":
-                guard let t = seconds(try value(argument)), t > 0 else { throw ScriptUsageError("--duration takes a time over zero: 5, 1.5s, 2m") }
+                guard let t = seconds(try value(argument)) else { throw Self.durationUsage }
                 request.duration = t
             case "--fps":
-                guard let n = Int(try value(argument)), n > 0 else { throw ScriptUsageError("--fps takes a whole number") }
+                guard let n = Int(try value(argument)) else { throw ScriptUsageError("--fps takes a whole number") }
                 request.fps = n
             case "--audio":
                 guard let a = ScriptRequest.audio(try value(argument)) else { throw ScriptUsageError("--audio takes system, mic, or both") }
                 request.audio = a
             case "--width":
-                guard let n = Int(try value(argument)), n >= RecordingRule.minWidth else { throw ScriptUsageError("--width takes pixels, \(RecordingRule.minWidth) or more") }
+                guard let n = Int(try value(argument)) else { throw Self.widthUsage }
                 request.width = n
             default:
                 guard !argument.hasPrefix("-") else { throw ScriptUsageError("unknown option '\(argument)'") }
@@ -230,8 +240,16 @@ public enum ScriptParser {
         return request
     }
 
-    /// What each command takes.
-    static func check(_ r: ScriptRequest) throws(ScriptUsageError) {
+    private static let displayUsage = ScriptUsageError("--display takes a number, 1 being the main display")
+    private static let regionUsage = ScriptUsageError("--region takes x,y,w,h in points")
+    private static let delayUsage = ScriptUsageError("--delay takes a time up to 24h: 5, 500ms, 1.5s, 2m, 1m30s, 1h")
+    private static let durationUsage = ScriptUsageError("--duration takes a time over zero, up to 24h: 5, 1.5s, 2m, 1h")
+    private static let widthUsage = ScriptUsageError("--width takes pixels, \(RecordingRule.minWidth) to \(ScriptRequest.widest)")
+
+    /// Whether `r` is a request Shotts can carry out: what each command takes, and every value in
+    /// bounds. The tool checks before sending, and Shotts again on receiving, since any program
+    /// of the user's can write to the socket.
+    public static func check(_ r: ScriptRequest) throws(ScriptUsageError) {
         switch r.command {
         case .stop, .list, .abort:
             guard r.outputs.isEmpty, r.target.isEmpty, r.delay == 0, r.duration == nil, r.fps == nil, r.width == nil, r.audio == nil else {
@@ -250,20 +268,32 @@ public enum ScriptParser {
             throw ScriptUsageError("say what to capture with --window, --display, or --region; `shotts list` shows what there is")
         }
         if r.target.window != nil, r.target.display != nil { throw ScriptUsageError("--window and --display: choose one") }
+        if let n = r.target.display, n < 1 { throw displayUsage }
+        if let a = r.target.region, !(a.size.width > 0 && a.size.height > 0 && [a.minX, a.minY, a.maxX, a.maxY].allSatisfy(\.isFinite)) { throw regionUsage }
+        guard r.delay >= 0, r.delay <= ScriptRequest.longest else { throw delayUsage }
+        if let t = r.duration, !(t > 0 && t <= ScriptRequest.longest) { throw durationUsage }
+        if let w = r.width, !(RecordingRule.minWidth...ScriptRequest.widest).contains(w) { throw widthUsage }
+        guard r.outputs.count <= ScriptRequest.mostFiles else { throw ScriptUsageError("at most \(ScriptRequest.mostFiles) files at once") }
+        var formats: [OutputFormat] = []
         for path in r.outputs {
+            guard path.hasPrefix("/") else { throw ScriptUsageError("'\(path)': a file's path must start at /") }
             guard let format = OutputFormat.of(path) else {
                 throw ScriptUsageError("'\((path as NSString).lastPathComponent)': unknown format; use \(r.command == .shot ? ".png, .jpg, or .heic" : ".mp4 or .gif")")
             }
             if format.isStill != (r.command == .shot) {
                 throw ScriptUsageError("\(r.command.rawValue) makes \(r.command == .shot ? ".png, .jpg, or .heic" : ".mp4 or .gif") files, not .\(format.rawValue)")
             }
+            formats.append(format)
+        }
+        // The rate fits every file made: those named, or the MP4 made when none is.
+        for format in formats.isEmpty ? [r.defaultFormat] : formats {
             if let fps = r.fps, let video = format.recording, !RecordingRule.frameRates(for: video).contains(fps) {
                 throw ScriptUsageError(".\(format.rawValue) takes --fps \(RecordingRule.frameRates(for: video).map(String.init).joined(separator: ", "))")
             }
         }
     }
 
-    /// A time: a bare number of seconds, or with units, as in 500ms, 1.5s, 2m, or 1m30s.
+    /// A time: a bare number of seconds, or with units, as in 500ms, 1.5s, 2m, 1m30s, or 1h.
     public static func seconds(_ text: String) -> Double? {
         if let plain = Double(text) { return plain >= 0 && plain.isFinite ? plain : nil }
         var total = 0.0, number = "", rest = Substring(text.lowercased())
@@ -287,7 +317,7 @@ public enum ScriptParser {
     /// x,y,w,h in points.
     static func region(_ text: String) -> CGRect? {
         let parts = text.split(separator: ",").map { Double($0.trimmingCharacters(in: .whitespaces)) }
-        guard parts.count == 4, let x = parts[0], let y = parts[1], let w = parts[2], let h = parts[3], w > 0, h > 0 else { return nil }
+        guard parts.count == 4, let x = parts[0], let y = parts[1], let w = parts[2], let h = parts[3] else { return nil }
         return CGRect(x: x, y: y, width: w, height: h)
     }
 }
