@@ -39,9 +39,16 @@ final class CaptureFlow {
     /// A stopped recording's files are being finished; its window opens next.
     private var finishing = false
 
-    /// Whether a recording is being made, which quitting would lose. One being finished is not:
-    /// stopping again would do nothing, and refusing to quit then could leave Shotts unquittable.
-    var isRecording: Bool { recording?.recorder != nil }
+    /// Whether a recording is being made or an area scrolled, which quitting stops rather than
+    /// loses. A recording being finished is not: stopping again would do nothing, so quitting
+    /// then asks about it, as an unsaved recording (`unsavedWork`).
+    var isUnderWay: Bool { recording?.recorder != nil || scrolling != nil }
+
+    /// Quitting while recording or scrolling: the recording stops, or the scrolled picture is
+    /// done, and either opens as from F10.
+    func stopUnderWay() {
+        if let scrolling { scrolling.setup.done() } else { stopRecording() }
+    }
 
     /// Whether a recording is being set up, made, or finished: `shotts` waits its turn.
     var isBusyRecording: Bool { recording != nil || finishing }
@@ -483,10 +490,10 @@ final class CaptureFlow {
     /// Whether Option-F10 has anything to show.
     var hasLastCapture: Bool { !editors.isEmpty || lastClosed != nil }
 
-    /// What quitting now would lose: open captures annotated or cropped, and recordings not yet
-    /// saved, copied, or dragged out.
+    /// What quitting now would lose: open captures annotated or cropped, or with words being typed,
+    /// and recordings not yet saved, copied, or dragged out, the one being finished among them.
     var unsavedWork: (captures: Int, recordings: Int) {
-        (editors.filter { $0.editor.canvas.document.isEdited }.count, recordings.filter { !$0.kept }.count)
+        (editors.filter { $0.editor.canvas.isAnnotated }.count, recordings.filter { !$0.kept }.count + (finishing ? 1 : 0))
     }
 
     /// Option-F10: the newest open editor, brought to the front; else the editor closed last,

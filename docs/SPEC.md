@@ -175,8 +175,11 @@ capture itself. Drawing, moving, or typing an annotation is one step.
 The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.
 Quitting Shotts asks first only when it would lose something, saying what ("2 annotated
 captures and an unsaved recording will be lost."), with Quit and Cancel: an open capture with
-annotations or a crop, or a recording not yet saved, copied, or dragged out. With nothing to
-lose, it quits at once.
+annotations or a crop (annotated, for short), or words being typed on it, or a recording still
+being finished or not yet saved, copied, or dragged out. With nothing to lose, it quits at once.
+Quitting while recording or scrolling stops that instead, and it opens; quitting again quits.
+Logging out, restarting, or shutting down is never held up: Shotts quits at once, whatever is
+open.
 Option-F10 brings the newest open editor to the front, or, when none is open, opens the one
 closed last again exactly as it was, annotations still editable; a minimized editor comes back
 too. Shotts keeps that one closed capture in memory until another editor closes and takes its

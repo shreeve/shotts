@@ -33,19 +33,17 @@ public struct Document: Equatable, Sendable {
         return 1
     }
 
-    /// Whether the user has drawn on it or cropped it.
-    public var isEdited: Bool { !annotations.isEmpty || crop != nil }
+    /// Whether the user has drawn on it or cropped it: annotated, as Quit and Option-F10 count it.
+    public var isAnnotated: Bool { !annotations.isEmpty || crop != nil }
 
     /// Option-F10 brings back one closed capture: a capture closing takes its place, unless that
     /// would put annotated work out for a capture with none.
     public static func keepsAsLast(_ closed: Document, over kept: Document?) -> Bool {
-        closed.isEdited || !(kept?.isEdited ?? false)
+        closed.isAnnotated || !(kept?.isAnnotated ?? false)
     }
 
     /// The part of the image the export shows.
     public var visibleRect: CGRect { crop?.intersection(pixelBounds) ?? pixelBounds }
-
-    public var isBlank: Bool { annotations.isEmpty && crop == nil }
 
     public func annotation(_ id: Annotation.ID) -> Annotation? {
         annotations.first { $0.id == id }

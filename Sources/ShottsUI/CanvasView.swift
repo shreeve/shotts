@@ -93,6 +93,9 @@ public final class CanvasView: NSView {
     public var onChange: (() -> Void)?
 
     public var document: Document { history.current }
+    /// Whether closing or quitting would lose work here: the document annotated, or words being
+    /// typed into a new text, which reach the document only when the typing ends.
+    public var isAnnotated: Bool { document.isAnnotated || !(textField?.string.allSatisfy(\.isWhitespace) ?? true) }
     public private(set) var selectedID: Annotation.ID?
 
     private var base: Document?

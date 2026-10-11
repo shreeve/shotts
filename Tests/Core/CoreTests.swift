@@ -116,17 +116,17 @@ import Testing
     @Test func documentEditsById() {
         let a = Annotation(shape: .pen([.zero, CGPoint(x: 5, y: 5)]), style: style)
         var d = Document(width: 10, height: 10, scale: 1)
-        #expect(d.isBlank)
+        #expect(!d.isAnnotated)
         d.add(a)
-        #expect(!d.isBlank && d.annotation(a.id) == a)
+        #expect(d.isAnnotated && d.annotation(a.id) == a)
         var b = a
         b.style.color = .blue
         d.replace(b)
         #expect(d.annotations == [b])
         d.remove(a.id)
-        #expect(d.isBlank)
+        #expect(!d.isAnnotated)
         d.setCrop(CGRect(x: 2.4, y: 2.6, width: 3.2, height: 3))
-        #expect(d.crop == CGRect(x: 2, y: 2, width: 4, height: 4) && !d.isBlank)
+        #expect(d.crop == CGRect(x: 2, y: 2, width: 4, height: 4) && d.isAnnotated)
         d.setCrop(CGRect(x: 40, y: 40, width: 5, height: 5))
         #expect(d.crop == nil)
         #expect(Document(width: 10, height: 10, scale: 1, crop: CGRect(x: -5, y: 0, width: 8, height: 10)).crop == CGRect(x: 0, y: 0, width: 3, height: 10))
