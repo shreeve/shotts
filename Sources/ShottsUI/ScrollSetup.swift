@@ -14,7 +14,8 @@ public final class ScrollSetup {
     public enum State: Equatable, Sendable {
         /// Shotts scrolling to the bottom.
         case scrolling
-        /// Shotts could not follow the area, frames kept not matching: the user scrolls.
+        /// Shotts could not follow the area (frames kept not matching, none came, or it is too
+        /// short), or macOS gave the mouse back to the user: the user scrolls.
         case gaveUp
         /// Shotts may not scroll other apps until Accessibility allows it: the user scrolls.
         case needsPermission

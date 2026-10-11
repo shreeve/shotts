@@ -53,8 +53,8 @@ public final class ScrollStitcher {
 
     /// Fingerprint blocks across a row.
     let blocks: Int
-    /// The picture: `capacity` bytes, of which `pictureHeight` rows are written. Nil once handed
-    /// over.
+    /// The picture, reserved at `maxBytes` or one frame, the larger, of which `pictureHeight`
+    /// rows are written. Nil once handed over.
     private var buffer: UnsafeMutableRawPointer?
     /// The last frame taken's fingerprints, and the newest frame's.
     private var lastPrints: [Float]
@@ -148,7 +148,8 @@ public final class ScrollStitcher {
         return UnsafeMutableRawBufferPointer(start: buffer, count: pictureHeight * rowBytes)
     }
 
-    /// The newest frame as the picture so far, until the bands are known.
+    /// The newest frame as the picture so far, and as the one the next is matched with, until
+    /// the bands are known.
     private func keep(_ frame: UnsafeRawPointer, bytesPerRow: Int, in buffer: UnsafeMutableRawPointer) {
         for y in 0..<height { (buffer + y * rowBytes).copyMemory(from: frame + y * bytesPerRow, byteCount: rowBytes) }
         swap(&prints, &lastPrints)
