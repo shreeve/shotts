@@ -147,6 +147,13 @@ import Testing
         #expect(mp4.size(recorded: (6016, 3384)).width <= 4096)
     }
 
+    /// A file beside one of the same name is numbered as the Finder numbers a copy.
+    @Test func numberedNames() {
+        #expect(ScriptFile.numbered("/d/Shotts at 10.12.34 AM.png", 2) == "/d/Shotts at 10.12.34 AM 2.png")
+        #expect(ScriptFile.numbered("/d/a.b.mp4", 3) == "/d/a.b 3.mp4")
+        #expect(ScriptFile.numbered("/d/plain", 2) == "/d/plain 2")
+    }
+
     @Test func filesWhenNoneAreNamed() {
         #expect(ScriptRequest(command: .shot).defaultFormat == .png)
         #expect(ScriptRequest(command: .record).defaultFormat == .mp4)

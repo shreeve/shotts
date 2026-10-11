@@ -338,8 +338,9 @@ shotts list   [--json]
   list` shows the windows, front to back, and the displays.
 - **Files** are as many as listed, up to 16, each in the format its extension names: `.png`,
   `.jpg`, or `.heic` from `shot`; `.mp4` or `.gif` from `record` and `start`. With none, one PNG
-  or MP4 goes where the Screenshot app saves, named as Shotts names it. Each is made under a hidden name
-  beside it and renamed into place, replacing what was there.
+  or MP4 goes where the Screenshot app saves, named as Shotts names it. Each is made in a hidden
+  folder beside its place and moved there once all are made: a file named replaces what was
+  there, and one Shotts names never does, taking a number after its name as the Finder does.
 - **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`, `1h`, up to a day. `--delay` counts down in the
   menu bar first.
 - `--width` (16 to 16384 pixels) makes files narrower in proportion, never wider. Without it, a

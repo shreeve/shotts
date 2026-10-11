@@ -564,6 +564,14 @@ public struct ScriptFile: Codable, Equatable, Sendable {
         self.frames = frames
         self.bytes = bytes
     }
+
+    /// `path` with `number` after its name, as the Finder names a copy beside a file of that
+    /// name: `Shotts at 10.12.34.png`, then `Shotts at 10.12.34 2.png`.
+    public static func numbered(_ path: String, _ number: Int) -> String {
+        let name = path as NSString
+        let numbered = name.deletingPathExtension + " \(number)"
+        return name.pathExtension.isEmpty ? numbered : numbered + "." + name.pathExtension
+    }
 }
 
 /// What was captured.
