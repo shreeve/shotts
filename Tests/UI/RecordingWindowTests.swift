@@ -318,6 +318,16 @@ import Testing
         #expect(badge.frame.maxY <= setup.drawing.canvas.bounds.maxY && badge.frame.minY > setup.drawing.canvas.bounds.midY)
     }
 
+    /// In an area too small for the plate and the space kept below it, the plate starts at the
+    /// area's top and is never wider than it.
+    @Test func keysStayInATinyArea() throws {
+        let canvas = DrawingCanvas(size: CGSize(width: 12, height: 40), scale: 2)
+        canvas.keysClearance = 60
+        canvas.showKey("⌘I")
+        let badge = try #require(canvas.subviews.compactMap { $0 as? KeysBadge }.first)
+        #expect(badge.frame.origin.y == 0 && badge.frame.size.width >= 0 && badge.frame.origin.x >= 0 && badge.frame.maxX <= 12)
+    }
+
     /// A click inside the area ripples where it landed; one outside does nothing.
     @Test func clicksRippleOnlyInTheArea() throws {
         let screen = try #require(NSScreen.screens.first)
