@@ -302,7 +302,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let tool = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/shotts").path
         guard FileManager.default.isExecutableFile(atPath: tool) else { NSSound.beep(); return }
         func quoted(_ s: String) -> String { "'" + s.replacing("'", with: "'\\''") + "'" }
-        let command = "mkdir -p /usr/local/bin && ln -sf \(quoted(tool)) /usr/local/bin/shotts"
+        // -n replaces a link to a folder rather than following it, so root never writes inside it.
+        let command = "mkdir -p /usr/local/bin && ln -sfn \(quoted(tool)) /usr/local/bin/shotts"
         let source = "do shell script \"\(command.replacing("\\", with: "\\\\").replacing("\"", with: "\\\""))\" with administrator privileges"
         Front.bringShotts()
         var error: NSDictionary?
