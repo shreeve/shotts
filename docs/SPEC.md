@@ -254,8 +254,7 @@ edge, and neither is recorded.
 
 Everything in the area is recorded as it happens, at the display's full resolution, up to 60
 frames a second, with the pointer, and with the Mac's own sound, kept apart from the
-microphone. The outline sits just outside the area; neither it, the bar, nor Shotts' menu bar
-item is ever recorded. While recording, the menu bar item shows a red dot and the time so far,
+microphone. Neither the outline, the bar, nor Shotts' menu bar item is ever recorded. While recording, the menu bar item shows a red dot and the time so far,
 and the bar beside the area has:
 
 | Control | Effect |
