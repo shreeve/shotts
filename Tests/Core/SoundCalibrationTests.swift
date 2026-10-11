@@ -46,4 +46,25 @@ import Testing
         #expect(SoundCalibration.gain(played: played, heard: played / 100) == nil)
         #expect(SoundCalibration.gain(played: played, heard: 0) == nil)
     }
+
+    /// A loss past 20 dB is a misreading, not a device: believed, it would flatten the top of
+    /// every loud sound. Up to it, the gain undoes it.
+    @Test func aLossPast20DecibelsIsNotBelieved() throws {
+        let played = 0.01
+        let gain = try #require(SoundCalibration.gain(played: played, heard: played * pow(10, -19.5 / 20)))
+        #expect(abs(20 * log10(gain) - 19.5) < 0.01)
+        #expect(SoundCalibration.gain(played: played, heard: played * pow(10, -20.5 / 20)) == nil)
+        #expect(SoundCalibration.gain(played: played, heard: played * pow(10, -25.0 / 20)) == nil)
+    }
+
+    /// A device's measurement is believed for a month, then taken again; one dated later than
+    /// now, after the clock was set back, is taken again at once.
+    @Test func aMeasurementIsBelievedForAMonth() {
+        let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let day = 24 * 60 * 60.0
+        #expect(SoundCalibration.isFresh(now, at: now))
+        #expect(SoundCalibration.isFresh(now.addingTimeInterval(-29 * day), at: now))
+        #expect(!SoundCalibration.isFresh(now.addingTimeInterval(-31 * day), at: now))
+        #expect(!SoundCalibration.isFresh(now.addingTimeInterval(day), at: now))
+    }
 }

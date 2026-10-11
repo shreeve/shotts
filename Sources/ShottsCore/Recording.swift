@@ -309,13 +309,26 @@ public enum FrameSampler {
 /// How much louder a recording's system sound is made, to undo what macOS takes off it.
 /// ScreenCaptureKit hands over the Mac's sound quieter than it played, by an amount fixed for
 /// each output device (none on a MacBook's speakers, 6 to 14 dB on some USB interfaces) and
-/// whatever the volume. Shotts plays a tone too quiet to hear, captures it, and compares what
-/// came back with what it played; the files made then put back what was taken.
+/// whatever the volume. Shotts plays a quiet tone, captures it, and compares what came back with
+/// what it played; the files made then put back what was taken. Each device's measurement is
+/// kept for `remembered`, so most recordings play no tone at all.
 public enum SoundCalibration {
-    /// The tone's level: far below hearing at any ordinary volume, far above the capture's floor.
+    /// The tone's level: below hearing at ordinary volumes, though headphones turned right up
+    /// let it be heard faintly; far above the capture's floor.
     public static let toneDecibels = -60.0
-    /// More taken off than this is not believed: something else went wrong.
-    public static let largestLoss = 30.0
+    /// More taken off than this is not believed: something else went wrong. Real devices take
+    /// up to 14 dB, and a misreading believed would make the Mac's sound flat-topped in every file.
+    public static let largestLoss = 20.0
+    /// How long a device's measurement is believed, in seconds: a month, after which it is
+    /// measured again, should macOS have changed what it takes off.
+    public static let remembered: Double = 30 * 24 * 60 * 60
+
+    /// Whether a measurement taken at `measured` is still believed at `now`; one from the
+    /// future, as a clock set back leaves, is not.
+    public static func isFresh(_ measured: Date, at now: Date) -> Bool {
+        let age = now.timeIntervalSince(measured)
+        return age >= 0 && age < remembered
+    }
 
     /// The tone's peak amplitude, from `toneDecibels`.
     public static var toneAmplitude: Double { pow(10, toneDecibels / 20) }

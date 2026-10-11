@@ -306,9 +306,10 @@ first, so a preview in Messages or Mail plays at once.
 
 The Mac's sound in a file is as loud as it played. macOS hands it over quieter, by an amount
 fixed for each output device (none from a MacBook's speakers; 6 to 14 dB through some USB
-interfaces and displays), so as each recording with it starts, Shotts plays a tone too quiet to
-hear, measures how much quieter it comes back, remembers that for the device, and puts it back
-in the files it makes. The microphone is left at the level the Mac's input volume gives it.
+interfaces and displays), so the first time a recording with it starts on an output device, and
+again a month later, Shotts plays a quiet tone, measures how much quieter it comes back, and
+remembers that for the device; the files it makes put it back. A loss past 20 dB is taken for a
+misreading and not put back. The microphone is left at the level the Mac's input volume gives it.
 
 ## Command line
 
