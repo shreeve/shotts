@@ -71,9 +71,9 @@ Decided against, so they are not rebuilt:
 Deferred, with the reason each waits:
 
 - Allow Command-Line Capture is a preference, so any program the user runs can turn it on with
-  `defaults write` and then capture through Shotts' grants. Launch arguments cannot (it is read
-  from Shotts' own saved settings only). A stronger gate, such as asking once per launch on the
-  first request, waits on the owner's decision.
+  `defaults write` and then capture through Shotts' grants; launch arguments cannot (it is read
+  from Shotts' own saved settings only). The owner keeps it so (2026-10-11): it guards against
+  accidents, as SPEC says, and asking once per launch was declined.
 - Configurable shortcuts: not for now, the owner says. F10 and ⇧⌘2 both work, with no setting:
   F10 for a top row of F-keys (fn-F10 otherwise), ⇧⌘2 on any keyboard. 0.9.1's ⇧⌘4 needed
   macOS's own turned off first (both answer a key two apps hold, so Shotts deferred to it), too

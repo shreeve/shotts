@@ -331,7 +331,8 @@ capturing under its own Screen Recording permission, and starts Shotts in the ba
 is not running. Shotts answers only while **Allow Command-Line Capture** is on in its menu, off
 until the user turns it on, since any program the user runs could then capture the screen, and
 with `--audio mic` record the microphone (macOS still shows its microphone light, and Shotts its
-timer).
+timer). The switch guards against accidents, not against programs the user runs: it is one of
+Shotts' settings, which such a program could change itself, as it could most of the user's.
 **Install Command-Line Tool…** in the menu links `/usr/local/bin/shotts` (asking for an
 administrator's password); it is not shown once `shotts` is installed, as the Homebrew cask
 installs it. `shotts` alone or `shotts --help` sums up what follows under the version; a
