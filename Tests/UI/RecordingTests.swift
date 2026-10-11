@@ -118,6 +118,30 @@ private func videoFrames(_ asset: AVAsset) async throws -> Int {
     return count
 }
 
+/// The root mean square of a file's sound, from a tenth of a second in to a tenth before the
+/// end, clear of the encoder's start and end.
+private func loudness(_ url: URL) async throws -> Double {
+    let asset = AVURLAsset(url: url)
+    let track = try #require(try await asset.loadTracks(withMediaType: .audio).first)
+    let reader = try AVAssetReader(asset: asset)
+    let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+        AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true,
+        AVLinearPCMIsNonInterleaved: false, AVLinearPCMIsBigEndianKey: false,
+    ])
+    reader.timeRange = CMTimeRange(start: CMTime(seconds: 0.1, preferredTimescale: 600), end: CMTime(seconds: 0.9, preferredTimescale: 600))
+    reader.add(output)
+    #expect(reader.startReading())
+    var sum = 0.0, count = 0
+    while let sample = output.copyNextSampleBuffer() {
+        let data = try #require(sample.dataBuffer).dataBytes()
+        data.withUnsafeBytes { bytes in
+            for x in bytes.bindMemory(to: Float.self) { sum += Double(x * x) }
+            count += bytes.count / 4
+        }
+    }
+    return (sum / Double(max(count, 1))).squareRoot()
+}
+
 /// A GIF's size, whether it loops, and its frames' delays.
 private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, delays: [Int]) {
     let b = [UInt8](data)
@@ -180,6 +204,27 @@ private func gifSummary(_ data: Data) -> (width: Int, height: Int, loops: Bool, 
         #expect(try await videoFrames(asset) == 3)
         let order = boxes(try Data(contentsOf: url))
         #expect(try #require(order.firstIndex(of: "moov")) < (try #require(order.firstIndex(of: "mdat"))))
+    }
+
+    /// The Mac's sound comes out `systemGain` times louder, putting back what macOS took off it;
+    /// the microphone comes out as it was, alone or mixed with it.
+    @Test func theMacsSoundIsPutBackAndTheMicrophoneLeftAsItWas() async throws {
+        var recording = try await makeRecording()
+        defer { try? FileManager.default.removeItem(at: recording.folder) }
+        func level(_ sound: RecordingSettings.Sound) async throws -> Double {
+            let url = recording.folder.appendingPathComponent("\(sound) \(recording.systemGain).mp4")
+            try await RecordingExport.write(recording, settings: RecordingSettings(format: .mp4, percent: 25, frameRate: 10, sound: sound), to: url)
+            return try await loudness(url)
+        }
+        let system = try await level(.system), microphone = try await level(.microphone), both = try await level(.both)
+        recording.systemGain = 2
+        let louder = (system: try await level(.system), microphone: try await level(.microphone), both: try await level(.both))
+        #expect(abs(louder.system / system - 2) < 0.05, "\(louder.system) from \(system)")
+        #expect(abs(louder.microphone / microphone - 1) < 0.05, "\(louder.microphone) from \(microphone)")
+        // Two pitches mixed: their powers add, the Mac's four times what it was.
+        let power = (louder.both * louder.both) / (both * both)
+        let expected = (4 * system * system + microphone * microphone) / (system * system + microphone * microphone)
+        #expect(abs(power / expected - 1) < 0.1, "\(louder.both) from \(both)")
     }
 
     @Test func mp4WithoutSoundHasNoSoundTrack() async throws {
