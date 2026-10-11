@@ -32,7 +32,8 @@ Simulators. Should a macOS shortcut be set to it in Keyboard Shortcuts, macOS an
 Shotts leaves it alone, so the two never answer the same press. Below, F10 stands for either. Another app may answer F10 too: macOS lets two apps hold one key, and only
 one that holds it exclusively stops Shotts having it, when the menu says so: Capture Area
 (another app has F10). F10 does nothing while a capture or a recording is being set up; it stops
-a recording under way, and ends a scrolling capture.
+a recording under way, and ends a scrolling capture. Option-F10 does nothing while any of these
+is up, and neither does anything while one of Shotts' alerts or its Print window is open.
 
 | Action | Result |
 | --- | --- |
@@ -51,9 +52,8 @@ a recording under way, and ends a scrolling capture.
 | Escape | Cancels, even mid-drag. Nothing is kept. |
 
 F10 leaves every window where it is, Shotts' editors included; Shotts itself comes to the front
-only when a capture's editor opens, or with Option-F10. A click on no window does nothing, so a
-stray click does not end the capture. Switching to another app, or a display being added,
-removed, or rearranged, cancels.
+only when a capture's editor opens, or with Option-F10. Switching to another app, or a display
+being added, removed, or rearranged, cancels.
 
 The crosshair is a light line with a dark edge, visible on any background, and shows only on the
 display the pointer is on; the keys act on that display. The selection stays on one display.
@@ -175,8 +175,11 @@ capture itself. Drawing, moving, or typing an annotation is one step.
 The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.
 Quitting Shotts asks first only when it would lose something, saying what ("2 annotated
 captures and an unsaved recording will be lost."), with Quit and Cancel: an open capture with
-annotations or a crop, or a recording not yet saved, copied, or dragged out. With nothing to
-lose, it quits at once.
+annotations or a crop (annotated, for short), or words being typed on it, or a recording still
+being finished or not yet saved, copied, or dragged out. With nothing to lose, it quits at once.
+Quitting while recording or scrolling stops that instead, and it opens; quitting again quits.
+Logging out, restarting, or shutting down is never held up: Shotts quits at once, whatever is
+open.
 Option-F10 brings the newest open editor to the front, or, when none is open, opens the one
 closed last again exactly as it was, annotations still editable; a minimized editor comes back
 too. Shotts keeps that one closed capture in memory until another editor closes and takes its

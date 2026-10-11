@@ -9,6 +9,16 @@ func privatePasteboard() -> NSPasteboard {
     NSPasteboard(name: NSPasteboard.Name("Shotts tests \(UUID().uuidString)"))
 }
 
+/// Points Export's temporary folders (`Shotts Drag`, `Shotts Copied`) at a folder of this test
+/// process's own, so a test run never empties the ones a running Shotts keeps its last dragged
+/// or copied file in. Every test that makes one calls this first.
+func useOwnTemporaryRoot() {
+    Export.temporaryRoot = ownTemporaryRoot
+}
+
+private let ownTemporaryRoot = FileManager.default.temporaryDirectory.appendingPathComponent("Shotts tests \(UUID().uuidString)",
+                                                                                            isDirectory: true)
+
 /// An encoded image's resolution and pixel size, as another app reading the file sees them.
 func properties(_ data: Data) -> (dpi: Double, width: Int, height: Int)? {
     guard let file = CGImageSourceCreateWithData(data as CFData, nil),
@@ -174,10 +184,13 @@ func patternImage(_ width: Int, _ height: Int) -> CGImage {
 
     /// Each drag replaces the last drag's file rather than leaving another beside it.
     @Test func onlyTheLatestDragIsLeftOnDisk() throws {
+        useOwnTemporaryRoot()
         let document = Document(width: 30, height: 20, scale: 2)
         let first = try Export.temporaryFile(document, source: blankImage(30, 20)).url
         let folder = first.deletingLastPathComponent()
         defer { try? FileManager.default.removeItem(at: folder) }
+        #expect(folder.deletingLastPathComponent().standardizedFileURL == Export.temporaryRoot.standardizedFileURL)
+        #expect(Export.temporaryRoot.standardizedFileURL != FileManager.default.temporaryDirectory.standardizedFileURL)
         let older = folder.appendingPathComponent("Shotts 2020-01-01 at 1.02.03 PM.png")
         try Data([1]).write(to: older)
         let second = try Export.temporaryFile(document, source: blankImage(30, 20)).url

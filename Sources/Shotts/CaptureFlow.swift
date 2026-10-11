@@ -9,8 +9,8 @@ import ShottsUI
 /// ends, a recording of the area: set up, recorded, and opened in a window of its own.
 final class CaptureFlow {
     /// The capture under way, from the hot key until its editor opens or it ends. There is one
-    /// at a time: the hot key does nothing while the picker is up, a window is being captured,
-    /// or an alert is open.
+    /// at a time: the hot key does nothing while the picker is up or a window is being captured
+    /// (`isBusy`).
     private var capture: Capture?
     /// The open editors, each with the app it gives focus back to when it closes.
     private var editors: [(editor: EditorWindowController, returnTo: NSRunningApplication?)] = []
@@ -39,9 +39,16 @@ final class CaptureFlow {
     /// A stopped recording's files are being finished; its window opens next.
     private var finishing = false
 
-    /// Whether a recording is being made, which quitting would lose. One being finished is not:
-    /// stopping again would do nothing, and refusing to quit then could leave Shotts unquittable.
-    var isRecording: Bool { recording?.recorder != nil }
+    /// Whether a recording is being made or an area scrolled, which quitting stops rather than
+    /// loses. A recording being finished is not: stopping again would do nothing, so quitting
+    /// then asks about it, as an unsaved recording (`unsavedWork`).
+    var isUnderWay: Bool { recording?.recorder != nil || scrolling != nil }
+
+    /// Quitting while recording or scrolling: the recording stops, or the scrolled picture is
+    /// done, and either opens as from F10.
+    func stopUnderWay() {
+        if let scrolling { scrolling.setup.done() } else { stopRecording() }
+    }
 
     /// Whether a recording is being set up, made, or finished: `shotts` waits its turn.
     var isBusyRecording: Bool { recording != nil || finishing }
@@ -59,6 +66,8 @@ final class CaptureFlow {
     }
 
     private struct Capture {
+        /// Which capture this is, so that work finishing after it has ended leaves the next alone.
+        let id: UUID
         /// The app in front when the hot key fired, Shotts itself when an editor was: a capture
         /// that ends without an editor leaves focus there.
         var frontmost: NSRunningApplication?
@@ -66,19 +75,18 @@ final class CaptureFlow {
         var returnTo: NSRunningApplication?
         /// The picker, which calls back once, to nothing, unless someone holds it.
         var selection: AreaSelection?
-        /// The displays, streaming while the picker is up.
-        var displays: [LiveDisplay] = []
     }
 
-    /// F10: a capture, or while recording, the end of the recording. Nothing while a capture or
-    /// a recording is being set up.
+    /// F10: a capture, or while recording, the end of the recording. Nothing while Shotts is
+    /// otherwise busy.
     func begin() {
         if recording?.recorder != nil { stopRecording(); return }
         // While an area is scrolled, F10 is Done.
         if let scrolling { scrolling.setup.done(); return }
-        guard capture == nil, recording == nil, !finishing else { return }
+        guard !isBusy else { return }
         let frontmost = NSWorkspace.shared.frontmostApplication
-        capture = Capture(frontmost: frontmost, returnTo: appToReturnTo(from: frontmost))
+        let id = UUID()
+        capture = Capture(id: id, frontmost: frontmost, returnTo: appToReturnTo(from: frontmost))
         guard ScreenCapture.hasPermission else {
             askPermission()
             return
@@ -86,14 +94,14 @@ final class CaptureFlow {
         // The picker goes up at once over the live screen; the streams it reads start behind it,
         // leaving its own windows out.
         let displays = LiveDisplay.all()
-        capture?.displays = displays
-        let selection = select(from: displays)
+        let selection = select(from: displays, for: id)
         for display in displays { display.onInterrupted = { [weak selection] in selection?.cancel() } }
         Task {
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
                 for display in displays { try await display.start(in: content, excluding: selection.windowNumbers) }
             } catch {
+                guard capture?.id == id else { return }
                 selection.cancel()
                 fail("Shotts could not capture the screen", error)
             }
@@ -108,10 +116,12 @@ final class CaptureFlow {
         return (editors.first { $0.editor.window?.isKeyWindow == true } ?? editors.last)?.returnTo
     }
 
-    private func select(from displays: [LiveDisplay]) -> AreaSelection {
-        let selection = AreaSelection(displays: displays.map(\.display)) { [weak self] outcome in
+    /// The picker for the capture `id`, streaming `live`. A picture that comes after a wait is
+    /// delivered only while that capture is still the one under way: one that ended meanwhile
+    /// leaves the next alone.
+    private func select(from live: [LiveDisplay], for id: UUID) -> AreaSelection {
+        let selection = AreaSelection(displays: live.map(\.display)) { [weak self] outcome in
             guard let self else { return }
-            let live = capture?.displays ?? []
             switch outcome {
             case .cancelled:
                 live.forEach { $0.stop() }
@@ -122,6 +132,7 @@ final class CaptureFlow {
                     _ = await live.first { $0.display === display }?.firstFrame()
                     let image = display.cut(rect)
                     live.forEach { $0.stop() }
+                    guard self.capture?.id == id else { return }
                     // Nothing to cut (no frame came in time): say so rather than nothing.
                     guard let image else { NSSound.beep(); self.end(); return }
                     self.deliver(image, scale: display.scale, on: display.screen)
@@ -139,6 +150,7 @@ final class CaptureFlow {
                     let captured = (try? await ScreenCapture.captureWindow(window.id, shadow: SelectionOptions.current.dropShadow))
                         ?? display.cut(window.frame).map { ($0, display.scale) }
                     live.forEach { $0.stop() }
+                    guard capture?.id == id else { return }
                     guard let (image, scale) = captured else { NSSound.beep(); end(); return }
                     deliver(image, scale: scale, on: display.screen)
                 }
@@ -219,8 +231,8 @@ final class CaptureFlow {
         if AutoScroller.allowed {
             let area = setup.area
             let primary = NSScreen.screens.first?.frame.maxY ?? area.maxY
+            // `AutoScroller.start` puts the pointer there and holds it while it scrolls.
             let middle = CGPoint(x: area.midX, y: primary - area.midY)
-            CGWarpMouseCursorPosition(middle)
             let autoScroller = AutoScroller(areaHeight: area.height, pointer: middle)
             // At the bottom, the picture opens; unable to follow, the user scrolls.
             autoScroller.onFinish = { [weak setup] in setup?.done() }
@@ -251,9 +263,12 @@ final class CaptureFlow {
                     throw ScreenCapture.Failure.noDisplay
                 }
                 try await scroller.start(display: number.uint32Value, rect: rect, excluding: setup.windowNumbers)
+                // Done or cancelled meanwhile, it is over; a later scrolling capture is not this one's.
+                guard scrolling?.capture === scroller else { return }
                 // It waits for the first frame before counting anything against the bottom.
                 scrolling?.auto?.start()
             } catch {
+                guard scrolling?.capture === scroller else { return }
                 cancelScroll()
                 fail("Shotts could not capture the screen", error)
             }
@@ -321,14 +336,16 @@ final class CaptureFlow {
         setup.show()
     }
 
+    /// Starts recording what `setup`'s panel stands beside, unless that recording is cancelled
+    /// while macOS answers, when nothing more is done for it.
     private func startRecording(on screen: NSScreen, rect: CGRect, choices wanted: RecordingSetup.Choices) async {
         guard let setup = recording?.setup else { return }
         var microphone = wanted.microphone
         if microphone, !(await Self.microphoneAllowed()) {
-            switch askAboutMicrophone() {
-            case .withoutIt: microphone = false
-            case .cancel: cancelRecording(); return
-            }
+            guard recording?.setup === setup else { return }
+            guard askToRecordWithout("Microphone", "Shotts can't use the microphone", setting: "Microphone", anchor: "Privacy_Microphone")
+            else { cancelRecording(); return }
+            microphone = false
         }
         var keys = wanted.keys
         if keys, !InputWatcher.keysAllowed {
@@ -339,10 +356,10 @@ final class CaptureFlow {
                 InputWatcher.askForKeys()
                 keys = false
             } else {
-                switch askAboutKeys() {
-                case .withoutIt: keys = false
-                case .cancel: cancelRecording(); return
-                }
+                guard askToRecordWithout("Keys", "Shotts can't see the keys you press", setting: "Input Monitoring", anchor: "Privacy_ListenEvent",
+                                         reopening: true)
+                else { cancelRecording(); return }
+                keys = false
             }
         }
         let recorder = Recorder()
@@ -353,11 +370,12 @@ final class CaptureFlow {
                                      excluding: setup.windowNumbers, keeping: setup.keptNumbers, microphone: microphone)
         } catch {
             _ = try? await recorder.stop()
+            guard recording?.setup === setup else { return }
             cancelRecording()
             fail("Shotts could not record the screen", error)
             return
         }
-        guard recording != nil else { _ = try? await recorder.stop(); return }
+        guard recording?.setup === setup else { _ = try? await recorder.stop(); return }
         recording?.recorder = recorder
         setup.onControl = { [weak self, weak setup, weak recorder] control in
             guard let self, let setup, let recorder else { return }
@@ -431,45 +449,28 @@ final class CaptureFlow {
         }
     }
 
-    private enum MicrophoneAnswer { case withoutIt, cancel }
-
-    /// Input Monitoring is off for Shotts: record without keys, or go and turn it on.
-    private func askAboutKeys() -> MicrophoneAnswer {
+    /// A permission this recording wants is off for Shotts, `setting` in Privacy & Security:
+    /// record without `thing`, or go and turn it on (which, like Cancel, cancels). Returns whether
+    /// to record without it, having given focus back to the app that was in front: the alert
+    /// brought Shotts and all its windows forward, over the area about to be recorded.
+    private func askToRecordWithout(_ thing: String, _ message: String, setting: String, anchor: String, reopening: Bool = false) -> Bool {
         Front.bringShotts()
         let alert = NSAlert()
-        alert.messageText = "Shotts can't see the keys you press"
-        alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › Input Monitoring, then record again. macOS may ask you to quit and reopen Shotts first."
-        alert.addButton(withTitle: "Record Without Keys")
+        alert.messageText = message
+        alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › \(setting), then record again."
+            + (reopening ? " macOS may ask you to quit and reopen Shotts first." : "")
+        alert.addButton(withTitle: "Record Without \(thing)")
         alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "Cancel")
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            return .withoutIt
+            Front.giveBack(to: recording?.frontmost)
+            return true
         case .alertSecondButtonReturn:
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") { NSWorkspace.shared.open(url) }
-            return .cancel
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") { NSWorkspace.shared.open(url) }
+            return false
         default:
-            return .cancel
-        }
-    }
-
-    /// The microphone is turned off for Shotts: record without it, or go and turn it on.
-    private func askAboutMicrophone() -> MicrophoneAnswer {
-        Front.bringShotts()
-        let alert = NSAlert()
-        alert.messageText = "Shotts can't use the microphone"
-        alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › Microphone, then record again."
-        alert.addButton(withTitle: "Record Without Microphone")
-        alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Cancel")
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            return .withoutIt
-        case .alertSecondButtonReturn:
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") { NSWorkspace.shared.open(url) }
-            return .cancel
-        default:
-            return .cancel
+            return false
         }
     }
 
@@ -480,18 +481,27 @@ final class CaptureFlow {
         lastClosed = (document, editor.canvas.source)
     }
 
-    /// Whether Option-F10 has anything to show.
-    var hasLastCapture: Bool { !editors.isEmpty || lastClosed != nil }
+    /// Whether Option-F10 has anything to show, and may now.
+    var hasLastCapture: Bool { !isBusy && (!editors.isEmpty || lastClosed != nil) }
 
-    /// What quitting now would lose: open captures annotated or cropped, and recordings not yet
-    /// saved, copied, or dragged out.
+    /// Whether a capture, a recording, or a scrolling capture is under way, from the hot key on,
+    /// or an alert or other modal window of Shotts' is open. The hot keys then do nothing (but
+    /// stop a recording or end a scrolling capture): an editor coming forward would be in the
+    /// picture, and a picker would stand over an alert that holds every event.
+    private var isBusy: Bool {
+        capture != nil || recording != nil || finishing || scrolling != nil || NSApp.modalWindow != nil
+    }
+
+    /// What quitting now would lose: open captures annotated or cropped, or with words being typed,
+    /// and recordings not yet saved, copied, or dragged out, the one being finished among them.
     var unsavedWork: (captures: Int, recordings: Int) {
-        (editors.filter { $0.editor.canvas.document.isEdited }.count, recordings.filter { !$0.kept }.count)
+        (editors.filter { $0.editor.canvas.isAnnotated }.count, recordings.filter { !$0.kept }.count + (finishing ? 1 : 0))
     }
 
     /// Option-F10: the newest open editor, brought to the front; else the editor closed last,
-    /// opened again as it was, its annotations still editable.
+    /// opened again as it was, its annotations still editable. Nothing while Shotts is busy.
     func showLast() {
+        guard !isBusy else { return }
         if let editor = editors.last?.editor {
             editor.present()
         } else if let (document, source) = lastClosed {
@@ -509,13 +519,13 @@ final class CaptureFlow {
         Front.giveBack(to: app)
     }
 
+    /// Says what went wrong; whoever failed has already ended what it was doing.
     private func fail(_ message: String, _ error: Error) {
         Front.bringShotts()
         let alert = NSAlert()
         alert.messageText = message
         alert.informativeText = error.localizedDescription
         alert.runModal()
-        end()
     }
 
     /// Without Screen Recording permission, the first press shows only the system's own prompt,
