@@ -156,6 +156,34 @@ import Testing
         // A copy that cannot be made leaves what was there.
         #expect(throws: (any Error).self) { try RecordingWindowController.copy(folder.appendingPathComponent("missing.mp4"), to: there) }
         #expect(try Data(contentsOf: there) == Data("new".utf8))
+        // A new name, too, gets the file only once it is whole, with nothing left beside it.
+        try RecordingWindowController.copy(made, to: folder.appendingPathComponent("fresh.mp4"))
+        #expect(try Data(contentsOf: folder.appendingPathComponent("fresh.mp4")) == Data("new".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == [".in-use", "fresh.mp4", "made.mp4", "there.mp4"])
+    }
+
+    /// A Save chosen while the file is still being made counts from then: closing the window
+    /// asks nothing and lets it finish, and the recording goes only once it is saved.
+    @Test func aSaveOutlivesItsWindow() async throws {
+        let recording = try await testRecording()
+        let controller = try await window(for: recording)
+        let elsewhere = FileManager.default.temporaryDirectory.appendingPathComponent("Shotts save test \(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: elsewhere) }
+        let destination = elsewhere.appendingPathComponent("Saved.mp4")
+        controller.askToDelete = { _ in Issue.record("asked") }
+        controller.save(to: destination)
+        #expect(controller.file == nil && controller.isBusy)
+        let window = try #require(controller.window)
+        #expect(controller.windowShouldClose(window))
+        window.close()
+        // Quitting now would cut it off, though the window is gone.
+        #expect(RecordingWindowController.closedWhileBusy == 1)
+        #expect(FileManager.default.fileExists(atPath: recording.folder.path))
+        for _ in 0..<400 where controller.isBusy { try await Task.sleep(for: .milliseconds(25)) }
+        #expect(!controller.isBusy && controller.kept && RecordingWindowController.closedWhileBusy == 0)
+        #expect(FileManager.default.fileExists(atPath: destination.path))
+        #expect(!FileManager.default.fileExists(atPath: recording.folder.path))
     }
 
     /// Closing a recording that has gone nowhere asks first: Cancel keeps it, Delete closes the

@@ -7,8 +7,9 @@ import UniformTypeIdentifiers
 /// and a timeline below it that plays, and trims what the files keep.
 /// The window always holds the file its settings make, made again in the background whenever
 /// they change, so its size shows exactly and Copy, Save, and a drag use it at once. Closing
-/// the window deletes the recording and every file made from it: a recording not yet saved,
-/// copied, or dragged out is deleted only once the user says so.
+/// the window deletes the recording and every file made from it, once a Copy or Save under way
+/// is done: a recording not yet saved, copied, or dragged out is deleted only once the user
+/// says so.
 public final class RecordingWindowController: NSWindowController, NSWindowDelegate {
     public let recording: Recording
     public let contents: RecordingExport.Contents
@@ -24,19 +25,27 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     /// The file for `current`, once made.
     private(set) var file: URL?
     private var making: Task<Void, Never>?
-    private var waiting: [(URL) -> Void] = []
+    /// Copies and Saves asked for before the file was made, run once it is.
+    private var waiting: [Use] = []
+    private typealias Use = (_ file: URL, _ done: @escaping () -> Void) -> Void
 
     let player = AVPlayerView()
     let timeline: Timeline
     private var timeObserver: Any?
     /// Setting up the player, which closing stops.
     private var loading: Task<Void, Never>?
-    /// Saves still copying, which the recording's folder outlives; and whether the window closed
-    /// meanwhile, so the last of them removes it.
-    private var saving = 0
+    /// Copies and Saves from the moment they are asked for until they are done, waiting for the
+    /// file or copying it. The window may close meanwhile: the file is still made for them, and
+    /// the last to finish removes the recording.
+    private var pending = 0
     private var closed = false
+    /// Whether a Copy or Save is under way: quitting now would cut it off.
+    public var isBusy: Bool { pending > 0 }
+    /// Windows closed with a Copy or Save still under way, until it is done: quitting now would
+    /// cut it off, though the window is gone.
+    public private(set) static var closedWhileBusy = 0
     /// Whether the recording has gone anywhere yet: saved, copied, or dragged out. Until it has,
-    /// closing the window asks first.
+    /// closing the window asks first, unless a Copy or Save is on its way.
     public private(set) var kept = false
     /// Said yes to deleting it, so the window closes without asking again.
     private var deleting = false
@@ -342,7 +351,9 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
                 try? FileManager.default.removeItem(at: folder)
                 guard !(error is CancellationError), !Task.isCancelled else { return }
                 // A Copy or Save waiting for this file is dropped rather than run later by surprise.
+                let dropped = waiting.count
                 waiting = []
+                if dropped > 0 { finished(dropped) }
                 NSSound.beep()
                 progress.isHidden = true
                 // What went wrong, short enough for the bar; all of it on hover.
@@ -362,12 +373,27 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         status.toolTip = nil
         let ready = waiting
         waiting = []
-        ready.forEach { $0(url) }
+        ready.forEach { $0(url) { self.finished() } }
     }
 
-    /// Runs `action` with the file, now or once it is made.
-    private func withFile(_ action: @escaping (URL) -> Void) {
-        if let file { action(file) } else { waiting.append(action) }
+    /// Runs `use` with the file, now or once it is made; it is pending until it calls `done`.
+    private func withFile(_ use: @escaping Use) {
+        pending += 1
+        if let file { use(file) { self.finished() } } else { waiting.append(use) }
+    }
+
+    /// `count` Copies or Saves are done; once the window has closed, the last removes the recording.
+    private func finished(_ count: Int = 1) {
+        pending -= count
+        guard closed, pending == 0 else { return }
+        Self.closedWhileBusy -= 1
+        removeRecording()
+    }
+
+    /// The recording, and every file made from it, goes: a file still being made is not needed.
+    private func removeRecording() {
+        making?.cancel()
+        Recording.removeFolder(recording.folder)
     }
 
     /// The file itself on the pasteboard, as the Finder copies files: it pastes into Messages,
@@ -375,8 +401,8 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     /// recording's folder, so it still pastes after this window closes; one at a time is kept,
     /// as with a drag from the editor.
     @objc public func copyPressed() {
-        withFile { [weak self] url in
-            guard let self else { return }
+        withFile { [self] url, done in
+            defer { done() }
             do {
                 let copy = try Export.temporaryFolder("Shotts Copied").appendingPathComponent(url.lastPathComponent)
                 try FileManager.default.copyItem(at: url, to: copy)
@@ -389,8 +415,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         }
     }
 
-    /// Save…: the file copied where the user says, off the main thread, since a long recording
-    /// can be a large file. A file already there is replaced only once the copy has worked.
+    /// Save…: asks where, then `save(to:)`.
     @objc public func savePressed() {
         guard let window else { return }
         let settings = current
@@ -399,32 +424,39 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
         panel.nameFieldStringValue = Self.fileName(for: recording, format: settings.format)
         panel.directoryURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
         panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let destination = panel.url, let self else { return }
-            withFile { url in
-                self.saving += 1
-                Task {
-                    do {
-                        try await Task.detached(priority: .userInitiated) { try Self.copy(url, to: destination) }.value
-                        self.kept = true
-                    } catch {
-                        if window.isVisible { NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil) } else { NSAlert(error: error).runModal() }
-                    }
-                    self.saving -= 1
-                    if self.saving == 0, self.closed { Recording.removeFolder(self.recording.folder) }
+            guard response == .OK, let destination = panel.url else { return }
+            self?.save(to: destination)
+        }
+    }
+
+    /// The file copied to `destination` once it is made, off the main thread, since a long
+    /// recording can be a large file; closing the window meanwhile lets it finish.
+    func save(to destination: URL) {
+        withFile { [self] url, done in
+            Task {
+                do {
+                    try await Task.detached(priority: .userInitiated) { try Self.copy(url, to: destination) }.value
+                    kept = true
+                } catch {
+                    if let window, window.isVisible { NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil) } else { NSAlert(error: error).runModal() }
                 }
+                done()
             }
         }
     }
 
-    /// Copies `url` to `destination` beside it first, then swaps it in, so a failed copy leaves
-    /// whatever was there.
+    /// Copies `url` beside `destination` first, then moves it into place, so what is under the
+    /// user's name is never a part-copied file, and a failed copy leaves whatever was there.
     nonisolated static func copy(_ url: URL, to destination: URL) throws {
         let files = FileManager.default
-        guard files.fileExists(atPath: destination.path) else { return try files.copyItem(at: url, to: destination) }
         let staged = destination.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString)-\(destination.lastPathComponent)")
         try files.copyItem(at: url, to: staged)
         do {
-            _ = try files.replaceItemAt(destination, withItemAt: staged)
+            if files.fileExists(atPath: destination.path) {
+                _ = try files.replaceItemAt(destination, withItemAt: staged)
+            } else {
+                try files.moveItem(at: staged, to: destination)
+            }
         } catch {
             try? files.removeItem(at: staged)
             throw error
@@ -439,7 +471,7 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     /// Escape, Command-W, and the red button: a recording that has gone nowhere yet is deleted
     /// only once the user says so, in a sheet whose Cancel (and Escape) keeps it.
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
-        guard !kept, !deleting else { return true }
+        guard !kept, pending == 0, !deleting else { return true }
         guard sender.attachedSheet == nil else { return false }
         let answer: (Bool) -> Void = { [weak self] delete in
             guard delete, let self else { return }
@@ -460,14 +492,13 @@ public final class RecordingWindowController: NSWindowController, NSWindowDelega
     }
 
     public func windowWillClose(_ notification: Notification) {
-        making?.cancel()
         loading?.cancel()
         player.player?.pause()
         if let timeObserver { player.player?.removeTimeObserver(timeObserver) }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         player.player = nil
         closed = true
-        if saving == 0 { Recording.removeFolder(recording.folder) }
+        if pending > 0 { Self.closedWhileBusy += 1 } else { removeRecording() }
         let done = onClose
         onClose = nil
         done?()
