@@ -43,6 +43,21 @@ import Testing
         #expect(cancelled)
     }
 
+    /// Turning Keys on says so at once, before Record, so macOS's question about Input
+    /// Monitoring can come then; turning it off says nothing.
+    @Test func turningKeysOnSaysSo() throws {
+        let screen = try #require(NSScreen.screens.first)
+        let setup = RecordingSetup(screen: screen, rect: CGRect(x: 100, y: 100, width: 300, height: 200), choices: RecordingSetup.Choices()) { _ in }
+        defer { setup.close() }
+        var turnedOn = 0
+        setup.onKeysTurnedOn = { turnedOn += 1 }
+        let panel = try #require(setup.setupPanel)
+        panel.keys.performClick(nil)
+        #expect(panel.keys.state == .on && turnedOn == 1)
+        panel.keys.performClick(nil)
+        #expect(panel.keys.state == .off && turnedOn == 1)
+    }
+
     /// The area is where the picker put it, flipped into screen coordinates.
     @Test func theAreaIsInScreenCoordinates() throws {
         let screen = try #require(NSScreen.screens.first)
@@ -141,6 +156,34 @@ import Testing
         // A copy that cannot be made leaves what was there.
         #expect(throws: (any Error).self) { try RecordingWindowController.copy(folder.appendingPathComponent("missing.mp4"), to: there) }
         #expect(try Data(contentsOf: there) == Data("new".utf8))
+        // A new name, too, gets the file only once it is whole, with nothing left beside it.
+        try RecordingWindowController.copy(made, to: folder.appendingPathComponent("fresh.mp4"))
+        #expect(try Data(contentsOf: folder.appendingPathComponent("fresh.mp4")) == Data("new".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == [".in-use", "fresh.mp4", "made.mp4", "there.mp4"])
+    }
+
+    /// A Save chosen while the file is still being made counts from then: closing the window
+    /// asks nothing and lets it finish, and the recording goes only once it is saved.
+    @Test func aSaveOutlivesItsWindow() async throws {
+        let recording = try await testRecording()
+        let controller = try await window(for: recording)
+        let elsewhere = FileManager.default.temporaryDirectory.appendingPathComponent("Shotts save test \(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: elsewhere) }
+        let destination = elsewhere.appendingPathComponent("Saved.mp4")
+        controller.askToDelete = { _ in Issue.record("asked") }
+        controller.save(to: destination)
+        #expect(controller.file == nil && controller.isBusy)
+        let window = try #require(controller.window)
+        #expect(controller.windowShouldClose(window))
+        window.close()
+        // Quitting now would cut it off, though the window is gone.
+        #expect(RecordingWindowController.closedWhileBusy == 1)
+        #expect(FileManager.default.fileExists(atPath: recording.folder.path))
+        for _ in 0..<400 where controller.isBusy { try await Task.sleep(for: .milliseconds(25)) }
+        #expect(!controller.isBusy && controller.kept && RecordingWindowController.closedWhileBusy == 0)
+        #expect(FileManager.default.fileExists(atPath: destination.path))
+        #expect(!FileManager.default.fileExists(atPath: recording.folder.path))
     }
 
     /// Closing a recording that has gone nowhere asks first: Cancel keeps it, Delete closes the
@@ -316,6 +359,16 @@ import Testing
         #expect(badge.text == "⌘I  ⌃K")
         // Near the bottom, inside the area.
         #expect(badge.frame.maxY <= setup.drawing.canvas.bounds.maxY && badge.frame.minY > setup.drawing.canvas.bounds.midY)
+    }
+
+    /// In an area too small for the plate and the space kept below it, the plate starts at the
+    /// area's top and is never wider than it.
+    @Test func keysStayInATinyArea() throws {
+        let canvas = DrawingCanvas(size: CGSize(width: 12, height: 40), scale: 2)
+        canvas.keysClearance = 60
+        canvas.showKey("⌘I")
+        let badge = try #require(canvas.subviews.compactMap { $0 as? KeysBadge }.first)
+        #expect(badge.frame.origin.y == 0 && badge.frame.size.width >= 0 && badge.frame.origin.x >= 0 && badge.frame.maxX <= 12)
     }
 
     /// A click inside the area ripples where it landed; one outside does nothing.

@@ -1,14 +1,17 @@
 import AVFoundation
 import CoreAudio
+import os
 import ScreenCaptureKit
 import ShottsCore
 
 /// Measures how much quieter ScreenCaptureKit hands over the Mac's sound than it played, on the
-/// output device in use (Core's `SoundCalibration` explains why it does). It plays a tone too
-/// quiet to hear and captures the sound of no app but Shotts while it plays, measuring at the
-/// tone's pitch alone, and believes only a steady reading, so what else plays cannot fool it. It runs only beside a recording the user started, which already captures: a
-/// measurement of its own would show macOS's capture indicator when nothing was asked for.
-/// Each device's last measurement is kept, for a recording too short to measure in.
+/// output device in use (Core's `SoundCalibration` explains why it does). It plays a quiet tone
+/// and captures the sound of no app but Shotts while it plays, measuring at the tone's pitch
+/// alone, and believes only a steady reading, so what else plays cannot fool it. Each device is
+/// measured once and again a month later (`SoundCalibration.remembered`), so most recordings
+/// play no tone and finish without waiting for one. It runs only beside a recording the user
+/// started, which already captures: a measurement of its own would show macOS's capture
+/// indicator when nothing was asked for.
 nonisolated final class SoundCalibrator: NSObject, SCStreamOutput, @unchecked Sendable {
     private let queue = DispatchQueue(label: "Shotts sound calibration")
     /// The first channel of what came back, on `queue`.
@@ -17,22 +20,25 @@ nonisolated final class SoundCalibrator: NSObject, SCStreamOutput, @unchecked Se
     private static let savedKey = "recording.soundCalibration"
     private static let sampleRate = 48_000.0
 
-    /// The gain for the output device in use now: measured, or the last measurement on it, or
-    /// nil when there is neither.
+    /// The gain for the output device in use now: its measurement while that is believed, else
+    /// one taken now, else its last (should another sound spoil the new one); nil when there is
+    /// none. Cancelled, as when the recording never started, it plays no tone.
     static func gain() async -> Double? {
         let device = outputDeviceID()
+        let last = device.flatMap { saved()[$0] }
+        if let last, SoundCalibration.isFresh(last.measured, at: .now) { return last.gain }
         if let measured = await SoundCalibrator().measure() {
             if let device { save(measured, for: device) }
             return measured
         }
-        return device.flatMap(saved)
+        return last?.gain
     }
 
     private func measure() async -> Double? {
         // ScreenCaptureKit lists every app but the one asking, so Shotts' own sound is what is
         // left with all of them taken out (with any background process's, which measuring at
         // the tone's pitch alone ignores).
-        guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false),
+        guard !Task.isCancelled, let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false),
               let display = content.displays.first else { return nil }
         let filter = SCContentFilter(display: display, excludingApplications: content.applications, exceptingWindows: [])
         let configuration = SCStreamConfiguration()
@@ -50,29 +56,38 @@ nonisolated final class SoundCalibrator: NSObject, SCStreamOutput, @unchecked Se
         } catch {
             return nil
         }
-        let tone = Self.tone(seconds: 0.8)
+        // Let the capture settle, play the tone, then let its tail arrive; a recording that has
+        // ended meanwhile plays none.
+        try? await Task.sleep(for: .milliseconds(150))
+        var played = false
+        if !Task.isCancelled { played = await Self.play(Self.tone(seconds: 0.8)) }
+        if played { try? await Task.sleep(for: .milliseconds(300)) }
+        try? await stream.stopCapture()
+        let samples = queue.sync { heard }
+        guard played, let level = SoundCalibration.level(of: samples) else { return nil }
+        return SoundCalibration.gain(played: SoundCalibration.toneAmplitude / 2.squareRoot(), heard: level)
+    }
+
+    /// Plays `tone`, returning once it has been played back (not merely handed to the device,
+    /// which a slow output such as Bluetooth plays well after), or after `limit` should it never
+    /// be, as when the output device changes and the engine stops. False if it could not play.
+    private static func play(_ tone: AVAudioPCMBuffer, limit: Duration = .seconds(3)) async -> Bool {
         let engine = AVAudioEngine()
         let player = AVAudioPlayerNode()
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: tone.format)
         defer { engine.stop() }
-        do {
-            try engine.start()
-        } catch {
-            try? await stream.stopCapture()
-            return nil
+        guard (try? engine.start()) != nil else { return false }
+        let waiting = OSAllocatedUnfairLock<CheckedContinuation<Void, Never>?>(initialState: nil)
+        await withCheckedContinuation { continuation in
+            waiting.withLock { $0 = continuation }
+            // Whichever comes first, the tone played back or the limit, resumes; the other finds nothing.
+            let done: @Sendable () -> Void = { waiting.withLock { $0.take() }?.resume() }
+            player.scheduleBuffer(tone, completionCallbackType: .dataPlayedBack) { _ in done() }
+            player.play()
+            Task { try? await Task.sleep(for: limit); done() }
         }
-        // Let the capture settle, play the tone through, then let its tail arrive.
-        try? await Task.sleep(for: .milliseconds(150))
-        player.play()
-        // Returns once the tone has been played; its tail then reaches the capture.
-        await player.scheduleBuffer(tone)
-        try? await Task.sleep(for: .milliseconds(300))
-        try? await stream.stopCapture()
-        let samples = queue.sync { heard }
-        let played = SoundCalibration.toneAmplitude / 2.squareRoot()
-        guard let heard = SoundCalibration.level(of: samples) else { return nil }
-        return SoundCalibration.gain(played: played, heard: heard)
+        return true
     }
 
     /// A 200 Hz sine at `SoundCalibration.toneDecibels`, faded in and out so it never clicks.
@@ -122,13 +137,19 @@ nonisolated final class SoundCalibrator: NSObject, SCStreamOutput, @unchecked Se
         return uid.takeRetainedValue() as String
     }
 
-    private static func saved(_ device: String) -> Double? {
-        (UserDefaults.standard.dictionary(forKey: savedKey)?[device] as? Double)
+    /// Each device's measurement and when it was taken, by the device's unique id.
+    private static func saved() -> [String: (gain: Double, measured: Date)] {
+        (UserDefaults.standard.dictionary(forKey: savedKey) ?? [:]).compactMapValues { value in
+            guard let entry = value as? [String: Any], let gain = entry["gain"] as? Double, let measured = entry["measured"] as? Date else { return nil }
+            return (gain, measured)
+        }
     }
 
+    /// Keeps `gain` for `device`, dropping the measurements no longer believed, so devices used
+    /// once (a borrowed headset, an AirPlay speaker) do not stay forever.
     private static func save(_ gain: Double, for device: String) {
-        var all = UserDefaults.standard.dictionary(forKey: savedKey) ?? [:]
-        all[device] = gain
-        UserDefaults.standard.set(all, forKey: savedKey)
+        var all = saved().filter { SoundCalibration.isFresh($0.value.measured, at: .now) }
+        all[device] = (gain, .now)
+        UserDefaults.standard.set(all.mapValues { ["gain": $0.gain, "measured": $0.measured] }, forKey: savedKey)
     }
 }

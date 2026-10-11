@@ -252,13 +252,12 @@ edge, and neither is recorded.
 | Record, or Return | Starts recording. The panel becomes the recording bar; the outline stays. |
 | Microphone | Records your voice as well. Off until turned on, and remembered. The first recording with it on asks macOS for the microphone. |
 | Clicks | Shows a yellow ripple where each click lands in the area, recorded with it. Off until turned on, and remembered. |
-| Keys | Shows the shortcuts pressed, on a dark plate near the area's bottom, recorded with it: keys with Control, Option, or Command, and keys that act on their own (Return, Tab, Escape, the arrows, F-keys). Typing never shows: letters, numbers, punctuation, and space, with or without Shift, nor the Delete keys. Shortcuts within two seconds of each other read as one line (`⌘I  ⌃K  ↩`), and the line stays five seconds after the last, as KeyCastr's line-break delay and linger work. Off until turned on, and remembered. The first recording with it on asks macOS for Input Monitoring; until that is allowed, recordings go ahead without keys. macOS sends no keys while a password is typed, so none ever shows. |
+| Keys | Shows the shortcuts pressed, on a dark plate near the area's bottom, recorded with it: keys with Control or Command, and keys that act on their own (Return, Tab, Escape, the arrows, F-keys), with Option or Shift if held. Typing never shows: letters, numbers, punctuation, and space, with or without Shift or Option (which types characters on most keyboards: ⌥L is @ on a German one), nor the Delete keys. Shortcuts within two seconds of each other read as one line (`⌘I  ⌃K  ↩`), and the line stays five seconds after the last, as KeyCastr's line-break delay and linger work. Off until turned on, and remembered. The first recording with it on asks macOS for Input Monitoring; until that is allowed, recordings go ahead without keys. macOS sends no keys while a password is typed, so none ever shows. |
 | Cancel, or Escape | Ends without recording. |
 
 Everything in the area is recorded as it happens, at the display's full resolution, up to 60
 frames a second, with the pointer, and with the Mac's own sound, kept apart from the
-microphone. The outline sits just outside the area; neither it, the bar, nor Shotts' menu bar
-item is ever recorded. While recording, the menu bar item shows a red dot and the time so far,
+microphone. Neither the outline, the bar, nor Shotts' menu bar item is ever recorded. While recording, the menu bar item shows a red dot and the time so far,
 and the bar beside the area has:
 
 | Control | Effect |
@@ -296,7 +295,9 @@ and a name like `Shotts Recording 2026-09-30 at 2.15.00 PM.mp4`, and replaces a 
 there only once the copy has worked; dragging the hand icon drags the file out. Each leaves the
 window open, so one recording can be saved several ways. Command-W, the red button, or Escape
 closes the window, which deletes the recording and every file made from it; saved and copied
-files stay. Until the recording has been saved, copied, or dragged out, closing asks first:
+files stay, and a Save or Copy chosen before closing, even while the file is still being made,
+still finishes. Until the recording has been saved, copied, or dragged out, or a Save or Copy is
+on its way, closing asks first:
 "Delete this recording?", with Delete and Cancel (Escape keeps it). When the window you are working in closes, focus goes back to the app that was in
 front when F10 was pressed.
 
@@ -308,9 +309,10 @@ first, so a preview in Messages or Mail plays at once.
 
 The Mac's sound in a file is as loud as it played. macOS hands it over quieter, by an amount
 fixed for each output device (none from a MacBook's speakers; 6 to 14 dB through some USB
-interfaces and displays), so as each recording with it starts, Shotts plays a tone too quiet to
-hear, measures how much quieter it comes back, remembers that for the device, and puts it back
-in the files it makes. The microphone is left at the level the Mac's input volume gives it.
+interfaces and displays), so the first time a recording with it starts on an output device, and
+again a month later, Shotts plays a quiet tone, measures how much quieter it comes back, and
+remembers that for the device; the files it makes put it back. A loss past 20 dB is taken for a
+misreading and not put back. The microphone is left at the level the Mac's input volume gives it.
 
 ## Command line
 

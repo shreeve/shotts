@@ -181,6 +181,24 @@ private func screenLike(_ width: Int = 96, _ height: Int = 48) -> Picture {
         #expect(colors.count <= 255)
         #expect(colors.contains(0xF5F5F7) && colors.contains(0x1D1D1F))
     }
+
+    /// A one-pixel line that falls between the sampling grid's points in one frame is counted
+    /// in another, so it reaches the palette.
+    @Test func thinLinesReachThePalette() {
+        var builder = PaletteBuilder()
+        let picture = Picture(1920, 1080) { x, _ in x == 1 ? 0xFF0000 : 0xF5F5F7 }
+        for _ in 0..<9 { picture.frame { builder.add($0) } }
+        #expect(builder.palette().colors.contains(0xFF0000))
+    }
+
+    /// Once many colors have been seen, a flat color that turns up later is still counted.
+    @Test func aLateFlatColorIsStillCounted() {
+        var builder = PaletteBuilder()
+        // 70,000 distinct colors, each seen once, then a flat color covering most samples.
+        for i in 0..<70_000 { builder.count(UInt32(i) * 239 & 0xFFFFFF | 0x010000, 1) }
+        for _ in 0..<5_000 { builder.count(0x123456, 1) }
+        #expect(builder.palette().colors.contains(0x123456))
+    }
 }
 
 @Suite struct QuantizerTests {
@@ -208,6 +226,17 @@ private func screenLike(_ width: Int = 96, _ height: Int = 48) -> Picture {
         var a = Quantizer(palette: GIFPalette(colors: [0x000000, 0xFFFFFF]))
         var b = Quantizer(palette: GIFPalette(colors: [0x000000, 0xFFFFFF]))
         for y in 0..<16 { for x in 0..<16 { #expect(a.index(0x777777, x: x, y: y) == b.index(0x777777, x: x, y: y)) } }
+    }
+
+    /// A palette color maps to itself even beside palette colors a shade away.
+    @Test func paletteColorsStayExactBesideNearOnes() {
+        var q = Quantizer(palette: GIFPalette(colors: [0x000000, 0x030303, 0x040404, 0xFFFFFF]))
+        for y in 0..<64 {
+            for x in 0..<64 {
+                #expect(q.index(0x000000, x: x, y: y) == 0)
+                #expect(q.index(0x030303, x: x, y: y) == 1)
+            }
+        }
     }
 }
 
@@ -377,6 +406,28 @@ private func lzwDecode(_ data: [UInt8], minimumCodeSize: Int, count: Int) throws
         let column = Set((0..<32).map { canvas[$0 * 256 + 18] })
         #expect(column == [0, 1])
     }
+
+    /// A frame shown longer than a GIF delay can hold goes on through filler frames, so the
+    /// GIF lasts as long as the clip.
+    @Test func longStillsKeepTheirTime() throws {
+        var bytes: [UInt8] = []
+        var writer = GIFWriter(width: 4, height: 4, palette: GIFPalette(colors: [0, 0xFFFFFF])) { bytes += $0 }
+        Picture(4, 4) { _, _ in 0 }.frame { writer.add($0, at: 0) }
+        writer.finish(at: 1000) // 100,000 hundredths
+        let gif = try decode(bytes)
+        #expect(gif.frames.map(\.delay).reduce(0, +) == 100_000)
+        #expect(gif.frames.count == 2 && gif.frames.allSatisfy { $0.canvas == gif.frames[0].canvas })
+    }
+
+    /// The last piece of a very long still is never under two hundredths.
+    @Test func theLastPieceOfALongStillIsNeverTooShort() throws {
+        var bytes: [UInt8] = []
+        var writer = GIFWriter(width: 2, height: 2, palette: GIFPalette(colors: [0, 0xFFFFFF])) { bytes += $0 }
+        Picture(2, 2) { _, _ in 0 }.frame { writer.add($0, at: 0) }
+        writer.finish(at: 655.36) // 65,536 hundredths: 65,535 and 1 would leave 1
+        let delays = try decode(bytes).frames.map(\.delay)
+        #expect(delays.reduce(0, +) == 65_536 && delays.allSatisfy { $0 >= 2 })
+    }
 }
 
 @Suite struct TrimTests {
@@ -451,49 +502,6 @@ private func lzwDecode(_ data: [UInt8], minimumCodeSize: Int, count: Int) throws
     }
 }
 
-@Suite struct GIFFixTests {
-    /// A one-pixel line that falls between the sampling grid's points in one frame is counted
-    /// in another, so it reaches the palette.
-    @Test func thinLinesReachThePalette() {
-        var builder = PaletteBuilder()
-        let picture = Picture(1920, 1080) { x, _ in x == 1 ? 0xFF0000 : 0xF5F5F7 }
-        for _ in 0..<9 { picture.frame { builder.add($0) } }
-        #expect(builder.palette().colors.contains(0xFF0000))
-    }
-
-    /// A palette color maps to itself even beside palette colors a shade away.
-    @Test func paletteColorsStayExactBesideNearOnes() {
-        var q = Quantizer(palette: GIFPalette(colors: [0x000000, 0x030303, 0x040404, 0xFFFFFF]))
-        for y in 0..<64 {
-            for x in 0..<64 {
-                #expect(q.index(0x000000, x: x, y: y) == 0)
-                #expect(q.index(0x030303, x: x, y: y) == 1)
-            }
-        }
-    }
-
-    /// Once many colors have been seen, a flat color that turns up later is still counted.
-    @Test func aLateFlatColorIsStillCounted() {
-        var builder = PaletteBuilder()
-        // 70,000 distinct colors, each seen once, then a flat color covering most samples.
-        for i in 0..<70_000 { builder.count(UInt32(i) * 239 & 0xFFFFFF | 0x010000, 1) }
-        for _ in 0..<5_000 { builder.count(0x123456, 1) }
-        #expect(builder.palette().colors.contains(0x123456))
-    }
-
-    /// A frame shown longer than a GIF delay can hold goes on through filler frames, so the
-    /// GIF lasts as long as the clip.
-    @Test func longStillsKeepTheirTime() throws {
-        var bytes: [UInt8] = []
-        var writer = GIFWriter(width: 4, height: 4, palette: GIFPalette(colors: [0, 0xFFFFFF])) { bytes += $0 }
-        Picture(4, 4) { _, _ in 0 }.frame { writer.add($0, at: 0) }
-        writer.finish(at: 1000) // 100,000 hundredths
-        let gif = try decode(bytes)
-        #expect(gif.frames.map(\.delay).reduce(0, +) == 100_000)
-        #expect(gif.frames.count == 2 && gif.frames.allSatisfy { $0.canvas == gif.frames[0].canvas })
-    }
-}
-
 @Suite struct RecordingTimelineTests {
     /// Frames go where they came, in order; one that comes no later than the last written is
     /// left out; one the writer was not ready for can be offered again.
@@ -527,9 +535,7 @@ private func lzwDecode(_ data: [UInt8], minimumCodeSize: Int, count: Int) throws
         #expect(whole.movingStart(to: 0.02) == whole)
         #expect(whole.movingEnd(to: 0.01, duration: 0.05) == whole)
     }
-}
 
-@Suite struct ReviewFixTests {
     /// A frame that arrives late, stamped inside a pause already over, is dropped rather than
     /// held for a later resume.
     @Test func aLateFrameFromAnEndedPauseIsDropped() {
@@ -541,15 +547,5 @@ private func lzwDecode(_ data: [UInt8], minimumCodeSize: Int, count: Int) throws
         timeline.pause(at: 6)
         #expect(timeline.frame(at: 7) == .hold)
         #expect(timeline.frame(at: 3) == .drop)
-    }
-
-    /// The last piece of a very long still is never under two hundredths.
-    @Test func theLastPieceOfALongStillIsNeverTooShort() throws {
-        var bytes: [UInt8] = []
-        var writer = GIFWriter(width: 2, height: 2, palette: GIFPalette(colors: [0, 0xFFFFFF])) { bytes += $0 }
-        Picture(2, 2) { _, _ in 0 }.frame { writer.add($0, at: 0) }
-        writer.finish(at: 655.36) // 65,536 hundredths: 65,535 and 1 would leave 1
-        let delays = try decode(bytes).frames.map(\.delay)
-        #expect(delays.reduce(0, +) == 65_536 && delays.allSatisfy { $0 >= 2 })
     }
 }

@@ -93,13 +93,11 @@ public nonisolated struct Recording: Sendable {
     }
 }
 
-/// Makes the files a recording is saved, copied, and dragged as: H.264 MP4 or animated GIF, at
-/// the size, frame rate, and sound the settings say, from the recording kept at full quality.
 /// The colors a recording's video is labeled with: the screen's, sRGB, whose primaries and
-/// matrix are BT.709's but whose brightness curve is its own. Labeled with BT.709's curve, as it
-/// was, QuickTime and Safari lifted the darks and mid-tones, a faint gray film over the video.
-/// AVFoundation names the sRGB curve from macOS 15; before that the writer is given no labels
-/// and takes those on the frames, which the capture and the scaler set.
+/// matrix are BT.709's but whose brightness curve is its own, so QuickTime and Safari show it as
+/// the screen did (BT.709's curve would have them lift the darks and mid-tones, a faint gray film
+/// over the video). AVFoundation names the sRGB curve from macOS 15; before that the writer is
+/// given no labels and takes those on the frames, which the capture and the scaler set.
 public nonisolated enum VideoColor {
     public static var writerSettings: [String: String]? {
         guard #available(macOS 15, *) else { return nil }
@@ -111,6 +109,8 @@ public nonisolated enum VideoColor {
     }
 }
 
+/// Makes the files a recording is saved, copied, and dragged as: H.264 MP4 or animated GIF, at
+/// the size, frame rate, and sound the settings say, from the recording kept at full quality.
 public nonisolated enum RecordingExport {
     /// What a recording holds.
     public nonisolated struct Contents: Sendable, Equatable {
