@@ -231,8 +231,8 @@ final class CaptureFlow {
         if AutoScroller.allowed {
             let area = setup.area
             let primary = NSScreen.screens.first?.frame.maxY ?? area.maxY
+            // `AutoScroller.start` puts the pointer there and holds it while it scrolls.
             let middle = CGPoint(x: area.midX, y: primary - area.midY)
-            CGWarpMouseCursorPosition(middle)
             let autoScroller = AutoScroller(areaHeight: area.height, pointer: middle)
             // At the bottom, the picture opens; unable to follow, the user scrolls.
             autoScroller.onFinish = { [weak setup] in setup?.done() }
@@ -343,10 +343,9 @@ final class CaptureFlow {
         var microphone = wanted.microphone
         if microphone, !(await Self.microphoneAllowed()) {
             guard recording?.setup === setup else { return }
-            switch askAboutMicrophone() {
-            case .withoutIt: microphone = false
-            case .cancel: cancelRecording(); return
-            }
+            guard askToRecordWithout("Microphone", "Shotts can't use the microphone", setting: "Microphone", anchor: "Privacy_Microphone")
+            else { cancelRecording(); return }
+            microphone = false
         }
         var keys = wanted.keys
         if keys, !InputWatcher.keysAllowed {
@@ -357,10 +356,10 @@ final class CaptureFlow {
                 InputWatcher.askForKeys()
                 keys = false
             } else {
-                switch askAboutKeys() {
-                case .withoutIt: keys = false
-                case .cancel: cancelRecording(); return
-                }
+                guard askToRecordWithout("Keys", "Shotts can't see the keys you press", setting: "Input Monitoring", anchor: "Privacy_ListenEvent",
+                                         reopening: true)
+                else { cancelRecording(); return }
+                keys = false
             }
         }
         let recorder = Recorder()
@@ -450,45 +449,28 @@ final class CaptureFlow {
         }
     }
 
-    private enum MicrophoneAnswer { case withoutIt, cancel }
-
-    /// Input Monitoring is off for Shotts: record without keys, or go and turn it on.
-    private func askAboutKeys() -> MicrophoneAnswer {
+    /// A permission this recording wants is off for Shotts, `setting` in Privacy & Security:
+    /// record without `thing`, or go and turn it on (which, like Cancel, cancels). Returns whether
+    /// to record without it, having given focus back to the app that was in front: the alert
+    /// brought Shotts and all its windows forward, over the area about to be recorded.
+    private func askToRecordWithout(_ thing: String, _ message: String, setting: String, anchor: String, reopening: Bool = false) -> Bool {
         Front.bringShotts()
         let alert = NSAlert()
-        alert.messageText = "Shotts can't see the keys you press"
-        alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › Input Monitoring, then record again. macOS may ask you to quit and reopen Shotts first."
-        alert.addButton(withTitle: "Record Without Keys")
+        alert.messageText = message
+        alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › \(setting), then record again."
+            + (reopening ? " macOS may ask you to quit and reopen Shotts first." : "")
+        alert.addButton(withTitle: "Record Without \(thing)")
         alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "Cancel")
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            return .withoutIt
+            Front.giveBack(to: recording?.frontmost)
+            return true
         case .alertSecondButtonReturn:
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") { NSWorkspace.shared.open(url) }
-            return .cancel
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") { NSWorkspace.shared.open(url) }
+            return false
         default:
-            return .cancel
-        }
-    }
-
-    /// The microphone is turned off for Shotts: record without it, or go and turn it on.
-    private func askAboutMicrophone() -> MicrophoneAnswer {
-        Front.bringShotts()
-        let alert = NSAlert()
-        alert.messageText = "Shotts can't use the microphone"
-        alert.informativeText = "Turn on Shotts under System Settings › Privacy & Security › Microphone, then record again."
-        alert.addButton(withTitle: "Record Without Microphone")
-        alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Cancel")
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            return .withoutIt
-        case .alertSecondButtonReturn:
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") { NSWorkspace.shared.open(url) }
-            return .cancel
-        default:
-            return .cancel
+            return false
         }
     }
 
