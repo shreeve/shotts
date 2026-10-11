@@ -23,8 +23,12 @@ final class AutoScroller {
         _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
 
-    private var rule: AutoScroll
+    private let areaHeight: Double
+    /// Made when scrolling starts, so its time counts from there.
+    private var rule: AutoScroll?
     private var timer: Timer?
+    /// Stopped: it never starts again, so the mouse is never held after it was let go.
+    private var stopped = false
     /// Where the pointer is held, in global display coordinates (from the top left).
     private let pointer: CGPoint
     private var tap: CFMachPort?
@@ -41,7 +45,7 @@ final class AutoScroller {
 
     /// `pointer` is where the pointer was put, in global display coordinates.
     init(areaHeight: Double, pointer: CGPoint) {
-        rule = AutoScroll(areaHeight: areaHeight, now: ProcessInfo.processInfo.systemUptime)
+        self.areaHeight = areaHeight
         self.pointer = pointer
     }
 
@@ -58,16 +62,19 @@ final class AutoScroller {
     }
 
     func start() {
-        guard timer == nil else { return }
+        guard timer == nil, !stopped else { return }
+        rule = AutoScroll(areaHeight: areaHeight, now: ProcessInfo.processInfo.systemUptime)
         let timer = Timer(timeInterval: AutoScroll.tick, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        holdMouse()
+        // An area too short to scroll gives up at the first tick, the mouse never held.
+        if areaHeight >= AutoScroll.shortest { holdMouse() }
     }
 
     func stop() {
+        stopped = true
         timer?.invalidate()
         timer = nil
         letGoOfMouse()
@@ -132,10 +139,12 @@ final class AutoScroller {
     }
 
     private func tick() {
-        let action = rule.next(height: height, lost: lost, full: full, now: ProcessInfo.processInfo.systemUptime)
+        guard let action = rule?.next(height: height, lost: lost, full: full, now: ProcessInfo.processInfo.systemUptime) else { return }
         // A frame not matched is answered once: the next not matched comes with its own frame.
         lost = false
         switch action {
+        case .wait:
+            break
         case .finish:
             stop()
             onFinish?()
