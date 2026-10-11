@@ -14,8 +14,10 @@ final class ScriptRunner {
     }
 
     private var server: ScriptServer?
-    /// Whether a recording from the picker is being set up, made, or finished: one at a time.
-    var isRecordingElsewhere: () -> Bool = { false }
+    /// Whether F10 has something under way (a picker, a recording set up, made, or finished, a
+    /// scrolling capture) or an alert of Shotts' is open: a capture now would take its windows,
+    /// and recordings go one at a time.
+    var isBusyElsewhere: () -> Bool = { false }
     /// Tells the menu bar item when a recording starts, with its recorder, and stops, with nil.
     var onRecording: ((Recorder?) -> Void)?
     /// Whole seconds left before a delayed capture, for the menu bar item; nil when done.
@@ -99,11 +101,7 @@ final class ScriptRunner {
         }
         if request.command == .stop || request.command == .abort { return stop(request, from: connection) }
         guard ScreenCapture.hasPermission else {
-            let asked = "capture.askedPermission"
-            if !UserDefaults.standard.bool(forKey: asked) {
-                UserDefaults.standard.set(true, forKey: asked)
-                ScreenCapture.requestPermission()
-            }
+            _ = ScreenCapture.askForPermissionOnce()
             return answer(connection, .failure(request.command, ScriptError(.permission,
                 "Shotts needs to record the screen: turn it on under System Settings › Privacy & Security › Screen & System Audio Recording")))
         }
@@ -155,6 +153,9 @@ final class ScriptRunner {
     // MARK: - Stills
 
     private func shot(_ request: ScriptRequest, aim: ScriptAim, displays: [ScreenCapture.NumberedDisplay], connection: ScriptConnection) async {
+        guard !isBusyElsewhere() else {
+            return answer(connection, .failure(request.command, ScriptError(.busy, "Shotts is busy with a capture from F10; try again once it is done")))
+        }
         stills += 1
         defer { stills -= 1 }
         guard await wait(request, while: { !connection.isGone }) else { return }
@@ -194,8 +195,11 @@ final class ScriptRunner {
     // MARK: - Recordings
 
     private func record(_ request: ScriptRequest, aim: ScriptAim, displays: [ScreenCapture.NumberedDisplay], connection: ScriptConnection) {
-        guard session == nil, !isRecordingElsewhere() else {
+        guard session == nil else {
             return answer(connection, .failure(request.command, ScriptError(.busy, "Shotts is already recording; `shotts stop` ends it")))
+        }
+        guard !isBusyElsewhere() else {
+            return answer(connection, .failure(request.command, ScriptError(.busy, "Shotts is busy with a capture from F10; try again once it is done")))
         }
         let session = Session(request: request, aim: aim, outputs: ScriptFiles.outputs(for: request), asker: connection)
         self.session = session

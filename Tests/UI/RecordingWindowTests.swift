@@ -129,6 +129,7 @@ import Testing
     /// Copy puts the file on the pasteboard, as the Finder does: a copy of its own, outside the
     /// recording's folder, which still pastes after the window closes.
     @Test func copyPutsTheFileOnThePasteboard() async throws {
+        useOwnTemporaryRoot()
         let controller = try await window(for: try await testRecording())
         let pasteboard = privatePasteboard()
         defer { pasteboard.releaseGlobally() }

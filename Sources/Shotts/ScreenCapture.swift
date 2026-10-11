@@ -26,6 +26,16 @@ enum ScreenCapture {
     /// records the answer; this returns before the user answers, so it reports nothing.
     static func requestPermission() { _ = CGRequestScreenCaptureAccess() }
 
+    /// Shows the system's own Screen Recording prompt, which macOS shows only once, the first
+    /// time Shotts asks; true if it did. Later, the caller explains where to turn it on instead.
+    static func askForPermissionOnce() -> Bool {
+        let asked = "capture.askedPermission"
+        guard !UserDefaults.standard.bool(forKey: asked) else { return false }
+        UserDefaults.standard.set(true, forKey: asked)
+        requestPermission()
+        return true
+    }
+
     /// One window on its own, whatever covers it, at the window's own scale, which comes back
     /// with the picture. With `shadow`, the picture is the window with the shadow macOS draws
     /// around it, on a transparent margin, exactly as the system's own window screenshots come

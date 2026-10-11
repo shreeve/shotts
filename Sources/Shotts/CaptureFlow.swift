@@ -50,9 +50,6 @@ final class CaptureFlow {
         if let scrolling { scrolling.setup.done() } else { stopRecording() }
     }
 
-    /// Whether a recording is being set up, made, or finished: `shotts` waits its turn.
-    var isBusyRecording: Bool { recording != nil || finishing }
-
     private struct RecordingSession {
         var setup: RecordingSetup
         /// Set once recording has started.
@@ -290,7 +287,8 @@ final class CaptureFlow {
             }
             let scale = session.capture.scale
             if SelectionOptions.current.copiesOnCapture { Export.copyInBackground(image, scale: scale) }
-            open(image: image, scale: scale, on: session.setup.screen, returningTo: session.returnTo)
+            let screen = NSScreen.screens.contains(session.setup.screen) ? session.setup.screen : NSScreen.main
+            open(image: image, scale: scale, on: screen, returningTo: session.returnTo)
         }
     }
 
@@ -331,6 +329,12 @@ final class CaptureFlow {
                 d.set(choices.keys, forKey: Self.keysKey)
                 Task { await self.startRecording(on: screen, rect: rect, choices: choices) }
             }
+        }
+        // macOS's Input Monitoring dialog comes as Keys is first turned on, not over the recording.
+        setup.onKeysTurnedOn = {
+            guard !InputWatcher.keysAllowed, !UserDefaults.standard.bool(forKey: Self.askedKeysKey) else { return }
+            UserDefaults.standard.set(true, forKey: Self.askedKeysKey)
+            InputWatcher.askForKeys()
         }
         recording = RecordingSession(setup: setup, frontmost: frontmost, returnTo: returnTo)
         setup.show()
@@ -411,9 +415,12 @@ final class CaptureFlow {
         finishing = true
         onRecording?(nil)
         session.inputs?.stop()
-        session.setup.close()
         Task {
             defer { finishing = false }
+            // The outline, bar, and drawing layer come down once the stream has stopped, so the
+            // file's last frames show the area as it was, not shapes vanishing from it.
+            await recorder.stopCapture()
+            session.setup.close()
             do {
                 let made = try await recorder.stop()
                 do {
@@ -488,14 +495,23 @@ final class CaptureFlow {
     /// or an alert or other modal window of Shotts' is open. The hot keys then do nothing (but
     /// stop a recording or end a scrolling capture): an editor coming forward would be in the
     /// picture, and a picker would stand over an alert that holds every event.
-    private var isBusy: Bool {
+    private var isBusy: Bool { isBusyHere || isBusyElsewhere() }
+
+    /// The same, for what F10 started alone: what `shotts` asks before it captures.
+    var isBusyHere: Bool {
         capture != nil || recording != nil || finishing || scrolling != nil || NSApp.modalWindow != nil
     }
+
+    /// Whether `shotts` has a request under way, from its countdown until its files are placed:
+    /// the hot keys then do nothing either, as a picker or an editor would be in its picture.
+    var isBusyElsewhere: () -> Bool = { false }
 
     /// What quitting now would lose: open captures annotated or cropped, or with words being typed,
     /// and recordings not yet saved, copied, or dragged out, the one being finished among them.
     var unsavedWork: (captures: Int, recordings: Int) {
-        (editors.filter { $0.editor.canvas.isAnnotated }.count, recordings.filter { !$0.kept }.count + (finishing ? 1 : 0))
+        // A window still saving or copying counts, even once closed: quitting would cut the file off.
+        (editors.filter { $0.editor.canvas.isAnnotated }.count,
+         recordings.filter { !$0.kept || $0.isBusy }.count + RecordingWindowController.closedWhileBusy + (finishing ? 1 : 0))
     }
 
     /// Option-F10: the newest open editor, brought to the front; else the editor closed last,
@@ -531,10 +547,7 @@ final class CaptureFlow {
     /// Without Screen Recording permission, the first press shows only the system's own prompt,
     /// which macOS shows once. Later presses explain where to turn it on.
     private func askPermission() {
-        let asked = "capture.askedPermission"
-        guard UserDefaults.standard.bool(forKey: asked) else {
-            UserDefaults.standard.set(true, forKey: asked)
-            ScreenCapture.requestPermission()
+        guard !ScreenCapture.askForPermissionOnce() else {
             capture = nil
             return
         }

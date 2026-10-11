@@ -40,7 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         flow.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
         script.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
         script.onCountdown = { [weak self] seconds in self?.showCountdown(seconds) }
-        script.isRecordingElsewhere = { [weak self] in self?.flow.isBusyRecording ?? false }
+        script.isBusyElsewhere = { [weak self] in self?.flow.isBusyHere ?? false }
+        flow.isBusyElsewhere = { [weak self] in self?.script.isBusy ?? false }
         #if DEBUG
         // A developer check runs without the updater, whose alerts would hold it up, and without
         // the hot keys or the menu bar item: the installed Shotts may be running beside it, and
@@ -82,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let work = flow.unsavedWork
         switch Quitting.reply(poweringOff: Self.isPoweringOff, underWay: flow.isUnderWay || script.isRecording,
-                              captures: work.captures, recordings: work.recordings) {
+                              captures: work.captures, recordings: work.recordings + script.unsavedRecordings) {
         case .now:
             return .terminateNow
         case .stop:
@@ -106,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         guard let event = NSAppleEventManager.shared().currentAppleEvent,
               let reason = event.attributeDescriptor(forKeyword: kAEQuitReason) ?? event.paramDescriptor(forKeyword: kAEQuitReason)
         else { return false }
-        return [kAEReallyLogOut, kAERestart, kAEShutDown].contains(reason.typeCodeValue)
+        return [kAELogOut, kAEReallyLogOut, kAERestart, kAEShutDown].contains { $0 == reason.typeCodeValue || $0 == reason.enumCodeValue }
     }
 
     /// Whether macOS answers "2" with `modifiers` itself, read afresh at each press, so a change
