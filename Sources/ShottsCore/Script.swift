@@ -63,7 +63,7 @@ public struct ScriptTarget: Codable, Equatable, Sendable {
     public var isEmpty: Bool { window == nil && display == nil && region == nil }
 }
 
-public struct ScriptRequest: Codable, Equatable, Sendable {
+public struct ScriptRequest: ScriptLine, Codable, Equatable, Sendable {
     public var command: ScriptCommand
     /// Absolute paths; empty for the usual name in the screenshot folder.
     public var outputs: [String] = []
@@ -382,7 +382,6 @@ public enum WindowMatch: Equatable, Sendable {
     }
 }
 
-/// What went wrong, as a program reads it.
 /// What `shotts` shows a person: the displays and windows `list` finds, the windows that match
 /// too many, and the files made, as tables (`TextTable` boxes them on a terminal).
 public enum ScriptListing {
@@ -436,8 +435,8 @@ public enum ScriptListing {
     /// `window 3340 · Ghostty`, `display 1`, or `region 0,0 800×600 · display 1`.
     static func describe(_ target: ScriptTargetInfo) -> String {
         switch target.kind {
-        case "window": (["window \(target.id.map(String.init) ?? "")"] + [target.app].compactMap { $0 }).joined(separator: " · ")
-        case "display": "display \(target.display)"
+        case .window: (["window \(target.id.map(String.init) ?? "")"] + [target.app].compactMap { $0 }).joined(separator: " · ")
+        case .display: "display \(target.display)"
         default: "region \(number(target.frame[0])),\(number(target.frame[1])) \(size(target.frame)) · display \(target.display)"
         }
     }
@@ -498,7 +497,7 @@ public struct ScriptAim: Equatable, Sendable {
             }
             guard target.region != nil else {
                 return .success(ScriptAim(source: .window(window.id), info: ScriptTargetInfo(
-                    kind: "window", id: window.id, app: window.app, bundle: window.bundle, title: window.title, frame: window.frame,
+                    kind: .window, id: window.id, app: window.app, bundle: window.bundle, title: window.title, frame: window.frame,
                     scale: d.scale, display: d.number)))
             }
             display = d
@@ -518,11 +517,12 @@ public struct ScriptAim: Equatable, Sendable {
             return .failure(ScriptError(.usage, "the region is not on display \(display.number)"))
         }
         return .success(ScriptAim(source: .area(display: display.number, rect: area.offsetBy(dx: -bounds.minX, dy: -bounds.minY)),
-                                  info: ScriptTargetInfo(kind: target.region == nil ? "display" : "region", frame: frame(area),
+                                  info: ScriptTargetInfo(kind: target.region == nil ? .display : .region, frame: frame(area),
                                                          scale: display.scale, display: display.number)))
     }
 }
 
+/// What went wrong, as a program reads it.
 public enum ScriptErrorCode: String, Codable, Sendable {
     case usage, permission, notAllowed = "not_allowed", notFound = "not_found", ambiguousWindow = "ambiguous_window", busy
     case captureFailed = "capture_failed", encodeFailed = "encode_failed"
@@ -582,7 +582,9 @@ public struct ScriptFile: Codable, Equatable, Sendable {
 
 /// What was captured.
 public struct ScriptTargetInfo: Codable, Equatable, Sendable {
-    public var kind: String
+    public enum Kind: String, Codable, Sendable { case window, display, region }
+
+    public var kind: Kind
     public var id: UInt32?
     public var app: String?
     public var bundle: String?
@@ -591,7 +593,7 @@ public struct ScriptTargetInfo: Codable, Equatable, Sendable {
     public var scale: Double
     public var display: Int
 
-    public init(kind: String, id: UInt32? = nil, app: String? = nil, bundle: String? = nil, title: String? = nil, frame: [Double],
+    public init(kind: Kind, id: UInt32? = nil, app: String? = nil, bundle: String? = nil, title: String? = nil, frame: [Double],
                 scale: Double, display: Int) {
         self.kind = kind
         self.id = id
@@ -604,13 +606,20 @@ public struct ScriptTargetInfo: Codable, Equatable, Sendable {
     }
 }
 
-/// Shotts' answer. A `record` sends one with state "recording" once it is live, then the last.
-public struct ScriptResult: Codable, Equatable, Sendable {
+/// Shotts' answer. A `record` sends one with state `recording` once it is live, then the last.
+public struct ScriptResult: ScriptLine, Codable, Equatable, Sendable {
+    public enum State: String, Codable, Sendable {
+        case recording
+        /// Files being made, `progress` of the way through them all, `saving` the one being made
+        /// now: sent along the way, never the answer.
+        case saving
+        case done
+    }
+
     public var ok: Bool
-    public var command: ScriptCommand
-    /// "recording", "saving" (files being made, `progress` of the way through, `saving` the one
-    /// being made now; sent along the way, never the answer), or "done".
-    public var state: String?
+    /// What was asked; nil for a request Shotts could not read.
+    public var command: ScriptCommand?
+    public var state: State?
     public var progress: Double?
     public var saving: String?
     public var target: ScriptTargetInfo?
@@ -622,7 +631,7 @@ public struct ScriptResult: Codable, Equatable, Sendable {
     public var displays: [ScriptDisplay]?
     public var error: ScriptError?
 
-    public init(command: ScriptCommand, state: String? = nil, target: ScriptTargetInfo? = nil, started: String? = nil, duration: Double? = nil,
+    public init(command: ScriptCommand?, state: State? = nil, target: ScriptTargetInfo? = nil, started: String? = nil, duration: Double? = nil,
                 files: [ScriptFile]? = nil) {
         ok = true
         self.command = command
@@ -633,22 +642,19 @@ public struct ScriptResult: Codable, Equatable, Sendable {
         self.files = files
     }
 
-    public static func failure(_ command: ScriptCommand, _ error: ScriptError) -> ScriptResult {
+    public static func failure(_ command: ScriptCommand?, _ error: ScriptError) -> ScriptResult {
         var r = ScriptResult(command: command)
         r.ok = false
         r.error = error
         return r
     }
-
-    /// One line of JSON, keys in a fixed order.
-    public func line() -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        return ((try? encoder.encode(self)) ?? Data()) + Data("\n".utf8)
-    }
 }
 
-extension ScriptRequest {
+/// What goes over the socket, each way.
+public protocol ScriptLine: Encodable {}
+
+extension ScriptLine {
+    /// One line of JSON, keys in a fixed order.
     public func line() -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]

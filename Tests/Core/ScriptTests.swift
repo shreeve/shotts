@@ -131,6 +131,11 @@ import Testing
         let text = String(decoding: line, as: UTF8.self)
         #expect(text.contains(#""code":"ambiguous_window""#) && text.contains(#""ok":false"#))
         #expect(try JSONDecoder().decode(ScriptResult.self, from: line) == failure)
+        // States and kinds are words on the wire.
+        let live = ScriptResult(command: .record, state: .recording, target: ScriptTargetInfo(kind: .window, frame: [0, 0, 1, 1], scale: 1, display: 1))
+        let words = String(decoding: live.line(), as: UTF8.self)
+        #expect(words.contains(#""state":"recording""#) && words.contains(#""kind":"window""#))
+        #expect(!String(decoding: ScriptResult.failure(nil, ScriptError(.usage, "?")).line(), as: UTF8.self).contains("command"))
         var request = ScriptRequest(command: .record)
         request.outputs = ["/a.mp4"]
         #expect(try JSONDecoder().decode(ScriptRequest.self, from: request.line()) == request)
@@ -182,7 +187,7 @@ import Testing
     @Test func windowsAndDisplays() throws {
         let window = try aim(ScriptTarget(window: "notes")).get()
         #expect(window.source == .window(9))
-        #expect(window.info.kind == "window" && window.info.scale == 1 && window.info.display == 2)
+        #expect(window.info.kind == .window && window.info.scale == 1 && window.info.display == 2)
         let whole = try aim(ScriptTarget(display: 2)).get()
         #expect(whole.source == .area(display: 2, rect: CGRect(x: 0, y: 0, width: 1920, height: 1080)))
         #expect(whole.info.frame == [1512, 0, 1920, 1080])
@@ -192,7 +197,7 @@ import Testing
     @Test func regions() throws {
         let inWindow = try aim(ScriptTarget(window: "7", region: CGRect(x: 10, y: 20, width: 100, height: 50))).get()
         #expect(inWindow.source == .area(display: 1, rect: CGRect(x: 110, y: 70, width: 100, height: 50)))
-        #expect(inWindow.info.kind == "region" && inWindow.info.frame == [110, 70, 100, 50])
+        #expect(inWindow.info.kind == .region && inWindow.info.frame == [110, 70, 100, 50])
         let onSecond = try aim(ScriptTarget(display: 2, region: CGRect(x: 1800, y: 1000, width: 400, height: 400))).get()
         #expect(onSecond.source == .area(display: 2, rect: CGRect(x: 1800, y: 1000, width: 120, height: 80)))
         #expect(onSecond.info.frame == [3312, 1000, 120, 80])
@@ -270,7 +275,7 @@ import Testing
         let narrow = TextTable(title: "a", columns: [.init("A"), .init("B")], rows: [["1", "2"]])
         #expect(narrow.boxed(color: false).split(separator: "\n")[2] == "├───┼───╮")
         #expect(TextTable(title: "a much longer tab", columns: [.init("A")], rows: [["1"]]).boxed(color: false)
-            .split(separator: "\n").map { TextTable.columns(String($0)) }.allSatisfy { $0 == 21 })
+            .split(separator: "\n").map { TextTable.width(of: String($0)) }.allSatisfy { $0 == 21 })
         // Color is on the text, never on the padding, so columns still line up.
         let colored = table.boxed(width: 30, color: true)
         #expect(colored.contains("\u{1B}[1mTITLE\u{1B}[0m               │") && colored.contains("\u{1B}[2m2 windows\u{1B}[0m"))
@@ -278,14 +283,14 @@ import Testing
 
     /// Wide characters take two columns, and are never split.
     @Test func wideCharacters() {
-        #expect(TextTable.columns("日本語") == 6 && TextTable.columns("a🎉b") == 4)
+        #expect(TextTable.width(of: "日本語") == 6 && TextTable.width(of: "a🎉b") == 4)
         #expect(TextTable.cut("日本語のタイトル", to: 7) == "日本語…")
         let table = TextTable(columns: [.init("T"), .init("X")], rows: [["日本", "1"], ["abcd", "2"]])
         #expect(table.plain() == "T     X\n日本  1\nabcd  2\n")
     }
 
     @Test func files() {
-        var result = ScriptResult(command: .record, state: "done", target: ScriptTargetInfo(kind: "window", id: 4211, app: "Safari", frame: [0, 0, 10, 10], scale: 2, display: 1),
+        var result = ScriptResult(command: .record, state: .done, target: ScriptTargetInfo(kind: .window, id: 4211, app: "Safari", frame: [0, 0, 10, 10], scale: 2, display: 1),
                                   duration: 4.96, files: [
             ScriptFile(path: "/Users/me/Desktop/demo.mp4", format: .mp4, width: 1600, height: 1000, fps: 30, frames: 149, bytes: 1_234_567),
             ScriptFile(path: "/tmp/demo.gif", format: .gif, width: 800, height: 500, fps: 20, frames: 99, bytes: 999),
@@ -294,7 +299,7 @@ import Testing
         #expect(table.title == "window 4211 · Safari")
         #expect(table.rows == [["~/Desktop/demo.mp4", "1600×1000", "30", "149", "1.2 MB"], ["/tmp/demo.gif", "800×500", "20", "99", "999 bytes"]])
         #expect(table.notes == ["recorded 5.0s"])
-        result.target = ScriptTargetInfo(kind: "region", frame: [10, 20, 300, 200], scale: 1, display: 2)
+        result.target = ScriptTargetInfo(kind: .region, frame: [10, 20, 300, 200], scale: 1, display: 2)
         #expect(ScriptListing.files(result, home: "/Users/me").title == "region 10,20 300×200 · display 2")
         #expect(ScriptListing.bytes(12_345_678) == "12 MB")
     }

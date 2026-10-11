@@ -188,7 +188,7 @@ final class ScriptRunner {
             ScriptFiles.discard(made)
             return answer(connection, .failure(.shot, ScriptError(.encodeFailed, error.localizedDescription)))
         }
-        answer(connection, ScriptResult(command: .shot, state: "done", target: info, started: Self.timestamp(started), files: files))
+        answer(connection, ScriptResult(command: .shot, state: .done, target: info, started: Self.timestamp(started), files: files))
     }
 
     // MARK: - Recordings
@@ -246,7 +246,7 @@ final class ScriptRunner {
         session.recorder = recorder
         session.started = started
         onRecording?(recorder)
-        let ready = ScriptResult(command: request.command, state: "recording", target: session.aim.info, started: Self.timestamp(started))
+        let ready = ScriptResult(command: request.command, state: .recording, target: session.aim.info, started: Self.timestamp(started))
         if request.command == .start, let asker = session.asker {
             session.asker = nil
             answer(asker, ready)
@@ -286,7 +286,7 @@ final class ScriptRunner {
         if self.session === session { self.session = nil }
         if let asker = session.asker { answer(asker, .failure(session.request.command, error)) }
         for stopper in session.stoppers {
-            answer(stopper, stopped ? ScriptResult(command: .stop, state: "done") : .failure(.stop, error))
+            answer(stopper, stopped ? ScriptResult(command: .stop, state: .done) : .failure(.stop, error))
         }
     }
 
@@ -294,7 +294,7 @@ final class ScriptRunner {
     /// With nothing recording, `stop` gives the last recording's answer.
     private func stop(_ request: ScriptRequest, from connection: ScriptConnection) {
         guard let session else {
-            var result = last ?? ScriptResult(command: .stop, state: "done")
+            var result = last ?? ScriptResult(command: .stop, state: .done)
             result.command = .stop
             return answer(connection, result)
         }
@@ -326,7 +326,7 @@ final class ScriptRunner {
     /// Tells those waiting which file is being made, and how far through them all it is.
     private func report(_ session: Session, saving path: String, progress: Double) {
         guard self.session === session, !session.aborted else { return }
-        var result = ScriptResult(command: session.request.command, state: "saving")
+        var result = ScriptResult(command: session.request.command, state: .saving)
         result.saving = path
         result.progress = min(progress, 1)
         session.asker?.send(result)
@@ -382,7 +382,7 @@ final class ScriptRunner {
         } catch {
             return failed(session, ScriptError(.encodeFailed, error.localizedDescription))
         }
-        let result = ScriptResult(command: request.command, state: "done", target: session.aim.info, started: session.started.map(Self.timestamp),
+        let result = ScriptResult(command: request.command, state: .done, target: session.aim.info, started: session.started.map(Self.timestamp),
                                   duration: duration, files: files)
         last = result
         if self.session === session { self.session = nil }

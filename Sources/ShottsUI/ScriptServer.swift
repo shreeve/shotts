@@ -149,7 +149,7 @@ public nonisolated final class ScriptConnection: @unchecked Sendable {
 
     /// Sends a result line; nothing once closed.
     public func send(_ result: ScriptResult) {
-        let line = result.line(), isProgress = result.state == "saving"
+        let line = result.line(), isProgress = result.state == .saving
         queue.async { [self] in
             guard !ended, !closing else { return }
             if isProgress { outgoing.removeAll(where: \.isProgress) }
@@ -203,7 +203,7 @@ public nonisolated final class ScriptConnection: @unchecked Sendable {
 
     private func refuse(_ message: String) {
         received = Data()
-        outgoing.append((ScriptResult.failure(.list, ScriptError(.usage, message)).line(), false))
+        outgoing.append((ScriptResult.failure(nil, ScriptError(.usage, message)).line(), false))
         finish()
     }
 

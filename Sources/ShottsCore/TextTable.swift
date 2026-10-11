@@ -65,7 +65,7 @@ public struct TextTable: Sendable {
         let tab = title.map { " \($0) " }
         if let tab {
             // The table is at least as wide as its tab.
-            let short = Self.columns(tab) + 2 - (widths.reduce(0, +) + 3 * columns.count + 1)
+            let short = Self.width(of: tab) + 2 - (widths.reduce(0, +) + 3 * columns.count + 1)
             if short > 0 { widths[widths.count - 1] += short }
         }
         var stops = [0]
@@ -98,7 +98,7 @@ public struct TextTable: Sendable {
 
         var out = ""
         if let tab {
-            let edge = Self.columns(tab) + 1
+            let edge = Self.width(of: tab) + 1
             out += "╭" + String(repeating: "─", count: edge - 1) + "╮\n"
             out += "│" + paint(tab, .bold) + "│\n"
             out += rule("├", "┬", "╮", tabEdge: edge)
@@ -119,7 +119,7 @@ public struct TextTable: Sendable {
     /// Each column's width, the flexible one narrowed so the table fits `width` with
     /// `overhead` columns of borders and gaps, but never below eight.
     private func fitted(to width: Int?, overhead: Int) -> [Int] {
-        var widths = columns.indices.map { i in ([columns[i].head] + rows.map { $0[i] }).map(Self.columns).max() ?? 0 }
+        var widths = columns.indices.map { i in ([columns[i].head] + rows.map { $0[i] }).map(Self.width(of:)).max() ?? 0 }
         if let width, let flexible = columns.firstIndex(where: \.flexible) {
             let over = widths.reduce(0, +) + overhead - width
             if over > 0 { widths[flexible] = max(widths[flexible] - over, min(widths[flexible], 8)) }
@@ -128,7 +128,7 @@ public struct TextTable: Sendable {
     }
 
     /// How many terminal columns `text` takes: two for wide characters (CJK, emoji), else one.
-    public static func columns(_ text: String) -> Int {
+    public static func width(of text: String) -> Int {
         text.reduce(0) { $0 + (isWide($1) ? 2 : 1) }
     }
 
@@ -146,7 +146,7 @@ public struct TextTable: Sendable {
 
     /// `text` cut to `width` columns, ending in an ellipsis when cut.
     static func cut(_ text: String, to width: Int) -> String {
-        guard columns(text) > width else { return text }
+        guard Self.width(of: text) > width else { return text }
         var out = ""
         var used = 0
         for c in text {
@@ -159,7 +159,7 @@ public struct TextTable: Sendable {
     }
 
     static func pad(_ text: String, _ width: Int, _ align: Align) -> String {
-        let room = String(repeating: " ", count: max(width - columns(text), 0))
+        let room = String(repeating: " ", count: max(width - Self.width(of: text), 0))
         return align == .left ? text + room : room + text
     }
 }

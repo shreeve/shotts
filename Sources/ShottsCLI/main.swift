@@ -59,7 +59,7 @@ let version: String? = {
 
 /// Prints the failure as the request asked (JSON on stdout, a line on stderr, and the windows
 /// that matched or how to get help) and exits with its code.
-func fail(_ command: ScriptCommand, _ error: ScriptError) -> Never {
+func fail(_ command: ScriptCommand?, _ error: ScriptError) -> Never {
     if wantsJSON { FileHandle.standardOutput.write(ScriptResult.failure(command, error).line()) }
     stderr.write(stderr.styled("shotts:", "1;31") + " \(error.message)\n")
     if let candidates = error.candidates, !candidates.isEmpty {
@@ -91,7 +91,7 @@ let request: ScriptRequest
 do {
     request = try ScriptParser.parse(arguments, workingDirectory: FileManager.default.currentDirectoryPath)
 } catch {
-    fail(ScriptCommand(rawValue: arguments.first ?? "") ?? .list, ScriptError(.usage, error.message))
+    fail(ScriptCommand(rawValue: arguments.first ?? ""), ScriptError(.usage, error.message))
 }
 
 #if DEBUG
@@ -192,11 +192,11 @@ var showingProgress = false
     guard let result = try? JSONDecoder().decode(ScriptResult.self, from: line) else { return }
     guard result.ok else { finish(result, line: line) }
     switch result.state {
-    case "recording" where request.command == .record:
+    case .recording where request.command == .record:
         stderr.write(stderr.isTerminal
             ? stderr.styled("●", "31") + " recording" + stderr.styled(" · Control-C or `shotts stop` ends it", "2") + "\n"
             : "recording\n")
-    case "saving":
+    case .saving:
         guard stderr.isTerminal, let saving = result.saving else { return }
         let percent = Int(((result.progress ?? 0) * 100).rounded(.down))
         stderr.write("\r\u{1B}[K" + stderr.styled("■", "2") + " making \((saving as NSString).lastPathComponent)"

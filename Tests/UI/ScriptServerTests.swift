@@ -46,8 +46,8 @@ import Testing
         var received: [ScriptRequest] = []
         let server = ScriptServer(path: path) { request, connection in
             received.append(request)
-            connection.send(ScriptResult(command: request.command, state: "recording"))
-            connection.send(ScriptResult(command: request.command, state: "done"))
+            connection.send(ScriptResult(command: request.command, state: .recording))
+            connection.send(ScriptResult(command: request.command, state: .done))
             connection.close()
         }
         try server.start()
@@ -67,7 +67,7 @@ import Testing
         request.outputs = ["/tmp/a.gif"]
         let answers = await Self.ask(path, request)
         #expect(received == [request])
-        #expect(answers.map(\.state) == ["recording", "done"])
+        #expect(answers.map(\.state) == [.recording, .done])
     }
 
     /// A folder opened to others is closed again; one that is a link to elsewhere is refused.
@@ -91,11 +91,11 @@ import Testing
     @Test func stoppingStopsListening() async throws {
         let oldPath = socketPath()
         let old = ScriptServer(path: oldPath) { _, connection in
-            connection.send(ScriptResult(command: .list, state: "old"))
+            connection.send(ScriptResult.failure(.list, ScriptError(.busy, "old")))
             connection.close()
         }
         try old.start()
-        #expect(await Self.ask(oldPath, ScriptRequest(command: .list)).map(\.state) == ["old"])
+        #expect(await Self.ask(oldPath, ScriptRequest(command: .list)).map(\.error?.message) == ["old"])
         let alias = (oldPath as NSString).deletingLastPathComponent + "/alias.sock"
         #expect(rename(oldPath, alias) == 0)
         old.stop()
@@ -107,14 +107,14 @@ import Testing
 
         let path = socketPath()
         let new = ScriptServer(path: path) { request, connection in
-            connection.send(ScriptResult(command: request.command, state: "new"))
+            connection.send(ScriptResult.failure(request.command, ScriptError(.busy, "new")))
             connection.close()
         }
         try new.start()
         defer { new.stop() }
-        var states: [String?] = []
-        for _ in 0..<8 { states += await Self.ask(path, ScriptRequest(command: .list)).map(\.state) }
-        #expect(states == Array(repeating: "new", count: 8))
+        var answers: [String?] = []
+        for _ in 0..<8 { answers += await Self.ask(path, ScriptRequest(command: .list)).map(\.error?.message) }
+        #expect(answers == Array(repeating: "new", count: 8))
     }
 
     /// A tool that stops reading (suspended, or reading only at the end) never holds the main
@@ -125,13 +125,13 @@ import Testing
         var sending: Duration = .zero
         let server = ScriptServer(path: path) { request, connection in
             let began = ContinuousClock.now
-            var progress = ScriptResult(command: request.command, state: "saving")
+            var progress = ScriptResult(command: request.command, state: .saving)
             for n in 0..<2000 {
                 progress.saving = "/Users/me/Desktop/" + String(repeating: "x", count: 200) + ".mp4"
                 progress.progress = Double(n) / 2000
                 connection.send(progress)
             }
-            connection.send(ScriptResult(command: request.command, state: "done"))
+            connection.send(ScriptResult(command: request.command, state: .done))
             connection.close()
             sending = ContinuousClock.now - began
         }
@@ -139,7 +139,7 @@ import Testing
         defer { server.stop() }
         let answers = await Self.exchange(path, ScriptRequest(command: .record).line(), pause: .milliseconds(500))
         #expect(sending < .milliseconds(400))
-        #expect(answers.last?.state == "done")
+        #expect(answers.last?.state == .done)
         #expect(answers.count < 200, "\(answers.count) lines: the progress lines waiting were not cut to the newest")
         #expect(answers.dropLast().last?.progress == 1999.0 / 2000)
     }
@@ -198,6 +198,8 @@ import Testing
         for bytes in [Data("{\"command\":\"frob\"}\n".utf8), Data(repeating: UInt8(ascii: "a"), count: 70_000)] {
             let answers = await Self.exchange(path, bytes)
             #expect(answers.count == 1 && answers.first?.ok == false && answers.first?.error?.code == .usage)
+            // Nothing was asked that Shotts could read, so the answer names no command.
+            #expect(answers.first.map { $0.command == nil } == true)
         }
         #expect(handled == 0)
     }
@@ -207,7 +209,7 @@ import Testing
         let path = socketPath()
         var hungUp = false
         let server = ScriptServer(path: path) { _, connection in
-            connection.send(ScriptResult(command: .record, state: "recording"))
+            connection.send(ScriptResult(command: .record, state: .recording))
             connection.onClose { hungUp = true }
         }
         try server.start()
@@ -246,7 +248,7 @@ import Testing
         var hungUp = false
         let server = ScriptServer(path: path) { _, connection in
             connection.onClose { hungUp = true }
-            connection.send(ScriptResult(command: .shot, state: "done"))
+            connection.send(ScriptResult(command: .shot, state: .done))
             connection.close()
         }
         try server.start()
