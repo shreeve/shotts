@@ -8,11 +8,9 @@ import ShottsUI
 /// that asks without that. A recording made this way shows in the menu bar like any other, and
 /// F10 or the timer stops it; its files are made before the answer goes back.
 final class ScriptRunner {
-    static let allowedKey = "commandLine.allowed"
-
     static var isAllowed: Bool {
-        get { UserDefaults.standard.bool(forKey: allowedKey) }
-        set { UserDefaults.standard.set(newValue, forKey: allowedKey) }
+        get { ScriptServer.isAllowed(in: .standard, domain: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName) }
+        set { UserDefaults.standard.set(newValue, forKey: ScriptServer.allowedKey) }
     }
 
     private var server: ScriptServer?

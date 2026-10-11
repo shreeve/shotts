@@ -114,6 +114,23 @@ import Testing
         #expect(hungUp)
     }
 
+    /// Allow Command-Line Capture is what the user saved, never what Shotts was launched with:
+    /// `-commandLine.allowed YES` on its command line does not turn it on.
+    @Test func onlyTheSavedSwitchAllows() throws {
+        let domain = "st-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let arguments = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        defer { defaults.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain) }
+        defaults.setVolatileDomain([ScriptServer.allowedKey: true], forName: UserDefaults.argumentDomain)
+        #expect(defaults.bool(forKey: ScriptServer.allowedKey), "the launch argument is what `bool(forKey:)` reads")
+        #expect(!ScriptServer.isAllowed(in: defaults, domain: domain))
+        defaults.set(true, forKey: ScriptServer.allowedKey)
+        #expect(ScriptServer.isAllowed(in: defaults, domain: domain))
+        defaults.set(false, forKey: ScriptServer.allowedKey)
+        #expect(!ScriptServer.isAllowed(in: defaults, domain: domain))
+    }
+
     /// Shotts closing its side, having answered, is not the tool hanging up.
     @Test func answeringIsNotHangingUp() async throws {
         let path = socketPath()

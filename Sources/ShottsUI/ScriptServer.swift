@@ -22,6 +22,16 @@ public nonisolated final class ScriptServer: @unchecked Sendable {
 
     public enum Failure: Error { case inUse, socket(String) }
 
+    /// Where Allow Command-Line Capture is kept.
+    public static let allowedKey = "commandLine.allowed"
+
+    /// Allow Command-Line Capture, as the user left it in `domain`, the app's own saved settings,
+    /// and nowhere else: `bool(forKey:)` also reads the arguments a process was launched with, so
+    /// `open -a Shotts --args -commandLine.allowed YES` would turn it on without the user.
+    public static func isAllowed(in defaults: UserDefaults, domain: String) -> Bool {
+        defaults.persistentDomain(forName: domain)?[allowedKey] as? Bool ?? false
+    }
+
     /// Listens, unless another Shotts already does: then this one leaves the socket to it.
     public func start() throws {
         let folder = (path as NSString).deletingLastPathComponent
