@@ -52,9 +52,8 @@ is up, and neither does anything while one of Shotts' alerts or its Print window
 | Escape | Cancels, even mid-drag. Nothing is kept. |
 
 F10 leaves every window where it is, Shotts' editors included; Shotts itself comes to the front
-only when a capture's editor opens, or with Option-F10. A click on no window does nothing, so a
-stray click does not end the capture. Switching to another app, or a display being added,
-removed, or rearranged, cancels.
+only when a capture's editor opens, or with Option-F10. Switching to another app, or a display
+being added, removed, or rearranged, cancels.
 
 The crosshair is a light line with a dark edge, visible on any background, and shows only on the
 display the pointer is on; the keys act on that display. The selection stays on one display.
