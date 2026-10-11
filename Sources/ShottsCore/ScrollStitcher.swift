@@ -185,17 +185,20 @@ public final class ScrollStitcher {
         let blocks = blocks, blockWidth = width / blocks, width = width
         prints.withUnsafeMutableBufferPointer { prints in
             for y in 0..<height {
-                let row = frame + y * bytesPerRow
+                let row = (frame + y * bytesPerRow).assumingMemoryBound(to: UInt8.self)
                 for b in 0..<blocks {
                     let from = b * blockWidth, to = b == blocks - 1 ? width : from + blockWidth
                     // Every pixel: fewer would leave the prints noisy enough that a still band,
                     // a sticky header, no longer reads as still. BGRA, each channel summed apart
                     // and weighted once, which is the same as weighting each pixel.
                     var blue = 0, green = 0, red = 0
-                    for x in from..<to {
-                        blue &+= Int(row.load(fromByteOffset: x * 4, as: UInt8.self))
-                        green &+= Int(row.load(fromByteOffset: x * 4 + 1, as: UInt8.self))
-                        red &+= Int(row.load(fromByteOffset: x * 4 + 2, as: UInt8.self))
+                    var p = row + from * 4
+                    let end = row + to * 4
+                    while p < end {
+                        blue &+= Int(p[0])
+                        green &+= Int(p[1])
+                        red &+= Int(p[2])
+                        p += 4
                     }
                     prints[y * blocks + b] = Float(red * 299 + green * 587 + blue * 114) / Float((to - from) * 1000)
                 }
@@ -204,9 +207,16 @@ public final class ScrollStitcher {
     }
 
     /// How unlike two rows' fingerprints are: the mean difference of their blocks.
+    ///
+    /// The innermost loops are `while` loops over pointers: a range's iterator is a generic call
+    /// per step in a debug build, where the tests run.
     private static func unlike(_ a: UnsafePointer<Float>, _ b: UnsafePointer<Float>, _ blocks: Int) -> Float {
         var sum: Float = 0
-        for i in 0..<blocks { sum += abs(a[i] - b[i]) }
+        var i = 0
+        while i < blocks {
+            sum += (a[i] - b[i]).magnitude
+            i += 1
+        }
         return sum / Float(blocks)
     }
 
