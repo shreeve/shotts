@@ -64,8 +64,8 @@ nonisolated final class ScrollCapture: NSObject, SCStreamOutput, SCStreamDelegat
         stream = nil
         return queue.sync { () -> CGImage? in
             defer { stitcher = nil }
-            guard let stitcher, stitcher.pictureHeight > 0 else { return nil }
-            return Self.image(stitcher.picture(), width: stitcher.width, height: stitcher.pictureHeight)
+            guard let stitcher, let picture = stitcher.takePicture() else { return nil }
+            return Self.image(picture, width: stitcher.width, height: stitcher.pictureHeight)
         }
     }
 
@@ -76,9 +76,15 @@ nonisolated final class ScrollCapture: NSObject, SCStreamOutput, SCStreamDelegat
         queue.sync { stitcher = nil }
     }
 
-    /// BGRA rows as an image, in the display's colors.
-    private static func image(_ pixels: [UInt8], width: Int, height: Int) -> CGImage? {
-        guard let provider = CGDataProvider(data: Data(pixels) as CFData) else { return nil }
+    /// BGRA rows as an image over them, in the display's colors: the image owns them, and frees
+    /// them when it goes.
+    private static func image(_ pixels: UnsafeMutableRawBufferPointer, width: Int, height: Int) -> CGImage? {
+        guard let provider = CGDataProvider(dataInfo: nil, data: pixels.baseAddress!, size: pixels.count, releaseData: { _, data, _ in
+            UnsafeMutableRawPointer(mutating: data).deallocate()
+        }) else {
+            pixels.deallocate()
+            return nil
+        }
         return CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
                        space: CGColorSpace(name: CGColorSpace.displayP3)!,
                        bitmapInfo: CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue),
