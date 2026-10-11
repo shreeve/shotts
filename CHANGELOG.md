@@ -54,7 +54,7 @@ The command line (`shotts`):
   `shotts` countdown, and beeps while a request is otherwise busy.
 
 Smaller and safer builds:
-- The app is 16% smaller and `shotts` 41% smaller.
+- The app is 10% smaller and `shotts` 38% smaller.
 - A debug build is its own app, with its own permissions, so it can never lend the release's
   Screen Recording permission to another program.
 
