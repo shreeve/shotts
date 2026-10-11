@@ -64,10 +64,14 @@ public enum Export {
         return (url, try write(document, source: source, to: url))
     }
 
+    /// Where the temporary folders are: the user's temporary folder, which a test run points
+    /// elsewhere so that it never empties the folders a running Shotts keeps its last file in.
+    public static var temporaryRoot = FileManager.default.temporaryDirectory
+
     /// A temporary folder of this name, emptied first, so it never holds more than the latest
     /// file put in it: the app it went to has had its copy by the next. Readable by its user alone.
     public static func temporaryFolder(_ name: String) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(name, isDirectory: true)
+        let folder = temporaryRoot.appendingPathComponent(name, isDirectory: true)
         try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         return folder
