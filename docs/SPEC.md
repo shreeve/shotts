@@ -6,9 +6,10 @@ the code disagree, find out which is wrong and fix that one.
 ## The product
 
 Shotts is a Mac screenshot tool that lives in the menu bar and takes one motion from key press
-to paste: F10, drag out an area, mark it up, Command-C. Pressing Command while dragging records
-the area instead, to save as an MP4 or an animated GIF. It runs on macOS 14 and later on Apple
-silicon. It captures and records only what the user selects, only when the user asks, and keeps
+to paste: F10 (or ⇧⌘2), drag out an area, mark it up, Command-C. Pressing Command while
+dragging records the area instead, to save as an MP4 or an animated GIF, and pressing Option
+captures all of a scrolling area as one tall picture. `shotts`, its command line, captures from
+scripts. It runs on macOS 14 and later on Apple silicon. It captures and records only what the user selects, only when the user asks, and keeps
 nothing on disk that the user did not save or drag out, but for a recording's own files while
 its window is open and the last recording file copied, kept so it still pastes. With Copy to
 Clipboard on, a capture is on the clipboard as soon as it is taken.
@@ -71,7 +72,8 @@ indicator in the menu bar.
 The menu bar menu holds About Shotts (the icon, version, copyright, and a link to the project),
 Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into the editor), the
 picker's options, remembered across launches, then Start at Login and Allow Command-Line Capture
-(how Shotts itself runs), Check for Updates…, and Quit. **Start at Login**, off until turned on,
+(how Shotts itself runs), Install Command-Line Tool… (until `shotts` is installed), Check for
+Updates…, and Quit Shotts. **Start at Login**, off until turned on,
 makes Shotts a login item, so it is in the menu bar after every login and restart; macOS keeps
 it, in System Settings › General › Login Items, where it can be turned off too, and the
 checkmark always shows what macOS has. While a recording is
