@@ -774,17 +774,18 @@ final class OverlayView: NSView {
         "Arrow keys move a pixel, ⇧ ten",
         "Esc cancels",
     ]
-    private var hints: [String] { Self.hints }
     private static let hintLineHeight: CGFloat = 17
     private static let hintAttributes: [NSAttributedString.Key: Any] = [
         .font: NSFont.systemFont(ofSize: 12),
         .foregroundColor: NSColor.white,
     ]
+    /// The keys' box, measured once rather than at every pointer move.
+    private static let hintsSize = CGSize(width: hints.map { ($0 as NSString).size(withAttributes: hintAttributes).width }.max()! + 20,
+                                          height: CGFloat(hints.count) * hintLineHeight + 10)
 
     /// Where the keys go: in the corner above and left of `p`, the mirror of the magnifier's.
     private func hintsRect(near p: CGPoint) -> CGRect {
-        let width = hints.map { ($0 as NSString).size(withAttributes: Self.hintAttributes).width }.max()! + 20
-        let size = CGSize(width: width, height: CGFloat(hints.count) * Self.hintLineHeight + 10)
+        let size = Self.hintsSize
         var origin = CGPoint(x: p.x - 24 - size.width, y: p.y - 24 - size.height)
         if origin.x < bounds.minX { origin.x = p.x + 24 }
         if origin.y < bounds.minY { origin.y = p.y + 24 }
@@ -799,7 +800,7 @@ final class OverlayView: NSView {
         ctx.setFillColor(CGColor(gray: 0.12, alpha: 0.85))
         ctx.addPath(CGPath(roundedRect: box, cornerWidth: 6, cornerHeight: 6, transform: nil))
         ctx.fillPath()
-        for (i, line) in hints.enumerated() {
+        for (i, line) in Self.hints.enumerated() {
             (line as NSString).draw(at: CGPoint(x: box.minX + 10, y: box.minY + 5 + CGFloat(i) * Self.hintLineHeight), withAttributes: Self.hintAttributes)
         }
     }

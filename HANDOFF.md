@@ -5,78 +5,48 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.9.2 is the latest release: tag `v0.9.2` on `main` (commit "Shotts 0.9.2"), the GitHub release
-with its notarized zip and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#148),
-which also links `shotts` (`binary`); installed copies are offered it through Sparkle. 0.6.0
-(shreeve/shotts#69) added `shotts`, the command line ("Command line" below; SPEC has the
-language). 0.6.1 made `record` show progress while saving and GIFs on-screen size, and took
-Control-C onto the main thread. 0.6.2 added `--audio system|mic|both` (MP4 only; `both` was `system,mic`, still taken), and the
-version atop the help and under `version`/`-V`. 0.6.3 labels recordings sRGB, not BT.709 (players
-had lifted the darks into a gray film), and puts back the level macOS takes off the Mac's sound
-("Sound level" under Command line). 0.6.4 names `--audio both`. 0.6.5 adds Start at Login, not yet tried by hand: turn it on, log out
-and in, and check Login Items in System Settings agrees with the checkmark. 0.6.6: the crosshair
-opens on the pointer (shreeve/shotts#70, Philip Lindberg; check by hand on a second display and
-an older macOS), Shift snaps a line's end while reshaping it, and the command-line server's
-stop no longer leaves a thread to take the next server's connections (Traps). 0.7.0: a click on
-the desktop captures the whole display, a Command-click records a window's area or the whole
-display, and recordings can show click ripples and the keys pressed (Input Monitoring); the owner
-tried 0.7.0's keys and liked them. 0.7.1 shows shortcuts only, never typing, those within two
-seconds on one line, for five seconds. 0.8.0 adds scrolling capture ("Scrolling capture" below),
-proven on a window of text scrolled in code but not yet tried by hand on real apps (Safari,
-Slack, Messages, Finder): sticky toolbars, lazy loading, and fast flicks are what to watch.
-0.8.1 scrolled for the user from an Option-click on a window, which on the owner's Google Drive
-window (a still sidebar and toolbar around a scrolling list) bobbed up and down for ever. 0.8.2
-makes it Option during a drag, as recording is Command, so the area is just the part that
-scrolls; auto-scrolling gives up rather than bob; F10 ends a scrolling capture as a recording;
-the picker keeps the arrow away (Traps); and its hints are shorter. Auto-scrolling still has not
-been tried by hand: that it reaches the bottom and opens the picture, and which way the posted
-steps scroll under the user's scrolling direction. The owner then captured a Google Drive list
-by Option-drag, auto-scrolled, whole but for one row left blank as Chrome drew it late; rows
-just come into view are now taken again until they scroll up (0.8.3).
-Still to try by hand: capture and record the whole display, Command-click a window,
-record with Clicks and with Keys (the first asks for Input Monitoring; check a password field
-shows nothing), and draw with a tool during a whole-display recording, the bar still in reach.
-Checked on a real screen for 0.6.2: `list`;
-stills of a window, a display at a width, a region, and after a delay, in PNG, JPEG, and HEIC;
-recordings of a window and a region with system sound, the microphone, both, and none (a
-window's recording carries only its app's sound); and a second Control-C while saving, which
-left nothing. Not yet by hand: `start`/`stop`, F10 or the timer stopping a scripted recording,
-and the Install Command-Line Tool menu item. 0.5.3
-(shreeve/shotts#68) made recording from the picker work: a Command press during the drag toggles
-the red, record state, its release does nothing, and the picker's view takes the keys. 0.5.1
-(shreeve/shotts#66): Space moves a shape being drawn, drawing tools select what they press, and
-arrow keys move by the pixel. 0.5.0 brought screen recording (shreeve/shotts#64) and a second
-revamp (shreeve/shotts#65). `CHANGELOG.md` has every release. The build has no warnings
-(warnings are errors) and `swift test` passes: 105 Core tests and 95 AppKit tests. Shotts has
-only ever run on macOS 27, and recording has been tried by hand only briefly.
+0.9.2 is the latest release: tag `v0.9.2` on `main`, the GitHub release with its notarized zip
+and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#148), which also links
+`shotts`; installed copies are offered each release through Sparkle. `CHANGELOG.md` has every
+release, and its Unreleased section the third revamp, on branch `revamp` from b07764d. The build
+has no warnings (warnings are errors) and `swift test` passes: 157 Core tests and 129 AppKit
+tests. Shotts has only ever run on macOS 27.
+
+Tried by hand on a real screen: capture, the editor and its tools, copy, save, drag, print;
+recording from the picker with the microphone and with Keys; the Option-drag scrolling capture
+of a Google Drive list, auto-scrolled; `shotts` `list`, stills of a window, a display, and a
+region in each format with `--width` and `--delay`, recordings of a window and a region with
+each sound, and a second Control-C while saving.
 
 Next, in order:
 
-1. Use `main` by hand on a Retina and a non-Retina display (see "Checking by hand"). The tests
-   and headless renders check a lot, but they missed 0.2.0's hidden bar, which only a real window
-   showed: look at the bar first, then a capture, every tool, copy into Mail or Notes (it should
-   paste at on-screen size), save, drag out, F10 from inside an editor, two displays.
-2. Check the next release on macOS 14, 15, and 26, in virtual machines (UTM runs them on Apple
+1. Before the next release, by hand ("Checking by hand" has how), on a Retina and a non-Retina
+   display:
+   - a release package (`CONFIG=release Scripts/package-app.sh`) launches and captures,
+     records, and scrolls: it is linked with `-internalize-at-link` and fully stripped;
+   - a debug package is its own app (`com.github.shreeve.shotts.debug`) and asks for Screen
+     Recording on its first capture;
+   - capture and record the whole display, Command-click a window, record with Clicks and with
+     Keys (turning Keys on asks for Input Monitoring; a password field shows nothing; ⌥L on a
+     German layout shows nothing), and draw during a whole-display recording;
+   - quitting: with an annotated capture, an unsaved recording, a recording whose Save is still
+     copying, and during a scrolling capture; a log-out cancelled by another app leaves the
+     next ⌘Q asking; F10 and ⇧⌘2 do nothing while a Shotts alert is open;
+   - scrolling capture: which way the steps scroll under natural scrolling, overlay scroll bars
+     in the picture, the pointer put back where it was, and a page with a spinner in its footer;
+   - the calibration tone plays on a device's first recording with the Mac's sound and not the
+     next;
+   - `shotts` `start`/`stop`, F10 and the timer stopping a scripted recording, F10 doing nothing
+     while `shotts` counts down, Install Command-Line Tool, and Start at Login (log out and in;
+     Login Items agrees with the checkmark);
+   - a Sparkle update from 0.5.0 or later (0.5.0 is the first to ship Sparkle thinned to arm64).
+2. Check a release on macOS 14, 15, and 26, in virtual machines (UTM runs them on Apple
    silicon). The target is macOS 14, where ScreenCaptureKit gained what Shotts uses (the one-shot
-   window capture, `captureResolution`, and the shadow switches), and it builds and tests there,
-   but it has only ever run on macOS 27. Watch what could differ: the editor and Option-F10
-   coming to the front (the first Trap), the picker taking keys and clicks while another app
-   stays in front, the live screen under the picker, and the Screen Recording prompts.
-3. Record by hand before releasing recording: nothing launched without a person at the Mac can
-   record, so no test has. Command-drag an area and let go; Record with and without the
-   microphone (the first asks for it); play sound; move windows and the pointer in the area;
-   draw arrows and rectangles while recording and check they fade and are in the file; pause
-   and resume, changing the screen while paused; stop with F10, the bar, and the menu bar item;
-   trim with both brackets; in the window, save an MP4 and a GIF at a few sizes
-   and rates, copy each into Messages and Mail, drag one to the Finder, close, and check the
-   folder under `Recording.parentFolder` is gone, while the copied file still pastes. Record an
-   area that includes the menu bar and check the timer is not in it. Quit while recording: it
-   stops and opens instead. Compare a recording's colors in QuickTime with the screen (it is
-   captured in BT.709 to match its tags).
-4. Confirm a Sparkle update installs from 0.5.0 or later: 0.5.0 is the first to ship Sparkle
-   thinned to arm64 without its headers. If it fails, those users update once by hand; the
-   Homebrew cask is unaffected.
-5. Deferred work, below.
+   window capture, `captureResolution`, and the shadow switches); it builds and tests there but
+   has only run on 27. Watch the editor and Option-F10 coming to the front (the first Trap), the
+   picker taking keys and clicks while another app stays in front, the live screen under the
+   picker, the Screen Recording prompts, and recordings' color labels (none on macOS 14).
+3. Deferred work, below.
 
 Decided against, so they are not rebuilt:
 
@@ -100,6 +70,10 @@ Decided against, so they are not rebuilt:
 
 Deferred, with the reason each waits:
 
+- Allow Command-Line Capture is a preference, so any program the user runs can turn it on with
+  `defaults write` and then capture through Shotts' grants; launch arguments cannot (it is read
+  from Shotts' own saved settings only). The owner keeps it so (2026-10-11): it guards against
+  accidents, as SPEC says, and asking once per launch was declined.
 - Configurable shortcuts: not for now, the owner says. F10 and ⇧⌘2 both work, with no setting:
   F10 for a top row of F-keys (fn-F10 otherwise), ⇧⌘2 on any keyboard. 0.9.1's ⇧⌘4 needed
   macOS's own turned off first (both answer a key two apps hold, so Shotts deferred to it), too
@@ -122,9 +96,27 @@ Deferred, with the reason each waits:
   the next launch removes it as a leftover instead of offering it back.
 - Pausing a recording drops samples but leaves the stream running (and the GPU busy) until it
   resumes; stopping and restarting the stream would need its own frame-continuity handling.
-- The second revamp's audit tables (deferred rows: Sparkle feed signing, text/TextBox overlap in
-  `Annotation`, one-pass GIF export, an `EditorStack` with tests for replacement and focus) are
-  summarized here; the full rows lived outside the repository.
+- Decisions in the app target have no tests, as no test target reaches it: which editor a
+  capture replaces, what Option-F10 brings back, focus return (an `EditorStack` in ShottsUI
+  would host them), and `shotts`' recording lifecycle in `ScriptRunner` (stop and abort before
+  and after the first frame, hang-up, `last`, the `start` cap).
+- Scrolling capture: on a nearly blank area, a changing spinner reads as small moves (the
+  stitcher grows the picture with copies of it and never sees the bottom); deciding between
+  still and a move from the rows that changed alone would fix it. Overlay scroll bars are taken with the rows (a dev check with a visible
+  scroller would show it), and `CGAssociateMouseAndMouseCursorPosition` is documented to work
+  only for the app in front, which Shotts is not while it scrolls; the tap's warp holds the
+  pointer either way. Both need a spare screen.
+- A display rearranged during a recording leaves the outline and bar where they were; files a
+  recording window made for earlier settings stay until it closes; clicks in Shotts' own windows
+  show no ripple (a global monitor never sees them).
+- `shotts` walks the whole window list for every request and encodes stills on the main actor;
+  a Shotts that runs but does not listen makes the tool wait its full timeout; alerts give no
+  focus back after Cancel; Option-F10 reopens on the main display.
+- Some diagnostics (concurrency checks in `ShottsCLI/main.swift`'s top level) print without
+  failing the build despite `treatAllWarnings(as: .error)`: read the build's output, not only
+  its status.
+- Revamp audits' deferred rows (Sparkle feed signing, text/TextBox overlap in `Annotation`,
+  one-pass GIF export) are summarized here; the full tables lived outside the repository.
 - Not built: see SPEC.
 
 ## Map
@@ -143,9 +135,9 @@ Deferred, with the reason each waits:
 | | `EditorLayout.swift` | The editor's sizing rules: the zoom for a window, the window for a zoom. |
 | | `Recording.swift` | `RecordingSettings` (format, size, frame rate, sound, trim), `Trim`, `TimelineLayout`, `PauseClock`, `RecordingTimeline` (where each recorded sample goes), `RecordingRule` (sizes, rates, the H.264 limit, defaults, bit rate), `FrameSampler` (which frames a rate keeps), the clock text. |
 | | `SystemShortcuts.swift` | Whether macOS answers a key itself, from its Keyboard Shortcuts list (an entry missing is at its default): ⇧⌘2 is Shotts' unless a macOS shortcut is set to it. |
-| | `Quitting.swift` | What quitting would lose (annotated captures, unsaved recordings), as the question Quit asks, or nil to quit at once. |
-| | `AutoScroll.swift` | How Shotts paces its scrolling: the step, backing up and slowing when a frame is not matched, giving up after five in a row, the bottom as where the picture stops growing, the other direction tried once. |
-| | `ScrollStitcher.swift` | A scrolling capture's picture from its frames: row fingerprints, the shift that fits (coarse, then fine, nearest the last move among near-ties), sticky bands kept once, new rows added and taken again until they scroll up, a size cap. |
+| | `Quitting.swift` | What Quit does (`reply`: quit now, stop what is under way, or ask) and the question it asks about what would be lost. |
+| | `AutoScroll.swift` | How Shotts paces its scrolling: waiting for the first frame, the step and its recovery, backing up and slowing when a frame is not matched, giving up, the bottom as where the picture stops growing, the other direction tried once, the 30 s limit. |
+| | `ScrollStitcher.swift` | A scrolling capture's picture from its frames, in one buffer reserved at the cap and handed to the image uncopied: row fingerprints, the shift that fits, bands decided at the first move, new rows added and taken again until they scroll up. |
 | | `Keystrokes.swift` | `KeystrokeLine`: which keys show (shortcuts and keys that act on their own, never typing) and as what (⇧⌘4, ↩), and how those within two seconds join one line (`⌘I  ⌃K  ↩`) that stays five seconds after the last. |
 | | `Script.swift` | The command line's language: `ScriptParser` (arguments, times, what each command takes), `ScriptRequest` and `ScriptResult` (the JSON lines), `WindowMatch`, `ScriptAim` (what a target comes to), the error codes and exit codes, the socket's path. |
 | | `TextTable.swift` | How `shotts` prints a table: boxed with a title tab and color on a terminal, plain columns for a pipe, widths in terminal columns (wide characters count two). |
@@ -157,27 +149,28 @@ Deferred, with the reason each waits:
 | | `StylePopover.swift` | The color and style popover. |
 | | `Export.swift` | The one encoder (PNG and TIFF at the capture's resolution), the pasteboard, a file, the drag file, one-file temporary folders. |
 | | `Front.swift` | The one way Shotts comes to the front, and the one way it hands focus back. |
-| | `RecordingSetup.swift` | The red outline around an area being recorded, and the panel beside it: Record, Microphone, and Cancel, then the recording bar (Arrow, Rectangle, Pause, Stop). |
+| | `RecordingSetup.swift` | The red outline around an area being recorded, and the panel beside it: Record, Microphone, Clicks, Keys, and Cancel, then the recording bar (Arrow, Rectangle, Pause, Stop). |
 | | `ScrollSetup.swift` | A scrolling capture's blue outline and its panel: where it stands, the height so far, Done, and Cancel. |
 | | `DrawingLayer.swift` | The clear, recorded window over the area that takes arrows and rectangles while recording and fades each out, and shows click ripples and the keys pressed (`KeysBadge`). |
 | | `Timeline.swift` | The recording window's timeline: play, the playhead, and the trim brackets. |
-| | `RecordingWindow.swift` | `RecordingWindowController`: the player, the export settings, the file made in the background, Copy, Save, the drag grip, deleting it all on close. |
+| | `RecordingWindow.swift` | `RecordingWindowController`: the player, the export settings, the file made in the background, Copy, Save, the drag grip, the question before deleting a recording that went nowhere, and deleting it all once the last Copy or Save is done. |
 | | `RecordingExport.swift` | `Recording` (the kept files) and `RecordingExport`: MP4 and GIF files from it, off the main thread. |
-| | `ScriptServer.swift` | The socket `shotts` talks to: the user's own folder, the peer's uid, a request line in, result lines out, and a tool hanging up first. |
-| | `ScriptFiles.swift` | Where `shotts`' files go when none are named, stills written at a width, and every file made under a hidden name and renamed into place. |
-| Shotts | `ShottsApp.swift` | `AppDelegate`: menu bar item and menu, main menu, Sparkle. |
-| | `CaptureFlow.swift` | One capture from hot key to editor, which app gets focus back, and the capture closed last. |
-| | `ScreenCapture.swift` | A clicked window through ScreenCaptureKit, and the window list; for `shotts`, the numbered displays, the windows it lists, and an area of a display. |
+| | `ScriptServer.swift` | The socket `shotts` talks to, on Dispatch: the user's own folder, the peer's uid, a request line in (with a deadline), result lines out without blocking, and a tool hanging up first. |
+| | `ScriptFiles.swift` | Where `shotts`' files go when none are named (never over another), stills written at a width, and every file made in a private folder on its place's volume and moved there once all are made. |
+| Shotts | `ShottsApp.swift` | `AppDelegate`: menu bar item and menu, main menu, the hot keys and whether macOS answers ⇧⌘2 itself, quitting, Start at Login, Install Command-Line Tool, Sparkle. |
+| | `CaptureFlow.swift` | One capture from hot key to editor, a recording and a scrolling capture from setup to window, whether Shotts is busy, what quitting would lose, which app gets focus back, and the capture closed last. |
+| | `ScreenCapture.swift` | Screen Recording permission and its one prompt, a clicked window through ScreenCaptureKit, and the window list; for `shotts`, the numbered displays, the windows it lists, and an area of a display. |
 | | `ScriptRunner.swift` | What `shotts` asks, done: list, shot, and a recording from its request to its files, the countdown, Allow Command-Line Capture. |
 | | `LiveDisplay.swift` | A display streamed while the picker is up: its latest frame and windows. |
 | | `AutoScroller.swift` | Scrolls a scrolling capture's area, with Accessibility, in steps `AutoScroll` paces, and says when it reaches the bottom or gives up. |
-| | `ScrollCapture.swift` | Streams the area for a scrolling capture and feeds each frame to `ScrollStitcher` off the main thread. |
+| | `ScrollCapture.swift` | Streams the area for a scrolling capture, in the display's colors, and feeds each frame to `ScrollStitcher` off the main thread; started and stopped on the main actor. |
 | | `InputWatcher.swift` | Clicks (a global mouse monitor) and keys (a listen-only event tap, needing Input Monitoring) while a recording that shows them runs. |
 | | `Recorder.swift` | Records an area through ScreenCaptureKit, the Mac's sound with it, and the microphone through AVFoundation. |
-| | `HotKey.swift` | The Carbon hot keys: F10 and ⇧⌘2 capture (or stop a recording), each with Option bringing the last capture back; ⇧⌘2 is left to macOS should one of its shortcuts be set to it (`SystemShortcuts`). |
+| | `SoundCalibrator.swift` | Measures how much quieter macOS hands over the Mac's sound on the current output device, with a tone too quiet to hear, once per device. |
+| | `HotKey.swift` | Registers a Carbon hot key and runs its action: F10 and ⇧⌘2, each with Option, from `ShottsApp`. |
 | | `MoveToApplications.swift` | A release launched outside Applications offers to move itself there. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
-| ShottsCLI | `main.swift` | `shotts`: parses, connects (starting Shotts with `open -g -b` when nothing listens), prints, exits with the answer's code, and turns Control-C into `stop`, then `abort`. |
+| ShottsCLI | `main.swift` | `shotts`: parses, checks, connects (starting the Shotts it is inside with `open -g` when nothing listens), prints, exits with the answer's code, and turns Control-C into `stop`, then `abort`. |
 
 Start at Login is not in the defaults: macOS keeps it (`SMAppService.mainApp`, shown in System
 Settings › General › Login Items, where the user can turn it off too), and the menu's checkmark
@@ -185,7 +178,7 @@ reads it each time the menu opens.
 
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
-`capture.askedPermission` once the system's permission prompt has been shown, `commandLine.allowed` (Allow Command-Line Capture), `recording.soundCalibration` (each output device's measured sound loss), `editor.newWindows`,
+`capture.askedPermission` once the system's permission prompt has been shown, `commandLine.allowed` (Allow Command-Line Capture, read from Shotts' own saved settings only), `recording.soundCalibration` (each output device's measured sound loss and when), `editor.newWindows`,
 `recording.microphone`, `recording.clicks`, `recording.keys`, `recording.askedInputMonitoring` (macOS's own Input Monitoring dialog shown), `scroll.askedAccessibility` (its Accessibility dialog shown for scrolling), `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
 editor's last style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 
@@ -198,8 +191,8 @@ of annotation edits; the source pixels are never copied.
 
 `Style` lengths are points. `Style.stroke(scale:)`, `highlighterWidth(scale:)`, and
 `arrow(from:to:scale:)` turn them into pixels at the document's scale, and both the renderer and
-`HitTest` use them, so an annotation is hit where it is drawn. Before, hit testing measured in
-points and missed Retina barbs and highlighter bands.
+`HitTest` use them, so an annotation is hit where it is drawn: measured in points, a hit would
+miss Retina barbs and highlighter bands.
 
 ## Capture
 
@@ -271,12 +264,14 @@ timer redrawing only while any are showing. The recorder leaves out Shotts' wind
 pause are dropped, later ones move back by the time paused, the last frame that came while
 paused is written at the resume (an unchanging screen sends no new one), and a frame the
 encoder was not ready for is offered again with the next sample and at the stop rather than
-lost; a frame from a pause already over is dropped. Quitting while recording
-(`applicationShouldTerminate`) stops it and opens its window, unless macOS has announced a
-logout or shutdown (`willPowerOffNotification`), which is never held up.
+lost; a frame from a pause already over is dropped. Quitting while recording stops it and opens
+its window (Core's `Quitting.reply`), unless the quit is a log-out, restart, or shut-down (the
+quit Apple event's `kAEQuitReason`), which is never held up. Stopping stops the stream first and
+then takes the outline, bar, and drawing layer down, so the file ends on the area as it was.
 
 `Recorder` streams the area with `SCStreamConfiguration.sourceRect` at full pixels, 4:2:0
-(`420v`, captured in BT.709 to match the files' tags), up to 60 frames a second, with the pointer and `capturesAudio` (the Mac's own
+(`420v`, captured as sRGB: BT.709 primaries and matrix with the sRGB curve, which `VideoColor`
+labels the files with on macOS 15 and later; on 14 they carry the frames' own attachments), up to 60 frames a second, with the pointer and `capturesAudio` (the Mac's own
 sound, Shotts' excluded). Only `.complete` frames are written: an idle stream sends frames with
 no picture, and the frame before goes on showing. The filter leaves out the outline, the panel,
 and every other Shotts window above layer 0 (the menu bar item among them), but keeps the
@@ -301,10 +296,15 @@ file for them in a folder of its own (`RecordingExport.write`), so a file still 
 earlier settings never meets it; files made earlier stay until the window closes, so one already
 copied still pastes. Copy puts a copy of the file outside the recording's folder (one at a time,
 in `Shotts Copied`) on the pasteboard, so it pastes after the window closes; Save copies it off
-the main thread and replaces an existing file only once the copy worked; the grip drags it. `RecordingExport` reads the movie back with `AVAssetReader` through an `AVMutableComposition`,
+the main thread beside its destination and moves it into place, so a file under the user's
+name is always whole; the grip drags it. A Copy or Save counts as `pending` from the moment it
+is chosen: closing the window then neither asks nor cancels the file it waits on, and the last
+to finish removes the folder (`closedWhileBusy` counts such windows for Quit). Until a
+recording has been saved, copied, or dragged out (`kept`), closing asks "Delete this
+recording?" first. `RecordingExport` reads the movie back with `AVAssetReader` through an `AVMutableComposition`,
 keeps the frames `FrameSampler` picks (the latest frame at each tick of the rate, so the last
 change before a pause is never lost), and scales them with `VTPixelTransferSession`, averaging
-as it shrinks. MP4: H.264 High, BT.709 tags, one AAC track mixed by
+as it shrinks. MP4: H.264 High, labeled as `VideoColor` says, one AAC track mixed by
 `AVAssetReaderAudioMixOutput` from the sounds chosen, `shouldOptimizeForNetworkUse` for the index
 first; video and sound are pumped in turn, since the writer wants them interleaved. GIF: two
 passes, the first gathering the clip's colors into one `PaletteBuilder`, the second writing
@@ -328,11 +328,19 @@ Shotts answers with `ScriptResult` lines and closes. Every decision (the parse, 
 match, what a target comes to, the codes) is in Core's `Script.swift`, with tests; the tool and
 `ScriptRunner` only move bytes and capture.
 
-- **Who may ask.** `ScriptServer` makes the folder 0700 and refuses to listen in one it does not
-  own, makes the socket 0600, and drops a peer whose `getpeereid` uid is not its own. It always
-  listens, so that with Allow Command-Line Capture off it can answer `not_allowed` at once; a
-  Shotts that never answers is older than the command line. A second Shotts finds the socket
-  answering and leaves it to the first.
+- **Who may ask.** `ScriptServer` makes the folder 0700 (closing it again if opened up) and
+  refuses one that is another user's or a link, makes the socket 0600, and drops a peer whose
+  `getpeereid` uid is not its own. It always listens, so that with Allow Command-Line Capture off
+  it can answer `not_allowed` at once; `stop` and `abort` are taken even then, as they only end
+  a recording already running. The switch is read from Shotts' own saved settings, never the
+  launch arguments `UserDefaults.standard` also searches. Every request is checked again in
+  Shotts (`ScriptParser.check`, with bounds), since any program of the user's can send one. A
+  second Shotts finds the socket answering and leaves it to the first.
+- **The server.** Each socket is waited on by a Dispatch source and closed in that source's
+  cancel handler, so nothing waits on a number once it is reused (Traps). Each connection reads
+  its request line within 10 s and writes from a queue of its own without ever blocking: a tool
+  that stops reading keeps only the newest progress line waiting and gets 5 s to take the final
+  answer.
 - **The connection is the recording's life.** `record` keeps its connection until the files are
   made; when the tool goes first (Control-C sends `stop` on a new connection, but a closed
   terminal just goes), `onClose` ends the recording and keeps the files. `start` is answered
@@ -347,37 +355,46 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
   asked before the countdown, and refused, it is a `permission` failure, never an alert. The
   "recording" answer waits for the first frame (`firstFrame(within:)`, five seconds: a minimized
   window sends none). The menu bar timer shows it, and F10, the timer, and quitting stop it
-  through `AppDelegate`, which asks `ScriptRunner` before `CaptureFlow`. One recording at a time,
-  from either: each asks whether the other is busy.
+  through `AppDelegate`, which asks `ScriptRunner` before `CaptureFlow`. F10 and `shotts` wait for
+  each other: while a request is under way (`ScriptRunner.isBusy`, from its countdown until its
+  files are placed), F10 stops its recording or its countdown and otherwise beeps, and Option-F10
+  does nothing; `shotts` answers `busy` while F10 has a picker,
+  recording, scrolling capture, or alert up (`CaptureFlow.isBusyHere`).
 - **The tool's threads.** Everything in `main.swift` happens on the main queue: Control-C
   arrives there, and each line read from Shotts is handed there. The main thread runs its run
   loop rather than `dispatchMain()`, which parks the main thread and drains the main queue on
   another, where the main actor's runtime checks stop the tool. Debug builds of the tool take
   `SHOTTS_SOCKET` to talk to a stand-in Shotts (a few lines of Python on a Unix socket, which
-  must answer each connection on its own thread, as Shotts does), so its output and Control-C
+  must answer each connection on its own, as Shotts does), so its output and Control-C
   can be checked without the screen; `HOME` does not move `NSHomeDirectory()`.
 - **Sound level.** ScreenCaptureKit hands over the Mac's sound quieter than it played, by an
   amount fixed per output device and whatever the volume (12 dB through a Studio Display; none
-  from MacBook speakers; Apple's forums, since macOS 14.2). `SoundCalibrator` runs beside each
-  recording with system sound: it plays a 200 Hz tone at -60 dB and captures the display's sound
+  from MacBook speakers; Apple's forums, since macOS 14.2). `SoundCalibrator` runs beside a
+  recording with system sound when the output device has no measurement under 30 days old, so
+  most recordings play no tone: it plays a 200 Hz tone at -60 dB, waits until it has been played
+  back (three seconds at most), and captures the display's sound
   with every listed app left out, since ScreenCaptureKit lists every app but the one asking and
   so cannot pick Shotts. Background processes (`afplay`, say) are not apps and stay in, so Core's
   `SoundCalibration.level` measures at the tone's pitch alone and believes only four steady
-  windows; a spoiled reading falls back to the device's saved one
-  (`recording.soundCalibration`, by device UID). The gain rides on `Recording.systemGain` and is
+  windows, and no loss over 20 dB; a spoiled reading falls back to the device's saved one
+  (`recording.soundCalibration`, by device UID, with when it was measured). The gain rides on `Recording.systemGain` and is
   applied when a file is made: the mix turns the microphone down by it and the whole up by it,
   clamped at full scale, which leaves the microphone as it was. The recording, and so the
   window's player, keeps the level as captured. Checked on a real screen: a chime and a tone
   came out within 0.2 dB of their files.
 - **Saving.** Once stopped, a recording sends "saving" lines (the file being made, and how far
-  through them all) to the tool and to anyone waiting in `stop`; `abort` then cancels the export
-  and removes the files that run made. A GIF without `--width` starts at the recording window's
+  through them all) to the tool and to anyone waiting in `stop`; `abort` then cancels the export,
+  and as files are placed only once all are made, what was at each path stays as it was. A GIF without `--width` starts at the recording window's
   size (`RecordingRule.defaults`): on screen, not full Retina.
 - **Files.** `RecordingExport.write` with `RecordingSettings.width` (never wider than the
   recording), returning size and frame count; stills scaled by `ScriptRequest.stillSize` and
-  encoded by `Export.encode`, so they carry the capture's resolution. Each is made as
-  `.<name>.<pid>.partial` beside its place and renamed over it; the recording's folder goes once
-  they are made, as a closed window's does.
+  encoded by `Export.encode`, so they carry the capture's resolution. Each is made in a private,
+  randomly named folder on its place's volume (macOS's item-replacement folder in the user's
+  private temporary folder, which macOS clears; or `.shotts-…` beside the place, 0700, should
+  that fail), where nothing planted can redirect the write, and moved into place once every file
+  is made. A path the user named replaces what
+  is there; a default name never does, but takes " 2", " 3"… as the Finder numbers. The
+  recording's folder goes once they are made, as a closed window's does.
 
 ## Scrolling capture
 
@@ -386,57 +403,62 @@ selection blue ("■ Scroll") or back, letting go of it changes nothing, and tur
 turns the other off; a drag released blue is `AreaSelection.Outcome.scroll`, and a click is as
 ever. `CaptureFlow.setUpScroll` puts up `ScrollSetup` (the blue outline and a panel with Done
 and Cancel, left out of the capture) and starts `ScrollCapture` at once, which streams the area
-at up to 60 frames a second, BGRA, in the display's P3 colors, without the pointer, handing each
-frame to Core's `ScrollStitcher` on its own queue, which keeps only the picture and the last
-frame. Done, Return, or F10 stops it and opens the picture in an editor as any capture;
-Escape cancels.
+at up to 60 frames a second, BGRA, in the display's colors, without the pointer, handing each
+frame to Core's `ScrollStitcher` on a queue of its own. The stream is started and stopped on the
+main actor, and a Done or Escape while it starts stops it once started. Done, Return, or F10
+stops it and opens the picture in an editor as any capture; Escape cancels; quitting ends it as
+Done; a display change ends it as Done too, unless the area's display is still there unmoved.
 
-With Accessibility, Shotts scrolls (`AutoScroller`, paced by Core's `AutoScroll`): the pointer
-is put in the middle of the area, and scroll-wheel steps in points, a sixth of the area (12 to
-120) twenty times a second, go with `CGEvent.post` to what is under it. Until it stops, the
-mouse is held (the owner's nudge of it sent the steps elsewhere, and the capture gave up):
-`CGAssociateMouseAndMouseCursorPosition(0)` keeps the pointer put, and an active session event
-tap, which Accessibility allows, drops every mouse move, click, and scroll but Shotts' own steps
-(marked in `eventSourceUserData`), warping the pointer back should it have moved all the same.
-`stop()`, from every way scrolling ends, lets go, and `AutoScroll.limit` (30 s) ends it with
-what it has however far it got, so the mouse is never held longer; quitting cannot come first, as the menu
-cannot be clicked meanwhile, and a tap dies with its process. The bottom, where the
-picture has not grown for 0.8 s while scrolling, opens the picture. A frame not matched backs it
-up a step and halves the step; five in a row with nothing added give up and leave the user to
-scroll (a whole window with a still sidebar once made it bob back and forth for ever: an area
-must be the part that scrolls); nothing new at all tries the other direction once. Without
+With Accessibility, Shotts scrolls (`AutoScroller`, paced by Core's `AutoScroll`). Nothing is
+posted until the first frame has come, and with none in 2 s it gives up. Then scroll-wheel steps
+in points, a sixth of the area up to 120, twenty times a second, go with `CGEvent.post` to what
+is under the pointer, put in the middle of the area. Until it stops, the mouse is held, since a
+nudge of it would send the steps elsewhere: `CGAssociateMouseAndMouseCursorPosition(0)` keeps
+the pointer put, and an active session event tap, which Accessibility allows, drops every mouse
+move, click, and scroll but Shotts' own steps (marked in `eventSourceUserData`), warping the
+pointer back should it have moved all the same. When scrolling stops, however it stops, the
+mouse is let go and the pointer put back where it was; macOS turning the tap off for the user
+(`tapDisabledByUserInput`) stops it too, and `AutoScroll.limit` (30 s) ends it with what it has,
+so the mouse is never held longer. The bottom, where the picture has not grown for 0.8 s, opens
+the picture. A frame not matched backs it up a step and halves the step (a miss right after a
+back-up, from frames already in flight, is not counted); each step that adds rows speeds it up
+by a quarter, back to the first step; five misses in a row with nothing added give up and leave
+the user to scroll, as an area that does not all scroll together never matches; nothing new at
+all tries the other direction once. An area under 24 points tall gives up at once. Without
 Accessibility, macOS's own dialog asks once (`scroll.askedAccessibility`) and the user scrolls.
-Auto-scrolling has not been tried by hand: the pacing is tested in Core, and the events can only
-be tried on a screen nobody is using.
 
 The stitcher reduces each row to 64 block brightnesses and finds the shift that best lines the
 frame's middle up with the last frame's: every fourth shift over every other row, then every
 shift within four of the one chosen. Among coarse shifts within half a level of the best it
 takes the one nearest the last move, since lists of rows alike fit at several. Rows within a
 level count as the same, a shift is believed below three levels, and it must keep a quarter of
-the middle overlapping. At the first move, the rows that stayed put at the top and bottom (a
-third of the frame at most) become bands: the top kept from the first frame, the bottom from the
-last frame to reach the picture's end (not simply the last, which may have backed up), the
-middle stitched between. The last third of the middle is not final: each frame showing it,
-moved or not, takes it again, and only rows that have scrolled above it stay as taken. Chrome
-leaves rows blank for a moment where they come into view when scrolling fast; taken once, as
-0.8.2 did, one of them stayed blank in the owner's Google Drive capture, the only flaw in an
-otherwise whole list. A third keeps the retaking below the middle of the area, where the
-pointer rests and a row under it may be highlighted. A band taken wrongly (a blank margin) costs nothing, since
-what passes under it is still taken in the middle. The bottom band is at least a twelfth of the
-frame: a window's rounded corners sit in its last rows over moving content, and rows taken from
-there carried the corners into the middle at every step. Shifts within a quarter of the middle
-of the last move are tried first, and the whole range only when none fits, which with every
-pixel fingerprinted (half of them left the prints too noisy to find a still header) makes an
-optimized frame of 3000 by 3200 pixels about 37 ms; it streams at up to 60 a second and drops
-what it cannot take. `--scroll-test out.png` (debug) scrolls a window of 300 numbered lines in
-code through the real capture and writes the picture beside the document drawn directly: with
-Core optimized (a debug build alone is too slow to keep up, and loses its place), 129 uneven
-steps came out 10,848 rows tall, the document's height, differing from it by 0.024 levels on
-average and nowhere in the body by more than 0.1. It is tested on generated pages: uneven
-scrolls, a still frame, scrolling back up, a jump too far then recovered, noise, a blinking
-cursor, and padded rows, and on a list of rows alike: rows drawn late, a last frame backed up,
-and random speeds; real apps need trying by hand.
+the middle overlapping. A frame is still only when every row is alike; otherwise no move is one
+more candidate, so a few lines moving over a blank page still count as a move. At the first
+nonzero shift that fits, the rows that stayed put at the top and bottom (a third of the frame at
+most) become bands, or, if strict bands leave no shift that fits, the rows that mostly stayed:
+a spinner or a status line in a sticky bar changing before the first move does not cut the bar
+short. The top band is kept from the frame before the first move, the bottom from the last frame to reach the
+picture's end (not simply the last, which may have backed up), the middle stitched between. The
+bottom band is at least a twelfth of the frame: a window's rounded corners sit in its last rows
+over moving content. The last third of the middle is not final: each frame showing it, moved or
+not, takes it again, and only rows that have scrolled above it stay as taken, since a browser
+leaves rows blank for a moment where they come into view when scrolling fast. A third keeps the
+retaking below the middle of the area, where the pointer rests and a row under it may be
+highlighted. A band taken wrongly (a blank margin) costs nothing, since what passes under it is
+still taken in the middle.
+
+The picture lives in one buffer reserved at the cap (256 MB, some 20,000 rows of a wide window),
+[top][middle][bottom] written in place, untouched pages costing nothing; no frame is copied once
+the bands are known, and once full no frame is read. The buffer becomes the `CGImage` through a
+`CGDataProvider` that frees it, uncopied. Optimized, a 3000 by 1600 frame stitches in about
+5 ms, and a capture at the cap peaks near the picture's own size (291 MB) and hands it over in
+about 5 ms. `--scroll-test out.png` (debug) scrolls a window of 300 numbered lines in code
+through the real capture and writes the picture beside the document drawn directly (build Core
+optimized for it: a debug build falls behind). It is tested on generated pages: uneven scrolls, a
+still frame, scrolling back up, a jump too far then recovered, noise, a blinking cursor, padded
+rows, the cap, the handover, a bar that changes before or at the first move, a sparse page, a
+first move too far to match, and a list of rows alike with rows drawn late, a last frame backed
+up, and random speeds; real apps need trying by hand.
 
 ## The editor
 
@@ -537,9 +559,8 @@ writes into `$TMPDIR/Shotts Drag/`, emptied before each drag, so at most one dra
 
 ## Fonts
 
-Text is bold Rounded (the default), System, or Open Sans. The first two every Mac has; Trebuchet,
-a stand-in for Droid Sans until Open Sans shipped, was dropped in 0.2.4, and a style remembered
-with it comes back Rounded. Open Sans, Droid Sans redrawn by its own designer, is bundled: `Support/Fonts` holds
+Text is bold Rounded (the default), System, or Open Sans. The first two every Mac has; a style
+remembered with a font Shotts no longer offers (Trebuchet) comes back Rounded. Open Sans, Droid Sans redrawn by its own designer, is bundled: `Support/Fonts` holds
 `OpenSans-Bold.ttf` from github.com/googlefonts/opensans with its license, `OFL.txt`, which
 must ship beside it. `package-app.sh` copies the folder into `Contents/Resources/Fonts`, and
 `ATSApplicationFontsPath` in `Info.plist` makes it Shotts' own font, installed nowhere else.
@@ -563,12 +584,19 @@ without asking; Check for Updates… is in the menu bar menu and the app menu.
 
 `swift test` runs two targets. `Tests/Core` covers Core: selection rules, history, the document,
 hit testing at scale 1 and 2, arrow parts and drags, styles, callout layout, the editor's
-layout, the recording rules, and the GIF encoder, read back by a GIF decoder of the tests' own. `Tests/UI` drives AppKit in windows that are never shown: the editor's gestures, undo,
+layout, the recording rules, the GIF encoder (read back by a GIF decoder of the tests' own),
+the command line's language (parsing, checks, window matching, aim, listing, help, tables),
+the scroll stitcher and auto-scroll pacing, keystrokes, sound calibration, macOS's shortcuts,
+and quitting. `Tests/UI` drives AppKit in windows that are never shown: the editor's gestures, undo,
 typing, restyling, closing, and resizing; the renderer (extent, text box, canvas against export);
 export (resolution, color space, obscure, the background copy, file names, the drag file); and
 the picker (the cut, the pointer per display, clipping, cancelling, Command-release); and
 recording (the setup panel, the window's settings and files, and MP4 and GIF export from a
-recording the tests write themselves, with no screen). `ScriptServerTests` round-trips the socket with a stand-in handler. `Tests/UI/Support.swift`
+recording the tests write themselves, with no screen); the scrolling panel; the drawing layer,
+ripples, and keys plate. `ScriptServerTests` round-trips the socket with a stand-in handler
+(stopping, a tool that never reads, oversized and unreadable requests), and `ScriptFilesTests`
+places files. Tests that copy or drag call `useOwnTemporaryRoot()` first, so they never empty
+the folders a running Shotts keeps its last copied and dragged files in. `Tests/UI/Support.swift`
 has the helpers, and `EditorTests.swift`'s `Mouse` posts events to a view, never to the screen.
 
 ## Checking by hand
@@ -615,9 +643,9 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   the picker closes, beside the views' cursor rects; that alone held in 120 samples of six runs.
 - AppKit's automatic termination ends a background app quietly once its last window closes,
   and the AppKit test process is one: a test that brings a real window on screen and closes it
-  can end the whole run partway, with no crash and exit code 0. It happened when the recording
-  bar was ordered front in `recording()`; the bar now sits a window level above the drawing
-  layer instead, and the tests' windows are never shown. So `swift test` succeeding is not
+  can end the whole run partway, with no crash and exit code 0, as ordering the recording bar
+  front in `recording()` once did; the bar sits a window level above the drawing layer
+  instead, and the tests' windows are never shown. So `swift test` succeeding is not
   enough: both summary lines, Core's and AppKit's ("Test run with N tests … passed"), must be
   there.
 
@@ -628,19 +656,26 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   (shreeve/shotts#70, Philip Lindberg). No test can catch it: windows that are never shown do
   not animate. Check it by hand: press F10 without moving the pointer, and the crosshair is on it.
 
-- A file descriptor's number is handed to the next one opened the moment it is closed. Close a
-  socket that another thread might still use, and that thread may use whatever gets the number
-  next: `ScriptServer.stop` once closed its listening socket while the listening thread was
-  between connections, and the next server's socket got the same number, so the old thread
-  took the new server's connections and answered them with the old handler. In the tests that
-  hung a whole run, about one in twenty, waiting on a handler that never closed. Now `stop` only
-  shuts the socket down and the listening thread closes it as it ends;
-  `aStoppedServerTakesNothingFromTheNext` holds the thread in that gap (`afterAccept`) and fails
-  without the fix. Only the thread using a descriptor should close it.
+- A file descriptor's number goes to the next one opened the moment it is closed, so only what
+  waits on a descriptor may close it. `ScriptServer` waits on its sockets with Dispatch sources
+  and closes each in a cancel handler, which runs after the source's last event: `stop` cancels
+  the listening source, so it stops listening at once and nothing can wait on the number once it
+  is reused. A connection's read and write sources leave a `DispatchGroup` as they are cancelled,
+  and its socket closes once both are done. `shutdown(2)` on a listening socket does nothing on
+  macOS: it neither stops it listening nor wakes `accept`. `stoppingStopsListening` checks,
+  through a second name for the socket, that `stop` leaves nothing listening.
 
 - Screen Recording permission is keyed to the code signature. An ad-hoc-signed build has a new
   signature every time, so each rebuild would ask again and leave another row in System
-  Settings. `Scripts/package-app.sh` signs every build with the Developer ID for that reason.
+  Settings. `Scripts/package-app.sh` signs every build with the Developer ID for that reason, and
+  gives a debug build an id of its own (`com.github.shreeve.shotts.debug`): signed alike, it would
+  share the release's grant, and its developer switches would let any program capture through it.
+- `UserDefaults.standard` searches the launch arguments first: `-key value` on the command line
+  overrides what the user saved. A setting that guards something, such as Allow Command-Line
+  Capture, is read from the app's persistent domain alone.
+- The quit Apple event says why the app is quitting (`kAEQuitReason`), and only while
+  `applicationShouldTerminate` runs; a ⌘Q or the menu has none. Read it there, as a type or an
+  enum code: a flag set by `willPowerOffNotification` outlives a log-out that is cancelled.
 - A menu bar app (`LSUIElement`) is not active when its windows appear, and on macOS 27 (the one
   version this was seen on) the plain `NSApp.activate()` is refused for it. `activate(ignoringOtherApps: true)` works, and every
   activation uses it; but activating brings all of an app's windows forward, so the picker does
@@ -661,9 +696,8 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   the old frozen picker's screen looked shadowless for that reason.
 - A clear window lets clicks through its transparent parts unless `ignoresMouseEvents` is set to
   false explicitly, even though false is what it reads by default; the live overlay sets it.
-- Views no longer clip their drawing to their bounds by default, and the rect `draw(_:)` is asked
-  to fill can reach past the view. The canvas filled it and painted its dark field over the bar
-  in 0.2.0; it sets `clipsToBounds` and fills only its bounds, and `BarTests` checks the bar
+- Views do not clip their drawing to their bounds by default, and the rect `draw(_:)` is asked
+  to fill can reach past the view, where a canvas filling it paints over the bar; the canvas sets `clipsToBounds` and fills only its bounds, and `BarTests` checks the bar
   shows.
 - Printing runs the operation on its own (`NSPrintOperation.run()`), in the standard Print window,
   on a portrait page with a wide picture turned onto it (`PrintSheet`): a landscape page made
@@ -676,9 +710,8 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   the text moved there.
 - A zip of a release fetched by clicking a link inside the Claude app gets a quarantine
   Gatekeeper calls "damaged", though the app is fine; test downloads through a browser.
-- Command-release took screenshots (0.5.0-0.5.2): the picker's view was never its window's first
-  responder, so modifier changes could miss it, and letting go of Command (which comes a moment
-  before the mouse when both are let go together) turned recording off. The view is now first
+- Modifier changes reach only the first responder, and letting go of Command comes a moment
+  before the mouse when both are let go together. So the picker's view is its window's first
   responder (`initialFirstResponder`), a Command press toggles recording and its release does
   nothing, and a release records exactly when the selection shows red.
 - Swift Testing interleaves `@MainActor` tests at their `await`s, and a notification one test

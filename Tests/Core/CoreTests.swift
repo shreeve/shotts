@@ -116,17 +116,17 @@ import Testing
     @Test func documentEditsById() {
         let a = Annotation(shape: .pen([.zero, CGPoint(x: 5, y: 5)]), style: style)
         var d = Document(width: 10, height: 10, scale: 1)
-        #expect(d.isBlank)
+        #expect(!d.isAnnotated)
         d.add(a)
-        #expect(!d.isBlank && d.annotation(a.id) == a)
+        #expect(d.isAnnotated && d.annotation(a.id) == a)
         var b = a
         b.style.color = .blue
         d.replace(b)
         #expect(d.annotations == [b])
         d.remove(a.id)
-        #expect(d.isBlank)
+        #expect(!d.isAnnotated)
         d.setCrop(CGRect(x: 2.4, y: 2.6, width: 3.2, height: 3))
-        #expect(d.crop == CGRect(x: 2, y: 2, width: 4, height: 4) && !d.isBlank)
+        #expect(d.crop == CGRect(x: 2, y: 2, width: 4, height: 4) && d.isAnnotated)
         d.setCrop(CGRect(x: 40, y: 40, width: 5, height: 5))
         #expect(d.crop == nil)
         #expect(Document(width: 10, height: 10, scale: 1, crop: CGRect(x: -5, y: 0, width: 8, height: 10)).crop == CGRect(x: 0, y: 0, width: 3, height: 10))
@@ -508,6 +508,25 @@ import Testing
         for typing in [key(4, "h"), key(4, "h", [.shift]), key(25, "9"), key(49, " "), key(51, "\u{7f}"), key(117, "")] {
             #expect(typing == nil)
         }
+    }
+
+    /// Option types characters on most keyboards: ⌥L is @ and ⌥8 is { on a German one, ⌥E an
+    /// accent on any. With Option or Shift alone, only keys that act on their own show; with
+    /// Control or Command, Option shows too.
+    @Test func optionTypingNeverShows() {
+        for typing in [key(37, "l", [.option]), key(28, "8", [.option]), key(37, "l", [.option, .shift]), key(14, "e", [.option]),
+                       key(32, "u", [.option]), key(49, " ", [.option]), key(51, "\u{7f}", [.option])] {
+            #expect(typing == nil)
+        }
+        #expect(key(7, "x", [.option, .command]) == "⌥⌘X" && key(37, "l", [.control, .option]) == "⌃⌥L")
+        #expect(key(123, "", [.option]) == "⌥←" && key(124, "", [.option, .shift]) == "⌥⇧→" && key(109, "", [.option]) == "⌥F10")
+    }
+
+    /// A key held down shows once, not again with each repeat.
+    @Test func aHeldKeyShowsOnce() {
+        #expect(Line.key(code: 124, base: "", modifiers: [], repeated: true) == nil)
+        #expect(Line.key(code: 6, base: "z", modifiers: [.command], repeated: true) == nil)
+        #expect(Line.key(code: 6, base: "z", modifiers: [.command], repeated: false) == "⌘Z")
     }
 
     /// Shortcuts within two seconds of each other join one line; a pause of two starts afresh;

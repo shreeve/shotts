@@ -40,11 +40,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         flow.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
         script.onRecording = { [weak self] recorder in self?.showRecording(recorder) }
         script.onCountdown = { [weak self] seconds in self?.showCountdown(seconds) }
-        script.isRecordingElsewhere = { [weak self] in self?.flow.isBusyRecording ?? false }
-        powerOffObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil,
-                                                                             queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.poweringOff = true }
+        script.isBusyElsewhere = { [weak self] in self?.flow.isBusyHere ?? false }
+        flow.isBusyElsewhere = { [weak self] in self?.script.isBusy ?? false }
+        #if DEBUG
+        // A developer check runs without the updater, whose alerts would hold it up, and without
+        // the hot keys or the menu bar item: the installed Shotts may be running beside it, and
+        // two apps holding F10 both answer it.
+        if CommandLine.arguments.contains(where: { $0.hasPrefix("--") }) {
+            DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
+            return
         }
+        #endif
         let capture = HotKey.register { [weak self] in self?.captureArea() }
         let showLast = HotKey.register(modifiers: optionKey) { [weak self] in self?.flow.showLast() }
         // ⇧⌘2 and ⌥⇧⌘2 as well, for a keyboard whose top row controls the Mac, where F10 needs
@@ -57,13 +63,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             if !Self.macOSAnswers(SystemShortcuts.shift | SystemShortcuts.command | SystemShortcuts.option) { self?.flow.showLast() }
         }
         makeStatusItem(hasHotKey: capture, hasShowLastKey: showLast)
-        #if DEBUG
-        // A developer check runs without the updater, whose alerts would hold it up.
-        if CommandLine.arguments.contains(where: { $0.hasPrefix("--") }) {
-            DevSwitches.run(CommandLine.arguments) { openFile($0, returningTo: nil) }
-            return
-        }
-        #endif
         // Recordings live only while their windows are open: what no running Shotts holds is
         // from a crash. Not under a developer switch, which another Shotts may be running beside.
         Recording.removeLeftovers()
@@ -77,26 +76,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
-    /// Quitting while recording would lose the recording: it stops instead and opens in its
-    /// window, and quitting again quits. Quitting with annotated captures or unsaved recordings
-    /// open asks first, saying what would be lost; with nothing to lose, it quits at once.
-    /// Logging out or shutting down is not held up: macOS says so first
-    /// (`willPowerOffNotification`), and then Shotts quits as asked.
+    /// Quit, as `Quitting.reply` decides: a recording or scrolling capture under way stops and
+    /// opens instead, and quitting again quits; with annotated captures or unsaved recordings
+    /// open, Shotts asks first, saying what would be lost. A log-out, restart, or shut-down quits
+    /// at once.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard !poweringOff else { return .terminateNow }
-        if flow.isRecording || script.isRecording {
-            stopRecording()
-            return .terminateCancel
-        }
         let work = flow.unsavedWork
-        guard let warning = Quitting.warning(captures: work.captures, recordings: work.recordings) else { return .terminateNow }
-        Front.bringShotts()
-        let alert = NSAlert()
-        alert.messageText = "Quit Shotts?"
-        alert.informativeText = warning
-        alert.addButton(withTitle: "Quit")
-        alert.addButton(withTitle: "Cancel")
-        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+        switch Quitting.reply(poweringOff: Self.isPoweringOff, underWay: flow.isUnderWay || script.isRecording,
+                              captures: work.captures, recordings: work.recordings + script.unsavedRecordings) {
+        case .now:
+            return .terminateNow
+        case .stop:
+            if script.isRecording { script.stopRecording() } else { flow.stopUnderWay() }
+            return .terminateCancel
+        case let .ask(warning):
+            Front.bringShotts()
+            let alert = NSAlert()
+            alert.messageText = "Quit Shotts?"
+            alert.informativeText = warning
+            alert.addButton(withTitle: "Quit")
+            alert.addButton(withTitle: "Cancel")
+            return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+        }
+    }
+
+    /// Whether macOS is quitting Shotts to log out, restart, or shut down: the reason in the quit
+    /// Apple event being handled (`kAEQuitReason`), which a ⌘Q or the menu has none of. It is read
+    /// for each quit, so a log-out cancelled before it reached Shotts leaves the next ⌘Q asking.
+    private static var isPoweringOff: Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              let reason = event.attributeDescriptor(forKeyword: kAEQuitReason) ?? event.paramDescriptor(forKeyword: kAEQuitReason)
+        else { return false }
+        return [kAELogOut, kAEReallyLogOut, kAERestart, kAEShutDown].contains { $0 == reason.typeCodeValue || $0 == reason.enumCodeValue }
     }
 
     /// Whether macOS answers "2" with `modifiers` itself, read afresh at each press, so a change
@@ -108,16 +119,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         return SystemShortcuts.macOSAnswers(keyCode: SystemShortcuts.two, modifiers: modifiers, in: shortcuts)
     }
 
-    private var poweringOff = false
-    private var powerOffObserver: NSObjectProtocol?
-
     @objc private func showLastCapture() {
         flow.showLast()
     }
 
     /// F10: a capture, or while `shotts` is recording, the end of that recording.
     @objc private func captureArea() {
-        if script.isRecording { script.stopRecording() } else { flow.begin() }
+        // F10 stops what `shotts` started: a recording, or a countdown; while a request is busy
+        // otherwise (capturing, or making its files), it beeps rather than doing nothing.
+        if script.isRecording {
+            script.stopRecording()
+        } else if script.isCountingDown {
+            script.stopCountdowns()
+        } else if script.isBusy {
+            NSSound.beep()
+        } else {
+            flow.begin()
+        }
     }
 
     /// Open Image…: the editor, or a cancelled panel, gives focus back to the app in front when
@@ -256,8 +274,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         button.setAccessibilityLabel("Capturing in \(seconds) seconds")
     }
 
-    // MARK: - The command line
-
     // MARK: - Start at Login
 
     /// Shotts as a login item, through macOS itself, which keeps the setting: it shows in System
@@ -295,7 +311,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let tool = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/shotts").path
         guard FileManager.default.isExecutableFile(atPath: tool) else { NSSound.beep(); return }
         func quoted(_ s: String) -> String { "'" + s.replacing("'", with: "'\\''") + "'" }
-        let command = "mkdir -p /usr/local/bin && ln -sf \(quoted(tool)) /usr/local/bin/shotts"
+        // -n replaces a link to a folder rather than following it, so root never writes inside it.
+        let command = "mkdir -p /usr/local/bin && ln -sfn \(quoted(tool)) /usr/local/bin/shotts"
         let source = "do shell script \"\(command.replacing("\\", with: "\\\\").replacing("\"", with: "\\\""))\" with administrator privileges"
         Front.bringShotts()
         var error: NSDictionary?

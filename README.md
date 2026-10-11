@@ -41,8 +41,10 @@ brew install --cask shreeve/tap/shotts
 
 Requires macOS 14 Sonoma or later on Apple silicon. Releases are signed with a Developer ID and notarized by
 Apple. Installed copies update themselves: choose **Check for Updates…** in the menu bar menu.
-The first capture asks for Screen Recording permission, once; the first recording with the
-microphone on asks for the microphone.
+The first capture asks for Screen Recording permission, once. Three others are asked only
+when a feature first needs them: the microphone, for a recording with Microphone on; Input
+Monitoring, for a recording that shows the shortcuts pressed; and Accessibility, for a
+scrolling capture Shotts scrolls by itself.
 
 Or download `Shotts-<version>.zip` from the [latest release](https://github.com/shreeve/shotts/releases/latest)
 and open Shotts: it offers to move itself into Applications, where it can keep itself up to date.

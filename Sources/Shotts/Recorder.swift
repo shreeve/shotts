@@ -230,13 +230,19 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
         }
     }
 
-    /// Stops, and finishes the files: the last frame lasts until now. The video is what makes a
-    /// recording: if only the microphone's file fails, the recording is kept without it.
-    func stop() async throws -> Recording {
+    /// Stops taking the screen and sound, as `stop` does first: what is on screen from now on,
+    /// such as the drawing layer coming down, is not recorded.
+    func stopCapture() async {
         try? await stream?.stopCapture()
         stream = nil
         capture?.stopRunning()
         capture = nil
+    }
+
+    /// Stops, and finishes the files: the last frame lasts until now. The video is what makes a
+    /// recording: if only the microphone's file fails, the recording is kept without it.
+    func stop() async throws -> Recording {
+        await stopCapture()
         let (movie, voice, end) = queue.sync { () -> (AVAssetWriter?, AVAssetWriter?, CMTime?) in
             // A frame still waiting gets one last chance before the end.
             if let (buffer, place) = unwritten {
@@ -253,13 +259,15 @@ nonisolated final class Recorder: NSObject, @unchecked Sendable {
             return (self.movie, self.voice?.writer, end)
         }
         guard var recording else { throw Failure.nothingRecorded }
-        if let gain = await calibration?.value { recording.systemGain = gain }
         guard let movie, let end, end > .zero else {
+            // Nothing to put the sound back in: no tone is played for it.
+            calibration?.cancel()
             movie?.cancelWriting()
             voice?.cancelWriting()
             Recording.removeFolder(recording.folder)
             throw Failure.nothingRecorded
         }
+        if let gain = await calibration?.value { recording.systemGain = gain }
         movie.endSession(atSourceTime: end)
         await movie.finishWriting()
         guard movie.status == .completed else {

@@ -35,6 +35,19 @@ import Testing
         #expect(words == "one\ntwo\nthree\nfour")
     }
 
+    /// Words being typed into a new text are work that quitting would lose, though they reach the
+    /// document only when the typing ends; blank ones are not.
+    @Test func wordsBeingTypedCountAsAnnotated() {
+        let canvas = canvasInWindow()
+        canvas.beginTextEntry(at: CGPoint(x: 40, y: 40), initial: "", style: canvas.style)
+        canvas.typeText(" \n")
+        #expect(!canvas.isAnnotated)
+        canvas.typeText("not yet finished")
+        #expect(canvas.isAnnotated && !canvas.document.isAnnotated)
+        #expect(canvas.cancelCurrent())
+        #expect(!canvas.isAnnotated)
+    }
+
     /// Escape cancels typing whole: a new text is never added.
     @Test func escapeDropsANewText() {
         let canvas = canvasInWindow()

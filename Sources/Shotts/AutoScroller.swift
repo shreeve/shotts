@@ -2,17 +2,18 @@ import AppKit
 import ApplicationServices
 import ShottsCore
 
-/// Scrolls what is under the pointer for a scrolling capture once Auto-Scroll is pressed, in
-/// steps Core's `AutoScroll` paces, until the picture stops growing (the bottom, `onFinish`) or
-/// frames keep not matching (`onGiveUp`). Sending scrolling to another app needs Accessibility:
-/// macOS asks for it when Auto-Scroll is first pressed, and without it the user scrolls. It sends
-/// nothing but scroll-wheel steps, and only while Auto-Scroll runs.
+/// Scrolls what is under the pointer for a scrolling capture, in steps Core's `AutoScroll`
+/// paces, until the picture stops growing (the bottom, `onFinish`) or it cannot follow the area
+/// (`onGiveUp`). Sending scrolling to another app needs Accessibility: macOS asks for it at the
+/// first scrolling capture, and without it the user scrolls. It sends nothing but scroll-wheel
+/// steps, and only between `start` and `stop`.
 ///
-/// Scrolling goes to what is under the pointer, so while it runs the pointer is held where it
-/// was put, and the mouse's own moves, clicks, and scrolling are dropped before any app sees
-/// them (an event tap, which Accessibility also allows): a nudge of the mouse would send the
-/// steps elsewhere, and a click would land in what is being captured. The keys still work: F10
-/// and Return end it, Escape cancels. The mouse is let go the moment scrolling stops, however.
+/// Scrolling goes to what is under the pointer, so while it runs the pointer is held in the
+/// area, and the mouse's own moves, clicks, and scrolling are dropped before any app sees them
+/// (an event tap, which Accessibility also allows): a nudge of the mouse would send the steps
+/// elsewhere, and a click would land in what is being captured. The keys still work: F10 and
+/// Return end it, Escape cancels. The mouse is let go the moment scrolling stops, however it
+/// stops, and the pointer goes back where it was, since the mouse's own moves went nowhere.
 final class AutoScroller {
     /// Whether Shotts may scroll other apps.
     static var allowed: Bool { AXIsProcessTrusted() }
@@ -23,30 +24,38 @@ final class AutoScroller {
         _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
 
-    private var rule: AutoScroll
+    private let areaHeight: Double
+    /// Made when scrolling starts, so its time counts from there.
+    private var rule: AutoScroll?
     private var timer: Timer?
+    /// Stopped: it never starts again, so the mouse is never held after it was let go.
+    private var stopped = false
     /// Where the pointer is held, in global display coordinates (from the top left).
     private let pointer: CGPoint
     private var tap: CFMachPort?
     private var tapSource: CFRunLoopSource?
-    /// Whether the pointer is held, with or without the tap: it is let go either way.
-    private var holding = false
+    /// Where the pointer was before it was held, while it is held, with or without the tap: it
+    /// is let go either way.
+    private var heldFrom: CGPoint?
+    /// macOS turned the tap off for the user's own input: the mouse is the user's again.
+    private var takenBack = false
     /// Marks Shotts' own scroll steps, which the tap lets through.
     nonisolated private static let mark: Int64 = 0x5348_4F54
     private var height = 0, lost = false, full = false
     /// Called once, at the bottom.
     var onFinish: (() -> Void)?
-    /// Called once, when frames keep not matching and it stops trying.
+    /// Called once, when it cannot follow the area and stops trying.
     var onGiveUp: (() -> Void)?
 
-    /// `pointer` is where the pointer was put, in global display coordinates.
+    /// `pointer` is where to hold the pointer, in global display coordinates.
     init(areaHeight: Double, pointer: CGPoint) {
-        rule = AutoScroll(areaHeight: areaHeight, now: ProcessInfo.processInfo.systemUptime)
+        self.areaHeight = areaHeight
         self.pointer = pointer
     }
 
-    deinit {
-        MainActor.assumeIsolated { stop() }
+    /// On the main actor, wherever the last reference goes, so the mouse is always let go.
+    isolated deinit {
+        stop()
     }
 
     /// The stitching's progress: the picture's height, whether the last frame was not matched,
@@ -58,26 +67,30 @@ final class AutoScroller {
     }
 
     func start() {
-        guard timer == nil else { return }
+        guard timer == nil, !stopped else { return }
+        rule = AutoScroll(areaHeight: areaHeight, now: ProcessInfo.processInfo.systemUptime)
         let timer = Timer(timeInterval: AutoScroll.tick, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        holdMouse()
+        // An area too short to scroll gives up at the first tick, the mouse never held.
+        if areaHeight >= AutoScroll.shortest { holdMouse() }
     }
 
     func stop() {
+        stopped = true
         timer?.invalidate()
         timer = nil
         letGoOfMouse()
     }
 
-    /// The pointer stays put while the mouse moves, and the mouse's events go nowhere.
+    /// The pointer goes to `pointer` and stays put while the mouse moves, and the mouse's events
+    /// go nowhere.
     private func holdMouse() {
+        heldFrom = CGEvent(source: nil)?.location ?? pointer
         CGWarpMouseCursorPosition(pointer)
         CGAssociateMouseAndMouseCursorPosition(0)
-        holding = true
         let types: [CGEventType] = [.mouseMoved, .leftMouseDown, .leftMouseUp, .leftMouseDragged, .rightMouseDown, .rightMouseUp,
                                     .rightMouseDragged, .otherMouseDown, .otherMouseUp, .otherMouseDragged, .scrollWheel]
         let mask = types.reduce(CGEventMask(0)) { $0 | CGEventMask(1) << $1.rawValue }
@@ -108,9 +121,10 @@ final class AutoScroller {
         tap = nil
         tapSource = nil
         // Even when no tap could be made: the pointer was held all the same.
-        guard holding else { return }
-        holding = false
+        guard let heldFrom else { return }
+        self.heldFrom = nil
         CGAssociateMouseAndMouseCursorPosition(1)
+        CGWarpMouseCursorPosition(heldFrom)
     }
 
     /// Shotts' own steps go on; the mouse's events are dropped, and the pointer, should it have
@@ -122,6 +136,10 @@ final class AutoScroller {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return true
         case .tapDisabledByUserInput:
+            // macOS turned it off for the user's own input, as for secure text entry: the
+            // mouse's events reach the apps again and the steps could go anywhere, so scrolling
+            // stops at the next tick and the user scrolls.
+            takenBack = true
             return true
         case .scrollWheel where mine:
             return true
@@ -132,10 +150,13 @@ final class AutoScroller {
     }
 
     private func tick() {
-        let action = rule.next(height: height, lost: lost, full: full, now: ProcessInfo.processInfo.systemUptime)
+        let now = ProcessInfo.processInfo.systemUptime
+        guard let action = takenBack ? .giveUp : rule?.next(height: height, lost: lost, full: full, now: now) else { return }
         // A frame not matched is answered once: the next not matched comes with its own frame.
         lost = false
         switch action {
+        case .wait:
+            break
         case .finish:
             stop()
             onFinish?()

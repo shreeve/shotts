@@ -2,10 +2,11 @@ import AppKit
 
 /// An area being captured as it is scrolled: a blue outline just outside it (just inside, for
 /// an area that fills its display), and a small panel beside it saying where the capture stands
-/// (Shotts scrolling, or the user, how tall the picture is so far), with Done (F10, as it ends a
-/// recording too, or Return) and Cancel (Escape). Neither the outline nor the panel is ever in the picture: the capture leaves
-/// out `windowNumbers`. The panel takes the keys without bringing Shotts forward, as the picker
-/// does, and scrolling goes, as always, to what is under the pointer.
+/// (Shotts scrolling, or the user, how tall the picture is so far), with Done (F10, as it ends
+/// a recording too, or Return) and Cancel (Escape). Neither the outline nor the panel is ever in
+/// the picture: the capture leaves out `windowNumbers`. The panel takes the keys without
+/// bringing Shotts forward, as the picker does, and scrolling goes, as always, to what is under
+/// the pointer.
 public final class ScrollSetup {
     public enum Outcome { case done, cancelled }
 
@@ -13,9 +14,8 @@ public final class ScrollSetup {
     public enum State: Equatable, Sendable {
         /// Shotts scrolling to the bottom.
         case scrolling
-        /// The user scrolling.
-        case capturing
-        /// Shotts could not follow the area, frames kept not matching: the user scrolls.
+        /// Shotts could not follow the area (frames kept not matching, none came, or it is too
+        /// short), or macOS gave the mouse back to the user: the user scrolls.
         case gaveUp
         /// Shotts may not scroll other apps until Accessibility allows it: the user scrolls.
         case needsPermission
@@ -23,7 +23,11 @@ public final class ScrollSetup {
 
     /// The area in screen coordinates.
     public let area: CGRect
-    public let screen: NSScreen
+    /// The area's display, as it is now.
+    public private(set) var screen: NSScreen
+    /// The display's number and its frame when the capture began.
+    private let display: NSNumber?
+    private let displayFrame: CGRect
     private let outline: NSWindow
     private let panel: ScrollPanel
     private var completion: ((Outcome) -> Void)?
@@ -32,17 +36,35 @@ public final class ScrollSetup {
     /// `rect` is in points from the top-left of `screen`, as the picker gives it.
     public init(screen: NSScreen, rect: CGRect, completion: @escaping (Outcome) -> Void) {
         self.screen = screen
+        display = Self.number(of: screen)
+        displayFrame = screen.frame
         area = CGRect(x: screen.frame.minX + rect.minX, y: screen.frame.maxY - rect.maxY, width: rect.width, height: rect.height)
         self.completion = completion
         outline = RecordingSetup.makeOutline(around: area, on: screen.frame, color: .systemBlue)
         panel = ScrollPanel()
         panel.onFinish = { [weak self] outcome in self?.finish(outcome) }
         place()
-        // The area's display going, or the displays rearranging, leaves the outline over nothing.
         observer = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil,
                                                           queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.finish(.cancelled) }
+            MainActor.assumeIsolated { self?.screensChanged(to: NSScreen.screens) }
         }
+    }
+
+    /// The displays changed. With the area's display still where it was, only the room for the
+    /// panel may have (the Dock, the menu bar), and it is placed again. Otherwise the outline is
+    /// over something else, and the capture ends as Done does, keeping what it has: a display
+    /// added or rearranged elsewhere loses nothing.
+    func screensChanged(to screens: [NSScreen]) {
+        guard let same = screens.first(where: { Self.number(of: $0) == display && $0.frame == displayFrame }) else {
+            finish(.done)
+            return
+        }
+        screen = same
+        place()
+    }
+
+    private static func number(of screen: NSScreen) -> NSNumber? {
+        screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
     }
 
     /// The outline's and the panel's windows, for the capture to leave out.
@@ -56,13 +78,10 @@ public final class ScrollSetup {
         panel.makeFirstResponder(nil)
     }
 
-    public var state: State { panel.state }
-
     /// Shows where the capture stands.
     public func show(_ state: State) {
         panel.state = state
-        panel.refresh()
-        place()
+        refresh()
     }
 
     /// How tall the picture is so far, in pixels, and how the last frame went: not matched
@@ -71,8 +90,13 @@ public final class ScrollSetup {
         panel.height = height
         panel.lost = lost
         panel.full = full
-        panel.refresh()
-        place()
+        refresh()
+    }
+
+    /// The panel's words, and its place only when its size changed: progress comes with every
+    /// frame, and a panel left of the area would otherwise shift as the digits change.
+    private func refresh() {
+        if panel.refresh() { place() }
     }
 
     /// Takes everything down, without an outcome.
@@ -127,7 +151,8 @@ final class ScrollPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         appearance = NSAppearance(named: .darkAqua)
 
-        message.font = .systemFont(ofSize: 14, weight: .medium)
+        // Digits all of a width: the panel keeps its size as the height counts up.
+        message.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
         message.textColor = .white
         message.setContentHuggingPriority(.required, for: .horizontal)
         for (button, action, tip) in [(done, #selector(donePressed), "Make the picture (F10)"),
@@ -138,6 +163,8 @@ final class ScrollPanel: NSPanel {
         }
         done.keyEquivalent = "\r"
         cancel.keyEquivalent = "\u{1b}"
+        row.setViews([message, done, cancel], in: .leading)
+        row.setCustomSpacing(14, after: message)
         row.orientation = .horizontal
         row.spacing = 8
         row.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 8)
@@ -166,8 +193,8 @@ final class ScrollPanel: NSPanel {
     @objc func cancelPressed() { onFinish?(.cancelled) }
     override func cancelOperation(_ sender: Any?) { cancelPressed() }
 
-    /// The words for the state, and the height so far.
-    func refresh() {
+    /// The words for the state, and the height so far; whether the panel's size changed.
+    @discardableResult func refresh() -> Bool {
         let tall = height > 0 ? "   \(height.formatted()) px" : ""
         let words: String
         var warning = false
@@ -176,9 +203,6 @@ final class ScrollPanel: NSPanel {
             words = "As tall as it can be: press F10"
         case .scrolling:
             words = "Scrolling; F10 stops"
-        case .capturing:
-            words = lost ? "Scroll a little slower" : "Scroll down, then press F10"
-            warning = lost
         case .gaveUp:
             words = "Couldn't follow it: scroll by hand, then press F10"
             warning = true
@@ -188,8 +212,9 @@ final class ScrollPanel: NSPanel {
         }
         message.stringValue = words + tall
         message.textColor = warning ? .systemYellow : .white
-        row.setViews([message, done, cancel], in: .leading)
-        row.setCustomSpacing(14, after: message)
-        setContentSize(row.fittingSize)
+        let size = row.fittingSize
+        guard size != frame.size else { return false }
+        setContentSize(size)
+        return true
     }
 }

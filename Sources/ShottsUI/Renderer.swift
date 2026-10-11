@@ -135,7 +135,7 @@ public enum Renderer {
     /// The exported image: the visible (cropped) part with every annotation, at pixel size. An
     /// untouched capture is the source itself, with nothing to draw and no second bitmap.
     public static func image(of document: Document, source: CGImage) -> CGImage? {
-        if document.isBlank { return source }
+        if !document.isAnnotated { return source }
         let visible = document.visibleRect
         let width = Int(visible.width), height = Int(visible.height)
         guard width > 0, height > 0, let ctx = bitmap(width: width, height: height, like: source) else { return nil }

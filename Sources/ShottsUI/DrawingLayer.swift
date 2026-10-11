@@ -147,12 +147,13 @@ final class DrawingCanvas: NSView {
         keysTimer = timer
     }
 
-    /// The keys centered near the bottom, clear of a panel inside the area.
+    /// The keys centered near the bottom, clear of a panel inside the area; in an area too small
+    /// for that, at its top, and never wider than it.
     private func placeKeys() {
         guard let badge = keysBadge else { return }
         let size = badge.fittingSize
-        let width = min(size.width, bounds.width - 16)
-        badge.frame = CGRect(x: (bounds.width - width) / 2, y: bounds.height - keysClearance - size.height, width: width, height: size.height)
+        let width = max(min(size.width, bounds.width - 16), 0)
+        badge.frame = CGRect(x: (bounds.width - width) / 2, y: max(bounds.height - keysClearance - size.height, 0), width: width, height: size.height)
     }
 
     @available(*, unavailable)

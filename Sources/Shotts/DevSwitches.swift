@@ -132,8 +132,8 @@ enum DevSwitches {
         }
     }
 
-    /// A picture standing in for a display: a gradient with a few marks, so the magnifier and
-    /// the color readout have something to show.
+    /// A scrolling capture of a window of numbered lines of its own, scrolled in code, stitched
+    /// as on a real screen: the picture goes to `output`, and the window's whole document beside it.
     static func scrollTest(to output: URL) async -> Bool {
         guard let screen = NSScreen.main, let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
         else { return false }
@@ -196,6 +196,8 @@ enum DevSwitches {
         return CGImageDestinationFinalize(file)
     }
 
+    /// A picture standing in for a display: a gradient with a few marks, so the magnifier and
+    /// the color readout have something to show.
     static func standIn(for screen: NSScreen) -> DisplayImage {
         let scale = screen.backingScaleFactor
         let w = Int(screen.frame.width * scale), h = Int(screen.frame.height * scale)

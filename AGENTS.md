@@ -19,9 +19,11 @@ read it before changing capture, the selection overlay, the editor, or export.
   test.
 - `ShottsUI`: AppKit. The selection overlay, the editor window and its canvas, the renderer that
   draws a document into a `CGContext`, and export to the pasteboard, a drag, or a file; the
-  recording's setup panel, its window, and the MP4 and GIF files made from it.
-- `Shotts`: `@main`, the menu bar item, the hot key, and capture and recording through
-  ScreenCaptureKit. The only target that touches the screen or the microphone.
+  recording's setup panel, its window, and the MP4 and GIF files made from it; the scrolling
+  capture's panel; and the command line's socket and the files it makes.
+- `Shotts`: `@main`, the menu bar item, the hot keys, and capture, recording, and scrolling
+  capture through ScreenCaptureKit. The only target that touches the screen, the microphone,
+  or the mouse.
 - `ShottsCLI`: `shotts`, the command line, on ShottsCore alone. It captures nothing: it asks the
   running Shotts over a socket and prints the answer.
 
@@ -53,7 +55,9 @@ read it before changing capture, the selection overlay, the editor, or export.
 - Escape cancels the current thing and nothing more, putting it back as it was. In the editor:
   typing (new words go, and a new arrow with them; edited words come back), then a drag, then
   the selection, then the editor. In the picker it cancels the capture, as the Screenshot app's
-  does; beside an area about to be recorded, it cancels the recording.
+  does; beside an area about to be recorded, it cancels the recording; in a scrolling capture,
+  it cancels the capture. In a recording's window it closes the window, and a recording not yet
+  saved, copied, or dragged out is deleted only once the user says Delete (Escape keeps it).
 - The editor is an ordinary window: copying, saving, dragging out, and printing leave it open,
   and closing it asks nothing, because Option-F10 brings the last one back. Quitting asks only
   when it would lose something: an open capture annotated or cropped, or an unsaved recording. When the editor
@@ -66,7 +70,7 @@ read it before changing capture, the selection overlay, the editor, or export.
   with Option for the last capture. Screen Recording is
   the permission Shotts asks for, when the first capture needs it; the others are the
   microphone, asked the first time a recording uses it; Input Monitoring, asked the first
-  time a recording shows the shortcuts pressed; and Accessibility, asked the first time a
+  time Keys is turned on for a recording, to show the shortcuts pressed; and Accessibility, asked the first time a
   scrolling capture starts, used only while Shotts scrolls one: to send scroll-wheel steps, and
   to hold the pointer still and drop the mouse's own events until it stops (without it, the
   user scrolls). Keys are watched only while such a recording

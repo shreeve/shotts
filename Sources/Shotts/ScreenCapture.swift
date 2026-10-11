@@ -3,8 +3,10 @@ import ScreenCaptureKit
 import ShottsCore
 import ShottsUI
 
-/// The one place Shotts reads the screen, through ScreenCaptureKit: each display live while the
-/// picker is up (`LiveDisplay`), a clicked window on its own, and the window list.
+/// Stills through ScreenCaptureKit, and the window list: a clicked window on its own, the windows
+/// the picker outlines and `shotts list` names, and `shotts`' displays and areas. The picker's
+/// live displays (`LiveDisplay`), a recording (`Recorder`, `SoundCalibrator`), and a scrolling
+/// capture (`ScrollCapture`) each run streams of their own.
 enum ScreenCapture {
     enum Failure: LocalizedError {
         case noDisplay
@@ -23,6 +25,16 @@ enum ScreenCapture {
     /// Asks macOS for permission. The system shows its own dialog, once per code signature, and
     /// records the answer; this returns before the user answers, so it reports nothing.
     static func requestPermission() { _ = CGRequestScreenCaptureAccess() }
+
+    /// Shows the system's own Screen Recording prompt, which macOS shows only once, the first
+    /// time Shotts asks; true if it did. Later, the caller explains where to turn it on instead.
+    static func askForPermissionOnce() -> Bool {
+        let asked = "capture.askedPermission"
+        guard !UserDefaults.standard.bool(forKey: asked) else { return false }
+        UserDefaults.standard.set(true, forKey: asked)
+        requestPermission()
+        return true
+    }
 
     /// One window on its own, whatever covers it, at the window's own scale, which comes back
     /// with the picture. With `shadow`, the picture is the window with the shadow macOS draws
@@ -52,6 +64,11 @@ enum ScreenCapture {
     /// editors are among them, since what is on screen can be captured; the picker, far above
     /// ordinary windows, is not.
     static func windowList() -> [(id: CGWindowID, frame: CGRect)] {
+        ordinaryWindows().map { ($0.id, $0.frame) }
+    }
+
+    /// `windowList`, each window with all the window server says of it.
+    private static func ordinaryWindows() -> [(id: CGWindowID, frame: CGRect, info: [String: Any])] {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
         else { return [] }
         return list.compactMap { w in
@@ -63,7 +80,7 @@ enum ScreenCapture {
                   let frame = CGRect(dictionaryRepresentation: bounds),
                   frame.width >= 40, frame.height >= 40
             else { return nil }
-            return (id, frame)
+            return (id, frame, w)
         }
     }
 
@@ -107,18 +124,8 @@ enum ScreenCapture {
     /// The ordinary windows on screen, front to back, as `shotts list` shows them, each on the
     /// display holding most of it.
     static func scriptWindows(on displays: [NumberedDisplay]) -> [ScriptWindow] {
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
-        else { return [] }
         var bundles: [pid_t: String] = [:]
-        return list.compactMap { w in
-            guard (w[kCGWindowLayer as String] as? Int) == 0,
-                  (w[kCGWindowAlpha as String] as? Double ?? 1) > 0,
-                  (w[kCGWindowSharingState as String] as? Int) != 0,
-                  let id = w[kCGWindowNumber as String] as? CGWindowID,
-                  let bounds = w[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: bounds),
-                  frame.width >= 40, frame.height >= 40
-            else { return nil }
+        return ordinaryWindows().map { id, frame, w in
             let pid = w[kCGWindowOwnerPID as String] as? pid_t ?? 0
             if bundles[pid] == nil { bundles[pid] = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? "" }
             let display = displays.max { a, b in

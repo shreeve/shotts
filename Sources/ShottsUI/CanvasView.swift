@@ -93,6 +93,9 @@ public final class CanvasView: NSView {
     public var onChange: (() -> Void)?
 
     public var document: Document { history.current }
+    /// Whether closing or quitting would lose work here: the document annotated, or words being
+    /// typed into a new text, which reach the document only when the typing ends.
+    public var isAnnotated: Bool { document.isAnnotated || !(textField?.string.allSatisfy(\.isWhitespace) ?? true) }
     public private(set) var selectedID: Annotation.ID?
 
     private var base: Document?
@@ -196,10 +199,8 @@ public final class CanvasView: NSView {
         commit(d)
     }
 
-
     /// Escape: typing, then a drag in progress, then the selection, each put back as it was
-    /// before. False when there was
-    /// nothing to cancel.
+    /// before. False when there was nothing to cancel.
     public func cancelCurrent() -> Bool {
         if let entry = textField {
             // Typing is undone whole: new words go, a new callout goes with its arrow, and words

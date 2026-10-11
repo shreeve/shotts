@@ -5,6 +5,59 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+Scrolling capture:
+- Memory at the largest picture is about a fifth of what it was (291 MB, not 1.4 GB), and the
+  picture opens at once.
+- A spinner, a typing indicator, or a status line in a sticky bar no longer breaks the capture,
+  and a page with only a few lines on it is followed to its end.
+- Shotts waits for the area's first frame before it scrolls, so the top is never lost; it speeds
+  back up after slowing; and the pointer goes back where it was when it stops.
+- A display change, or quitting, keeps what was captured and opens it.
+- Pictures are in the display's own colors.
+
+Recording:
+- Keys never show typing: a key counts as a shortcut only with Control or Command; Option and
+  Shift alone show only with keys that act on their own (arrows, Return, Tab, Escape, F-keys).
+  A held key shows once.
+- A Save or Copy chosen while the file is still being made finishes even if the window is
+  closed, and Save never leaves a cut-off file under your name. Closing still asks until the
+  recording has really been saved, copied, or dragged out.
+- The quiet calibration tone plays only on a device's first recording with the Mac's sound,
+  and again after a month, not every time; stopping no longer waits for it.
+- Turning Keys on asks for Input Monitoring then, not over the recording. Recording without
+  the microphone or keys after the alert leaves the app you were in at the front.
+- The recording's last frames no longer catch the outline and drawings coming down.
+
+Quitting and the hot keys:
+- Quit asks before losing a recording still being finished or saved, words being typed into a
+  new text, or a `shotts` recording's files; quitting during a scrolling capture opens it.
+- A cancelled log-out no longer turns the quit question off.
+- F10, ⇧⌘2, and their Option forms do nothing while a capture, recording, or scrolling capture
+  is being set up or an alert is open, so an editor never lands in what is being captured.
+
+The command line (`shotts`):
+- Allow Command-Line Capture can no longer be turned on by a launch argument.
+- Every request is checked in Shotts as well as in the tool, within bounds: `--delay` and
+  `--duration` up to a day, `--width` 16 to 16384, at most 16 files, and `--fps` checked even
+  with no file named. A request a script makes by hand can no longer crash Shotts.
+- A tool that stops reading (Control-Z, a script reading only at the end) can no longer freeze
+  Shotts.
+- Files are made where nothing else can reach them and placed only once all are made; a
+  default name never replaces an existing file but takes " 2", " 3"…
+- `stop` works while a recording runs even with the switch off.
+- New exit code 6 (`unavailable`) when Shotts is not installed or does not answer.
+- `--audio system,mic` is gone: use `both`.
+- `shotts` opens the Shotts it is inside, and window titles with control characters print safely.
+- F10 and `shotts` wait for each other instead of capturing each other's windows; F10 stops a
+  `shotts` countdown, and beeps while a request is otherwise busy.
+
+Smaller and safer builds:
+- The app is 10% smaller and `shotts` 38% smaller.
+- A debug build is its own app, with its own permissions, so it can never lend the release's
+  Screen Recording permission to another program.
+
 ## 0.9.2 — 2026-10-09
 
 - ⇧⌘2 captures, in place of 0.9.1's ⇧⌘4, and Option-⇧⌘2 brings the last capture back, on any

@@ -227,16 +227,18 @@ extension OverlayView {
     /// A display change or another app coming to the front cancels the picker.
     @Test func screenChangeOrLosingActiveCancels() async throws {
         let screen = try #require(NSScreen.screens.first)
-        let changes: [(NotificationCenter, Notification.Name)] = [
-            (.default, NSApplication.didChangeScreenParametersNotification),
-            (NSWorkspace.shared.notificationCenter, NSWorkspace.didActivateApplicationNotification),
+        // Another app, as macOS names the one that came forward.
+        let other = try #require(NSWorkspace.shared.runningApplications.first { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier })
+        let changes: [(NotificationCenter, Notification.Name, [AnyHashable: Any]?)] = [
+            (.default, NSApplication.didChangeScreenParametersNotification, nil),
+            (NSWorkspace.shared.notificationCenter, NSWorkspace.didActivateApplicationNotification, [NSWorkspace.applicationUserInfoKey: other]),
         ]
-        for (center, name) in changes {
+        for (center, name, userInfo) in changes {
             var outcome: AreaSelection.Outcome?
             let selection = AreaSelection(displays: [DisplayImage(screen: screen, image: blankImage(40, 30), scale: 2)], options: SelectionOptions()) {
                 outcome = $0
             }
-            center.post(name: name, object: NSWorkspace.shared)
+            center.post(name: name, object: NSWorkspace.shared, userInfo: userInfo)
             try await Task.sleep(for: .milliseconds(20))
             guard case .cancelled? = outcome else { Issue.record("\(name.rawValue) left the picker up"); continue }
             _ = selection

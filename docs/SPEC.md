@@ -6,9 +6,10 @@ the code disagree, find out which is wrong and fix that one.
 ## The product
 
 Shotts is a Mac screenshot tool that lives in the menu bar and takes one motion from key press
-to paste: F10, drag out an area, mark it up, Command-C. Pressing Command while dragging records
-the area instead, to save as an MP4 or an animated GIF. It runs on macOS 14 and later on Apple
-silicon. It captures and records only what the user selects, only when the user asks, and keeps
+to paste: F10 (or ⇧⌘2), drag out an area, mark it up, Command-C. Pressing Command while
+dragging records the area instead, to save as an MP4 or an animated GIF, and pressing Option
+captures all of a scrolling area as one tall picture. `shotts`, its command line, captures from
+scripts. It runs on macOS 14 and later on Apple silicon. It captures and records only what the user selects, only when the user asks, and keeps
 nothing on disk that the user did not save or drag out, but for a recording's own files while
 its window is open and the last recording file copied, kept so it still pastes. With Copy to
 Clipboard on, a capture is on the clipboard as soon as it is taken.
@@ -29,10 +30,15 @@ standard function keys" is on. ⇧⌘2 does the same on any keyboard, with no fn
 up, and Option-⇧⌘2 brings the last capture back; it is no shortcut of macOS's (whose own are
 ⇧⌘3, ⇧⌘4, and ⇧⌘5), and it takes the place of ⇧⌘2 in other apps, such as Xcode's Devices and
 Simulators. Should a macOS shortcut be set to it in Keyboard Shortcuts, macOS answers it and
-Shotts leaves it alone, so the two never answer the same press. Below, F10 stands for either. Another app may answer F10 too: macOS lets two apps hold one key, and only
-one that holds it exclusively stops Shotts having it, when the menu says so: Capture Area
-(another app has F10). F10 does nothing while a capture or a recording is being set up; it stops
-a recording under way, and ends a scrolling capture.
+Shotts leaves it alone, so the two never answer the same press. Below, F10 stands for either.
+Another app may answer F10 too: macOS lets two apps hold one key, and only one that holds it
+exclusively stops Shotts having it, when the menu says so: Capture Area (another app has F10).
+
+F10 does nothing while a capture or a recording is being set up; it stops a recording under
+way, and ends a scrolling capture. Option-F10 does nothing while any of these is up, and neither
+does anything while one of Shotts' alerts or its Print window is open. With a `shotts` request
+under way, F10 stops its recording or its countdown, and otherwise beeps until its files are
+placed; Option-F10 waits for it too.
 
 | Action | Result |
 | --- | --- |
@@ -51,9 +57,8 @@ a recording under way, and ends a scrolling capture.
 | Escape | Cancels, even mid-drag. Nothing is kept. |
 
 F10 leaves every window where it is, Shotts' editors included; Shotts itself comes to the front
-only when a capture's editor opens, or with Option-F10. A click on no window does nothing, so a
-stray click does not end the capture. Switching to another app, or a display being added,
-removed, or rearranged, cancels.
+only when a capture's editor opens, or with Option-F10. Switching to another app, or a display
+being added, removed, or rearranged, cancels.
 
 The crosshair is a light line with a dark edge, visible on any background, and shows only on the
 display the pointer is on; the keys act on that display. The selection stays on one display.
@@ -71,7 +76,8 @@ indicator in the menu bar.
 The menu bar menu holds About Shotts (the icon, version, copyright, and a link to the project),
 Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into the editor), the
 picker's options, remembered across launches, then Start at Login and Allow Command-Line Capture
-(how Shotts itself runs), Check for Updates…, and Quit. **Start at Login**, off until turned on,
+(how Shotts itself runs), Install Command-Line Tool… (until `shotts` is installed), Check for
+Updates…, and Quit Shotts. **Start at Login**, off until turned on,
 makes Shotts a login item, so it is in the menu bar after every login and restart; macOS keeps
 it, in System Settings › General › Login Items, where it can be turned off too, and the
 checkmark always shows what macOS has. While a recording is
@@ -175,8 +181,11 @@ capture itself. Drawing, moving, or typing an annotation is one step.
 The editor is an ordinary window: it stays open until it is closed, and closing asks nothing.
 Quitting Shotts asks first only when it would lose something, saying what ("2 annotated
 captures and an unsaved recording will be lost."), with Quit and Cancel: an open capture with
-annotations or a crop, or a recording not yet saved, copied, or dragged out. With nothing to
-lose, it quits at once.
+annotations or a crop (annotated, for short), or words being typed on it, or a recording still
+being finished or not yet saved, copied, or dragged out. With nothing to lose, it quits at once.
+Quitting while recording or scrolling stops that instead, and it opens; quitting again quits.
+Logging out, restarting, or shutting down is never held up: Shotts quits at once, whatever is
+open.
 Option-F10 brings the newest open editor to the front, or, when none is open, opens the one
 closed last again exactly as it was, annotations still editable; a minimized editor comes back
 too. Shotts keeps that one closed capture in memory until another editor closes and takes its
@@ -206,9 +215,9 @@ One tall picture of something longer than its window. Press Option while draggin
 to scroll, the part that scrolls (the message list, say, without its sidebar or toolbar), so the
 selection turns blue and reads "■ Scroll", as Command turns it red to record. Letting go
 outlines the area in blue, with a small panel beside it, and capturing starts at once: Shotts
-puts the pointer in the middle of the area and scrolls it down, in steady steps as fast as it
-can stitch, until the picture stops growing (the bottom), and then opens it in an editor, as
-any capture is (and copies it, with Copy to Clipboard on).
+puts the pointer in the middle of the area and, from the first frame, scrolls it down, in steady
+steps as fast as it can stitch, until the picture stops growing (the bottom), and then opens it
+in an editor, as any capture is (and copies it, with Copy to Clipboard on).
 
 | Control | Effect |
 | --- | --- |
@@ -219,10 +228,12 @@ Scrolling another app needs Accessibility: the first scrolling capture asks macO
 until it is allowed the panel says to scroll yourself and press F10. While Shotts scrolls, the
 mouse is held: the pointer stays in the middle of the area, and moving, clicking, or scrolling
 does nothing, since scrolling goes to what is under the pointer and a click would land in what
-is being captured. The keys still work, and the mouse comes back when scrolling stops: at the
-bottom, or after 30 seconds at most, when the picture opens with what it has. If frames keep not
-matching (an area that does not all scroll together), Shotts stops scrolling and says so;
-scroll by hand, then press F10. F10 ends a scrolling capture as it ends a recording.
+is being captured. The keys still work, and the mouse comes back, the pointer where it was,
+when scrolling stops: at the bottom, or after 30 seconds at most, when the picture opens with
+what it has. If Shotts cannot follow the area (frames keep not matching, as in an area that does
+not all scroll together; no frame comes; or the area is under 24 points tall), it stops
+scrolling and says so; scroll by hand, then press F10. F10 ends a scrolling capture as it ends a
+recording.
 
 Shotts adds only what comes into view below what it already has, so scrolling back up adds
 nothing; scrolled too far between two looks, the panel says to scroll a little slower, and it
@@ -233,8 +244,9 @@ none blank.
 A bar that stays put at the top or bottom while the rest scrolls, a sticky header or a toolbar,
 is kept once, not repeated down the picture. The picture stops growing at 256 MB (some 20,000
 rows of a wide window), and the panel says so. Neither the outline, the panel, nor the pointer
-is in the picture. A display being added, removed, or rearranged cancels. Shotts sends nothing
-but scroll-wheel steps, and holds the mouse, only while it scrolls a capture.
+is in the picture. Should the area's display go or move, the capture ends as Done does, with
+what it has; other display changes leave it going. Shotts sends nothing but scroll-wheel steps,
+and holds the mouse, only while it scrolls a capture.
 
 ## Recording
 
@@ -249,13 +261,12 @@ edge, and neither is recorded.
 | Record, or Return | Starts recording. The panel becomes the recording bar; the outline stays. |
 | Microphone | Records your voice as well. Off until turned on, and remembered. The first recording with it on asks macOS for the microphone. |
 | Clicks | Shows a yellow ripple where each click lands in the area, recorded with it. Off until turned on, and remembered. |
-| Keys | Shows the shortcuts pressed, on a dark plate near the area's bottom, recorded with it: keys with Control, Option, or Command, and keys that act on their own (Return, Tab, Escape, the arrows, F-keys). Typing never shows: letters, numbers, punctuation, and space, with or without Shift, nor the Delete keys. Shortcuts within two seconds of each other read as one line (`⌘I  ⌃K  ↩`), and the line stays five seconds after the last, as KeyCastr's line-break delay and linger work. Off until turned on, and remembered. The first recording with it on asks macOS for Input Monitoring; until that is allowed, recordings go ahead without keys. macOS sends no keys while a password is typed, so none ever shows. |
+| Keys | Shows the shortcuts pressed, on a dark plate near the area's bottom, recorded with it: keys with Control or Command, and keys that act on their own (Return, Tab, Escape, the arrows, F-keys), with Option or Shift if held. Typing never shows: letters, numbers, punctuation, and space, with or without Shift or Option (which types characters on most keyboards: ⌥L is @ on a German one), nor the Delete keys. Shortcuts within two seconds of each other read as one line (`⌘I  ⌃K  ↩`), and the line stays five seconds after the last, as KeyCastr's line-break delay and linger work. Off until turned on, and remembered. Turning it on the first time asks macOS for Input Monitoring; until that is allowed, Record offers to go ahead without keys. macOS sends no keys while a password is typed, so none ever shows. |
 | Cancel, or Escape | Ends without recording. |
 
 Everything in the area is recorded as it happens, at the display's full resolution, up to 60
 frames a second, with the pointer, and with the Mac's own sound, kept apart from the
-microphone. The outline sits just outside the area; neither it, the bar, nor Shotts' menu bar
-item is ever recorded. While recording, the menu bar item shows a red dot and the time so far,
+microphone. Neither the outline, the bar, nor Shotts' menu bar item is ever recorded. While recording, the menu bar item shows a red dot and the time so far,
 and the bar beside the area has:
 
 | Control | Effect |
@@ -293,9 +304,11 @@ and a name like `Shotts Recording 2026-09-30 at 2.15.00 PM.mp4`, and replaces a 
 there only once the copy has worked; dragging the hand icon drags the file out. Each leaves the
 window open, so one recording can be saved several ways. Command-W, the red button, or Escape
 closes the window, which deletes the recording and every file made from it; saved and copied
-files stay. Until the recording has been saved, copied, or dragged out, closing asks first:
-"Delete this recording?", with Delete and Cancel (Escape keeps it). When the window you are working in closes, focus goes back to the app that was in
-front when F10 was pressed.
+files stay, and a Save or Copy chosen before closing, even while the file is still being made,
+still finishes. Until the recording has been saved, copied, or dragged out, closing asks first,
+even with a Save on its way, which could still fail: "Delete this recording?", with Delete and
+Cancel (Escape keeps it). When the window you are working in closes, focus goes back to the app
+that was in front when F10 was pressed.
 
 A GIF has one palette for the whole clip. Colors that cover much of the picture are kept
 exactly, so text and flat backgrounds stay crisp; colors between the palette's are dithered with
@@ -305,9 +318,10 @@ first, so a preview in Messages or Mail plays at once.
 
 The Mac's sound in a file is as loud as it played. macOS hands it over quieter, by an amount
 fixed for each output device (none from a MacBook's speakers; 6 to 14 dB through some USB
-interfaces and displays), so as each recording with it starts, Shotts plays a tone too quiet to
-hear, measures how much quieter it comes back, remembers that for the device, and puts it back
-in the files it makes. The microphone is left at the level the Mac's input volume gives it.
+interfaces and displays), so the first time a recording with it starts on an output device, and
+again a month later, Shotts plays a quiet tone, measures how much quieter it comes back, and
+remembers that for the device; the files it makes put it back. A loss past 20 dB is taken for a
+misreading and not put back. The microphone is left at the level the Mac's input volume gives it.
 
 ## Command line
 
@@ -317,7 +331,8 @@ capturing under its own Screen Recording permission, and starts Shotts in the ba
 is not running. Shotts answers only while **Allow Command-Line Capture** is on in its menu, off
 until the user turns it on, since any program the user runs could then capture the screen, and
 with `--audio mic` record the microphone (macOS still shows its microphone light, and Shotts its
-timer).
+timer). The switch guards against accidents, not against programs the user runs: it is one of
+Shotts' settings, which such a program could change itself, as it could most of the user's.
 **Install Command-Line Tool…** in the menu links `/usr/local/bin/shotts` (asking for an
 administrator's password); it is not shown once `shotts` is installed, as the Homebrew cask
 installs it. `shotts` alone or `shotts --help` sums up what follows under the version; a
@@ -336,14 +351,16 @@ shotts list   [--json]
   match one window. `--display <n>`: 1 is the main display. `--region x,y,w,h`: points from the
   window's or display's top-left corner (the main display's alone), cut to the display. `shotts
   list` shows the windows, front to back, and the displays.
-- **Files** are as many as listed, each in the format its extension names: `.png`, `.jpg`, or
-  `.heic` from `shot`; `.mp4` or `.gif` from `record` and `start`. With none, one PNG or MP4 goes
-  where the Screenshot app saves, named as Shotts names it. Each is made under a hidden name
-  beside it and renamed into place, replacing what was there.
-- **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`. `--delay` counts down in the menu bar first.
-- `--width` makes files narrower in proportion, never wider. Without it, a still and an MP4 are
-  their full pixel size, and a GIF the size the area has on screen (half, from a Retina
-  display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
+- **Files** are as many as listed, up to 16, each in the format its extension names: `.png`,
+  `.jpg`, or `.heic` from `shot`; `.mp4` or `.gif` from `record` and `start`. With none, one PNG
+  or MP4 goes where the Screenshot app saves, named as Shotts names it. Each is made in a hidden
+  folder beside its place and moved there once all are made: a file named replaces what was
+  there, and one Shotts names never does, taking a number after its name as the Finder does.
+- **Times**: `5`, `500ms`, `1.5s`, `2m`, `1m30s`, `1h`, up to a day. `--delay` counts down in the
+  menu bar first, and F10 stops the countdown, capturing nothing.
+- `--width` (16 to 16384 pixels) makes files narrower in proportion, never wider. Without it, a
+  still and an MP4 are their full pixel size, and a GIF the size the area has on screen (half,
+  from a Retina display), as the recording window starts them. `--fps`: MP4 takes 60, 30, 20, 10,
   5, or 1 (30 unless asked); GIF 30, 20, 10, 5, or 1 (20).
 - **Sound** goes only in an MP4, and only with `--audio`: `system` (the Mac's sound; recording a
   window, only its app's), `mic` (the microphone), or `both`, mixed into one track. A GIF
@@ -357,22 +374,26 @@ shotts list   [--json]
   at Control-C, at `shotts stop`, at F10 or the menu bar timer (it shows like any recording), or
   when its terminal closes; then it makes the files, saying on a terminal which and how far
   along, prints them, and exits. A second Control-C, even while the files are being made, stops
-  it and keeps nothing: no file it was making or had made (exit 130).
+  it and keeps nothing: no file is placed, and one it was to replace stays as it was (exit 130).
 - **`start`** returns once recording; it ends as `record` does, and after ten minutes unless
   `--duration` says otherwise. **`stop`** ends it and waits for the files; with nothing
-  recording, it prints the last recording's answer. One recording at a time.
+  recording, it prints the last recording's answer. One recording at a time. With Allow
+  Command-Line Capture turned off, `stop` and a second Control-C still end a recording under
+  way, since stopping captures nothing; nothing else is taken.
 - **Answers**: on a terminal, tables in rounded boxes (the files made, their size, frames, and
   bytes; for `list`, the displays and windows), in color unless `NO_COLOR` is set; piped or
   redirected, the paths alone, one a line, and `list` as plain columns. With `--json`, one line
-  of JSON: `ok`, `command`, `state`,
+  of JSON: `ok`, `command` (absent when Shotts could not read the request), `state`,
   `target` (`kind`, `id`, `app`, `bundle`, `title`, `frame`, `scale`, `display`), `started`,
   `duration`, and `files` (`path`, `format`, `width`, `height`, `fps`, `frames`, `bytes`); `list`
   gives `windows` and `displays`. A failure gives `error` (`code`, `message`, and for several
-  matching windows `candidates`) and a line on stderr.
+  matching windows `candidates`) and a line on stderr. In a table, a window's title or app name
+  shows any control character, or mark that reorders text, as �: they are any app's to set.
 - **Exit status**: 0 done; 1 the capture or a file failed (`capture_failed`, `encode_failed`); 2
   a mistake in the command (`usage`); 3 no permission, or Allow Command-Line Capture is off
   (`permission`, `not_allowed`); 4 no such window or display, or several windows match
-  (`not_found`, `ambiguous_window`); 5 already recording (`busy`).
+  (`not_found`, `ambiguous_window`); 5 already recording, or busy with a capture, recording, or alert from F10 (`busy`); 6 Shotts is not installed, did
+  not answer, or stopped answering (`unavailable`).
 
 ## Not built
 

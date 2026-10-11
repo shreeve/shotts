@@ -4,8 +4,8 @@ import ShottsCore
 
 /// While a recording that shows them runs: each click anywhere, and each shortcut pressed. Clicks
 /// come from a global mouse monitor, which needs no permission. Keys come from a listen-only
-/// event tap, which needs Input Monitoring: macOS asks for it the first time a recording shows
-/// keys, and while a password is typed it sends a tap no keys at all. Nothing is kept: each
+/// event tap, which needs Input Monitoring: macOS asks for it the first time Keys is turned on,
+/// and while a password is typed it sends a tap no keys at all. Nothing is kept: each
 /// click or key goes straight to the recording's drawing layer, and all of it stops with the
 /// recording.
 final class InputWatcher {
@@ -40,8 +40,8 @@ final class InputWatcher {
         tapSource = nil
     }
 
-    deinit {
-        MainActor.assumeIsolated { stop() }
+    isolated deinit {
+        stop()
     }
 
     private func startTap() {
@@ -85,6 +85,7 @@ final class InputWatcher {
         if flags.contains(.command) { modifiers.insert(.command) }
         // The key's own character, as without modifiers ("4" for Shift-Command-4). Typing is not shown.
         let base = key.characters(byApplyingModifiers: []) ?? key.charactersIgnoringModifiers ?? ""
-        if let shortcut = KeystrokeLine.key(code: key.keyCode, base: base, modifiers: modifiers) { onKey(shortcut) }
+        let repeated = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+        if let shortcut = KeystrokeLine.key(code: key.keyCode, base: base, modifiers: modifiers, repeated: repeated) { onKey(shortcut) }
     }
 }
