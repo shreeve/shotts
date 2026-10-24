@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shotts — Screenshots for the Mac, in one motion</title>
+    <meta name="description" content="Shotts is a free, open-source screenshot tool for the Mac: press F10, drag, mark it up, and paste. It records MP4s and GIFs and captures whole scrolling pages too.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Shotts — Screenshots for the Mac, in one motion">
+    <meta property="og:description" content="Press F10, drag, mark it up, paste. Free and open source for macOS 14 and later on Apple silicon.">
+    <meta property="og:image" content="https://shreeve.github.io/shotts/icon.png">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="theme-color" content="#fcfcfe" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#16171c" media="(prefers-color-scheme: dark)">
+
+    <!-- The theme before anything draws: the visitor's own choice, else the system's. -->
+    <script>
+      try {
+        const saved = localStorage.getItem('theme')
+        document.documentElement.dataset.theme = saved ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      } catch { document.documentElement.dataset.theme = 'light' }
+    </script>
+
+    <!-- While Rip compiles the page in the browser, only the icon shows, on the theme's background. -->
+    <style>
+      html { background: #fcfcfe; }
+      html[data-theme="dark"] { background: #16171c; }
+      #boot { position: fixed; inset: 0; display: grid; place-items: center; transition: opacity .35s ease; }
+      #boot img { width: 88px; height: 88px; animation: pulse 1.4s ease-in-out infinite; }
+      @keyframes pulse { 50% { transform: scale(.94); opacity: .7; } }
+      body:not(.booting) #boot { opacity: 0; pointer-events: none; }
+      body.booting #app { opacity: 0; }
+      #app { transition: opacity .35s ease; }
+    </style>
+
+    <script src="@rip/tailwind.min.js"></script>
+    <script>
+      fetch('index.css').then((r) => r.text()).then((css) => {
+        document.head.appendChild(Object.assign(document.createElement('style'), { type: 'text/tailwindcss', textContent: css }))
+      })
+    </script>
+  </head>
+  <body class="booting">
+    <div id="boot" aria-hidden="true"><img src="icon.svg" alt=""></div>
+    <noscript>
+      <style>#boot { display: none; } body { font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1.25rem; color: #222; }</style>
+      <h1>Shotts</h1>
+      <p>Screenshots for the Mac, in one motion: press F10, drag, mark it up, and paste. Free and open source, for macOS 14 and later on Apple silicon.</p>
+      <p><code>brew install --cask shreeve/tap/shotts</code></p>
+      <p><a href="https://github.com/shreeve/shotts/releases/latest">Download the latest release</a> · <a href="https://github.com/shreeve/shotts">Source on GitHub</a></p>
+    </noscript>
+    <div id="app"></div>
+    <script type="module">
+      import { bootApp } from './@rip/rip.min.js'
+      // Served from a project's own path on GitHub Pages (/shotts/), or from a folder's root locally.
+      const base = location.pathname.startsWith('/shotts') ? '/shotts' : ''
+      try {
+        await bootApp({ url: new URL('bundle.json', document.baseURI).href, base })
+      } finally {
+        // A moment for Tailwind's runtime to style what was just rendered.
+        setTimeout(() => document.body.classList.remove('booting'), 30)
+      }
+    </script>
+  </body>
+</html>

@@ -4,6 +4,8 @@
 
 <h1 align="center">Shotts</h1>
 
+<p align="center"><a href="https://shreeve.github.io/shotts/"><strong>shreeve.github.io/shotts</strong></a></p>
+
 <p align="center">
   Screenshots for the Mac, in one motion.<br>
   <strong>F10 → select → annotate → copy → paste.</strong>

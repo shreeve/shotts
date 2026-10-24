@@ -28,13 +28,17 @@ plus `version.rip`, the release the page offers (`VERSION`, default the latest `
 compiles the modules in the browser and keeps them in IndexedDB, so a visit after the first
 compiles nothing.
 
-`dist/` is static files and nothing else, so any static host serves it. On GitHub Pages it is
-served from `/shotts/`, which the shell passes to the router as its base; locally, from `/`. It
-carries `.nojekyll`, since Jekyll would hide the `@rip` folder.
+`dist/` is static files and nothing else, so any static host serves it. It is committed, and
+the Website workflow (`.github/workflows/website.yml`) deploys it to GitHub Pages at
+https://shreeve.github.io/shotts/ whenever it changes on `main`; it is built here rather than
+there because it needs a Rip checkout. Pages serves it from `/shotts/`, which the shell passes to
+the router as its base; locally, from `/`. It carries `.nojekyll`, since Jekyll would hide the
+`@rip` folder on a host that runs it.
 
 ## Changing it
 
-The release on offer comes from the tags, so after a release a rebuild is all the page needs.
+The release on offer comes from the tags, so after a release a rebuild and a commit of `dist/`
+are all the page needs.
 Words and sections are in `routes/index.rip`; the pictures in `components/mockups.rip` scale as
 one through container units (`cqw`), so a change there keeps its proportions at every width.
 Check both themes (the moon and sun in the bar) and a phone width before publishing.
