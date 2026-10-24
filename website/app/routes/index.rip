@@ -1,0 +1,216 @@
+import { Icon } from '../components/icon.rip'
+import { Command, Feature, Heading, Kbd, ThemeToggle } from '../components/parts.rip'
+import { Hero, Recording, Scrolling } from '../components/mockups.rip'
+import { VERSION } from '../version.rip'
+
+REPO =! 'https://github.com/shreeve/shotts'
+BREW =! 'brew install --cask shreeve/tap/shotts'
+
+STEPS =! [
+  { title: 'Press F10', text: 'Or ⇧⌘2 on any keyboard. The screen stays live under a crosshair and a magnifier.' }
+  { title: 'Drag an area', text: 'Or click a window, or the desktop for the whole display.' }
+  { title: 'Mark it up', text: 'Arrows with words, boxes, highlights, blurred-out secrets, a crop.' }
+  { title: 'Copy and paste', text: 'It pastes at its true size, sharp on every Retina screen.' }
+]
+
+FEATURES =! [
+  { icon: 'crosshair', title: 'A live picker', text: 'The screen keeps moving under the crosshair, so you can wait for the menu, the hover, or the animation, then drag. A magnifier shows every pixel and its color.' }
+  { icon: 'window', title: 'Windows and whole displays', text: 'Click a window to capture just it, even if something covers it, with or without its shadow. Click the desktop for the whole display.' }
+  { icon: 'callout', title: 'Arrows that carry their words', text: 'Drag an arrow and type: the words sit at its tail and lay themselves out as you move it. One object, one undo.' }
+  { icon: 'pixelate', title: 'Hide what is private', text: 'Obscure pixelates in coarse blocks of flattened color, so the text underneath cannot be read back out of the picture.' }
+  { icon: 'history', title: 'Closed is not gone', text: 'Option-F10 brings back the capture you closed last, annotations and all, still editable. Quitting asks before anything is lost.' }
+  { icon: 'clipboard', title: 'Copy, save, drag, print', text: 'Every way out is the same picture you see, at the resolution and in the colors it was captured in.' }
+]
+
+TOOLS =! [
+  ['callout', 'Arrow with text'], ['arrow-tool', 'Arrow'], ['line', 'Line'], ['text', 'Text']
+  ['square', 'Rectangle'], ['circle', 'Ellipse'], ['pen', 'Pen'], ['highlighter', 'Highlighter']
+  ['pixelate', 'Obscure'], ['crop', 'Crop']
+]
+
+RECORDING =! [
+  { icon: 'video', title: 'MP4 or GIF', text: 'Hold ⌘ while you drag and the area records instead. Trim it, then save H.264 or a blue-noise-dithered GIF that stays crisp.' }
+  { icon: 'mic', title: 'The Mac and you', text: 'The Mac’s own sound, your microphone, or both, as loud as they played.' }
+  { icon: 'pointer', title: 'Clicks and keys', text: 'A ripple where each click lands, and the shortcuts you press. Never your typing.' }
+  { icon: 'arrow-tool', title: 'Draw as you go', text: 'Arrows and boxes on the area while it records, each fading after a few seconds.' }
+]
+
+PRIVACY =! [
+  { icon: 'lock', title: 'Only what you ask', text: 'Shotts captures and records only the area you choose, only when you ask. Nothing is uploaded, and there is no account.' }
+  { icon: 'shield', title: 'Permissions when needed', text: 'Screen Recording on your first capture. The microphone, Input Monitoring, and Accessibility only when you first use the feature that needs each.' }
+  { icon: 'heart', title: 'Free and open', text: 'MIT licensed, notarized by Apple, and updated through the app itself or Homebrew. Read every line on GitHub.' }
+]
+
+export Home = component
+  downloadUrl =! "#{REPO}/releases/download/v#{VERSION}/Shotts-#{VERSION}.zip"
+
+  render
+    div class: 'relative overflow-x-clip'
+      # A soft wash of the icon's colors behind the top of the page.
+      div class: 'pointer-events-none absolute inset-x-0 -top-40 -z-10 h-[46rem] bg-[radial-gradient(60%_50%_at_50%_30%,var(--glow),transparent)]'
+
+      # The bar along the top.
+      header class: 'sticky top-0 z-20 border-b border-surface/70 bg-background/80 backdrop-blur-xl'
+        nav class: 'mx-auto flex h-16 max-w-6xl items-center gap-6 px-5'
+          a href: '#top', class: 'flex items-center gap-2.5 font-display text-lg font-semibold'
+            img src: 'icon.svg', alt: '', class: 'size-8'
+            'Shotts'
+          div class: 'hidden items-center gap-6 text-sm font-medium text-secondary md:flex'
+            a href: '#features', class: 'hover:text-primary', 'Features'
+            a href: '#recording', class: 'hover:text-primary', 'Recording'
+            a href: '#scrolling', class: 'hover:text-primary', 'Scrolling'
+            a href: '#command-line', class: 'hover:text-primary', 'Command line'
+          div class: 'ml-auto flex items-center gap-1'
+            a href: REPO, class: 'flex size-9 items-center justify-center rounded-lg text-tertiary transition hover:bg-muted hover:text-primary', aria-label: 'Shotts on GitHub'
+              Icon name: 'github', class: 'size-4.5'
+            ThemeToggle
+            a href: downloadUrl, class: 'ml-2 hidden items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-on-accent shadow-sm transition hover:bg-accent-hover sm:flex'
+              Icon name: 'download', class: 'size-4'
+              'Download'
+
+      main id: 'top'
+        # The hero.
+        section class: 'mx-auto max-w-6xl px-5 pt-16 pb-20 text-center sm:pt-24'
+          img src: 'icon.svg', alt: 'The Shotts icon', class: 'mx-auto size-24 drop-shadow-xl sm:size-28'
+          p class: 'mt-8 inline-flex items-center gap-2 rounded-full border border-surface bg-surface px-3 py-1 text-xs font-medium text-secondary shadow-xs'
+            span class: 'size-1.5 rounded-full bg-[#28c840]'
+            "Free and open source · Version #{VERSION}"
+          h1 class: 'mx-auto mt-6 max-w-3xl font-display text-5xl font-bold tracking-tight text-balance sm:text-7xl'
+            'Screenshots for the Mac, '
+            span class: 'brand-text', 'in one motion.'
+          p class: 'mx-auto mt-6 max-w-2xl text-lg text-pretty text-secondary sm:text-xl'
+            'Press '
+            Kbd 'F10'
+            ', drag, mark it up, and paste. Record the area as an MP4 or a GIF, or capture a whole scrolling page as one tall picture. A small utility that feels like Apple shipped it.'
+          div class: 'mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row'
+            a href: downloadUrl, class: 'flex items-center gap-2.5 rounded-xl bg-accent px-6 py-3.5 font-semibold text-on-accent shadow-lg shadow-blue-brand/25 transition hover:-translate-y-0.5 hover:bg-accent-hover'
+              Icon name: 'download', class: 'size-5'
+              'Download for Mac'
+            div class: 'w-full max-w-md text-left sm:w-auto'
+              Command text: BREW
+          p class: 'mt-5 text-sm text-tertiary', 'macOS 14 or later on Apple silicon · Signed and notarized by Apple · Updates itself'
+
+          div class: 'mx-auto mt-16 max-w-5xl'
+            Hero
+
+        # One motion, four steps.
+        section class: 'border-y border-surface bg-surface'
+          ol class: 'mx-auto grid max-w-6xl gap-px bg-surface sm:grid-cols-2 lg:grid-cols-4'
+            for step, i in STEPS
+              li class: 'bg-surface px-6 py-7 sm:py-10'
+                div class: 'flex items-center gap-3'
+                  span class: 'flex size-7 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent', "#{i + 1}"
+                  h3 class: 'font-semibold', step.title
+                p class: 'mt-3 text-sm/6 text-secondary', step.text
+
+        # Features.
+        section id: 'features', class: 'mx-auto max-w-6xl px-5 py-24'
+          Heading eyebrow: 'Capture and mark up', title: 'Everything you reach for, nothing you don’t', lead: 'An editor that opens with each capture, with the tools you use every day and a picker that never makes you miss the moment.'
+          div class: 'mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3'
+            for feature in FEATURES
+              Feature icon: feature.icon, title: feature.title, text: feature.text
+          div class: 'mt-12 flex flex-wrap justify-center gap-2'
+            for tool in TOOLS
+              span class: 'flex items-center gap-2 rounded-full border border-surface bg-surface px-3.5 py-1.5 text-sm text-secondary'
+                Icon name: tool[0], class: 'size-4 text-accent'
+                tool[1]
+
+        # Recording.
+        section id: 'recording', class: 'border-y border-surface bg-surface'
+          div class: 'mx-auto grid max-w-6xl items-center gap-14 px-5 py-24 lg:grid-cols-2'
+            div
+              p class: 'text-sm font-semibold tracking-wide text-accent uppercase', 'Record'
+              h2 class: 'mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl', 'Hold ⌘ and it records instead'
+              p class: 'mt-4 text-lg text-secondary'
+                'Drag with '
+                Kbd '⌘'
+                ' held, or ⌘-click a window or the desktop. Press Return to start, '
+                Kbd 'F10'
+                ' to stop, and the recording opens ready to trim and share.'
+              div class: 'mt-10 grid gap-6 sm:grid-cols-2'
+                for item in RECORDING
+                  div class: 'flex gap-3'
+                    div class: 'flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent'
+                      Icon name: item.icon, class: 'size-4.5'
+                    div
+                      h3 class: 'font-semibold', item.title
+                      p class: 'mt-1 text-sm/6 text-secondary', item.text
+            Recording
+
+        # Scrolling capture.
+        section id: 'scrolling', class: 'mx-auto grid max-w-6xl items-center gap-14 px-5 py-24 lg:grid-cols-2'
+          div class: 'lg:order-2'
+            p class: 'text-sm font-semibold tracking-wide text-accent uppercase', 'Scrolling capture'
+            h2 class: 'mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl', 'Hold ⌥ for the whole page'
+            p class: 'mt-4 text-lg text-secondary'
+              'Drag out the part that scrolls with '
+              Kbd '⌥'
+              ' held. Shotts scrolls it for you, top to bottom, and stitches one tall picture: sticky headers kept once, rows that load late filled in, your pointer put back where it was.'
+            ul class: 'mt-8 space-y-3 text-secondary'
+              for line in ['Message threads, long documents, feeds, and file lists', 'Stops at the bottom by itself, or when you press F10', 'Opens in the editor like any capture, ready to mark up']
+                li class: 'flex items-start gap-3'
+                  Icon name: 'check', class: 'mt-1 size-4.5 shrink-0 text-accent'
+                  span line
+          Scrolling
+
+        # The command line.
+        section id: 'command-line', class: 'border-y border-surface bg-surface'
+          div class: 'mx-auto max-w-6xl px-5 py-24'
+            Heading eyebrow: 'For scripts', title: 'A command line, when you want one', lead: 'shotts captures a window, a display, or part of either, as a still or a recording, and prints the files it made. Off until you turn on Allow Command-Line Capture in the menu.'
+            div class: 'mx-auto mt-12 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-code font-mono text-sm shadow-2xl'
+              div class: 'flex items-center gap-2 border-b border-white/10 px-4 py-3'
+                span class: 'size-3 rounded-full bg-[#ff5f57]'
+                span class: 'size-3 rounded-full bg-[#febc2e]'
+                span class: 'size-3 rounded-full bg-[#28c840]'
+                span class: 'ml-3 text-xs text-white/50', 'Terminal'
+              pre class: 'overflow-x-auto p-5 leading-7 text-white/85'
+                code
+                  span class: 'text-cyan-brand', '$ '
+                  'shotts shot --window Safari'
+                  "\n"
+                  span class: 'text-white/45', '/Users/you/Desktop/Shotts 2026-10-23 at 9.41.07 AM.png'
+                  "\n\n"
+                  span class: 'text-cyan-brand', '$ '
+                  'shotts record demo.mp4 demo.gif --display 1 --duration 10s --audio both'
+                  "\n"
+                  span class: 'text-white/45', 'demo.mp4  1920 × 1080  30 fps   4.1 MB'
+                  "\n"
+                  span class: 'text-white/45', 'demo.gif   960 × 540  20 fps   2.3 MB'
+                  "\n\n"
+                  span class: 'text-cyan-brand', '$ '
+                  'shotts list --json | jq .windows[0]'
+
+        # Privacy.
+        section class: 'mx-auto max-w-6xl px-5 py-24'
+          Heading eyebrow: 'Yours alone', title: 'Small, quiet, and private', lead: 'A menu bar utility that stays out of the way, asks before it loses anything, and keeps nothing you did not save.'
+          div class: 'mt-14 grid gap-5 md:grid-cols-3'
+            for item in PRIVACY
+              Feature icon: item.icon, title: item.title, text: item.text
+
+        # Install.
+        section id: 'download', class: 'px-5 pb-24'
+          div class: 'relative mx-auto max-w-4xl overflow-hidden rounded-3xl brand-gradient px-6 py-16 text-center text-white shadow-2xl sm:px-16'
+            div class: 'absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgb(255_255_255/0.25),transparent_65%)]'
+            div class: 'relative'
+              img src: 'icon.svg', alt: '', class: 'mx-auto size-20 drop-shadow-xl'
+              h2 class: 'mt-6 font-display text-3xl font-bold tracking-tight sm:text-4xl', 'Get Shotts. It’s free.'
+              p class: 'mx-auto mt-4 max-w-xl text-lg text-balance text-white/85', 'Download it, or install it with Homebrew. Either way it keeps itself up to date.'
+              div class: 'mx-auto mt-10 flex max-w-xl flex-col items-center gap-4'
+                a href: downloadUrl, class: 'flex items-center gap-2.5 rounded-xl bg-white px-6 py-3.5 font-semibold text-blue-brand shadow-lg transition hover:-translate-y-0.5'
+                  Icon name: 'download', class: 'size-5'
+                  "Download Shotts #{VERSION}"
+                div class: 'w-full text-left'
+                  Command text: BREW
+              p class: 'mt-6 text-sm text-white/75', 'macOS 14 Sonoma or later · Apple silicon'
+
+      # The foot of the page.
+      footer class: 'border-t border-surface'
+        div class: 'mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-10 text-sm text-tertiary sm:flex-row'
+          div class: 'flex items-center gap-2.5'
+            img src: 'icon.svg', alt: '', class: 'size-6'
+            span "Shotts #{VERSION} · MIT License"
+          div class: 'flex gap-6'
+            a href: REPO, class: 'hover:text-primary', 'GitHub'
+            a href: "#{REPO}/releases", class: 'hover:text-primary', 'Releases'
+            a href: "#{REPO}/blob/main/CHANGELOG.md", class: 'hover:text-primary', 'Changelog'
+            a href: "#{REPO}/issues", class: 'hover:text-primary', 'Report an issue'

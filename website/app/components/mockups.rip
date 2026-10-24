@@ -1,0 +1,129 @@
+# The page's pictures of Shotts at work, drawn in HTML and SVG rather than screenshots, so they
+# stay sharp at any size and follow the theme. Sizes are in container units (cqw), so each
+# picture scales as one.
+
+import { Icon } from './icon.rip'
+
+# A window's top bar: the three traffic lights.
+Lights = component
+  render
+    div class: 'flex gap-[0.6cqw]'
+      span class: 'size-[1.1cqw] rounded-full bg-[#ff5f57]'
+      span class: 'size-[1.1cqw] rounded-full bg-[#febc2e]'
+      span class: 'size-[1.1cqw] rounded-full bg-[#28c840]'
+
+# A page of something worth capturing: a heading, a chart, and lines of text.
+Content = component
+  render
+    div class: 'flex h-full flex-col gap-[1.4cqw] p-[2.2cqw]'
+      div class: 'h-[1.8cqw] w-2/5 rounded-full bg-primary/80'
+      div class: 'h-[1cqw] w-3/5 rounded-full bg-tertiary/40'
+      div class: 'mt-[0.8cqw] flex flex-1 items-end gap-[1.2cqw] rounded-[1cqw] bg-muted p-[1.6cqw]'
+        for h, i in [38, 62, 45, 80, 58, 92, 70]
+          div
+            class: ['flex-1 rounded-t-[0.5cqw]', if i is 5 then 'bg-blue-brand' else 'bg-blue-brand/35']
+            style: "height: #{h}%"
+      div class: 'h-[0.9cqw] w-full rounded-full bg-tertiary/30'
+      div class: 'h-[0.9cqw] w-11/12 rounded-full bg-tertiary/30'
+      div class: 'h-[0.9cqw] w-4/5 rounded-full bg-tertiary/30'
+
+# The hero: a desktop with an app window, the picker dragging out an area over it (the rest
+# dimmed, the size shown, the magnifier beside the crosshair), and the editor that opens after.
+export Hero = component
+  render
+    div class: '@container relative aspect-[16/10] w-full overflow-hidden rounded-[1.6cqw] glow ring-1 ring-black/10 dark:ring-white/10'
+      div class: 'absolute inset-0 brand-gradient'
+      div class: 'absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgb(255_255_255/0.35),transparent_60%)]'
+      # The menu bar, with Shotts' item at the right.
+      div class: 'absolute inset-x-0 top-0 flex h-[3.2cqw] items-center justify-between bg-black/15 px-[2cqw] text-[1.3cqw] font-medium text-white backdrop-blur-sm'
+        span class: 'font-semibold', 'Finder'
+        div class: 'flex items-center gap-[1.6cqw]'
+          Icon name: 'crosshair', class: 'size-[1.8cqw]'
+          span 'Thu 9:41 AM'
+      # The app window being captured.
+      div class: 'absolute top-[11%] left-[6%] h-[72%] w-[58%] overflow-hidden rounded-[1.2cqw] bg-surface shadow-2xl'
+        div class: 'flex h-[3.4cqw] items-center gap-[1.4cqw] border-b border-surface px-[1.6cqw]'
+          Lights
+          div class: 'mx-auto h-[1.6cqw] w-2/5 rounded-[0.6cqw] bg-muted'
+        Content
+      # The picker: everything but the area dimmed, the area outlined, its size beneath.
+      div class: 'absolute top-[30%] left-[16%] h-[40%] w-[36%] rounded-[0.2cqw] ring-[0.18cqw] ring-white shadow-[0_0_0_200cqw_rgb(0_0_0/0.38)]'
+        div class: 'absolute -bottom-[4.2cqw] left-1/2 -translate-x-1/2 rounded-full bg-black/75 px-[1.4cqw] py-[0.5cqw] font-mono text-[1.25cqw] whitespace-nowrap text-white', '1024 × 640'
+        # The crosshair at the corner being dragged, and the magnifier beside it.
+        div class: 'absolute -right-[0.1cqw] -bottom-[0.1cqw]'
+          div class: 'absolute -top-[3cqw] left-0 h-[6cqw] w-[0.15cqw] -translate-x-1/2 bg-white shadow'
+          div class: 'absolute top-0 -left-[3cqw] h-[0.15cqw] w-[6cqw] -translate-y-1/2 bg-white shadow'
+          div class: 'absolute top-[2cqw] left-[2cqw] flex flex-col items-center gap-[0.6cqw]'
+            div class: 'relative size-[10cqw] overflow-hidden rounded-full bg-[#1d4fb8] ring-[0.35cqw] ring-neutral-900/80 pixels shadow-xl'
+              div class: 'absolute inset-0 bg-[linear-gradient(135deg,#2a5fd0_0_50%,#e9eef8_50%)] opacity-90'
+              div class: 'absolute inset-0 pixels'
+              div class: 'absolute top-1/2 left-1/2 size-[1.2cqw] -translate-1/2 ring-[0.2cqw] ring-white'
+            div class: 'rounded-[0.6cqw] bg-neutral-900/85 px-[1cqw] py-[0.4cqw] font-mono text-[1.1cqw] whitespace-nowrap text-white', '#2470EB'
+      # The editor that opens with the capture, already marked up: the chart the area held, an
+      # arrow with its words, and a box around the bar that matters.
+      div class: 'absolute top-[13%] right-[3%] w-[37%] overflow-hidden rounded-[1.2cqw] bg-neutral-800 shadow-2xl ring-1 ring-white/10'
+        div class: 'flex h-[3.4cqw] items-center gap-[1cqw] bg-neutral-900 px-[1.4cqw] text-white/70'
+          Lights
+          div class: 'ml-auto flex items-center gap-[1cqw]'
+            for name in ['callout', 'arrow-tool', 'text', 'square', 'highlighter', 'pixelate', 'crop']
+              Icon name: name, class: (if name is 'callout' then 'size-[1.6cqw] text-white' else 'size-[1.6cqw]')
+            span class: 'ml-[0.6cqw] size-[1.5cqw] rounded-full bg-[#ff3b30]'
+        div class: 'm-[1.6cqw] overflow-hidden rounded-[0.4cqw] bg-surface shadow-lg'
+          svg class: 'block w-full', viewBox: '0 0 160 100', fill: 'none'
+            for h, i in [62, 45, 80, 58, 92]
+              rect x: 14 + i * 27, y: 92 - h * 0.78, width: 20, height: h * 0.78, rx: 2, fill: '#2470EB', fill-opacity: (if i is 4 then 1 else 0.35)
+            rect x: 117, y: 14, width: 26, height: 82, rx: 3, stroke: '#ff3b30', stroke-width: 2.4
+            path d: 'M44 24 Q 80 8 110 30', stroke: '#ff3b30', stroke-width: 2.8, stroke-linecap: 'round'
+            path d: 'M110 30 L100 29 M110 30 L106 21', stroke: '#ff3b30', stroke-width: 2.8, stroke-linecap: 'round'
+            text x: 8, y: 30, fill: '#ff3b30', stroke: 'white', stroke-width: 2.4, paint-order: 'stroke', font-size: 13, font-weight: 800, font-family: '-apple-system, system-ui, sans-serif', 'Ship it!'
+
+# Recording: an area outlined in red, the bar beside it, a click's ripple, and the keys pressed.
+export Recording = component
+  render
+    div class: '@container relative aspect-[4/3] w-full overflow-hidden rounded-[2cqw] bg-muted ring-1 ring-black/5 dark:ring-white/10'
+      div class: 'absolute inset-[9%] bottom-[22%] overflow-hidden rounded-[1.6cqw] bg-surface shadow-xl ring-[0.5cqw] ring-[#ff3b30]'
+        div class: 'flex h-[6cqw] items-center gap-[2cqw] border-b border-surface px-[2.6cqw]'
+          Lights
+        Content
+        # A click, as Clicks shows it.
+        div class: 'absolute top-[58%] left-[63%] size-[9cqw] -translate-1/2 animate-ping rounded-full bg-yellow-300/60'
+        div class: 'absolute top-[58%] left-[63%] size-[3.2cqw] -translate-1/2 rounded-full bg-yellow-300 ring-[0.5cqw] ring-white'
+        # The shortcuts pressed, as Keys shows them: never typing.
+        div class: 'absolute bottom-[6%] left-1/2 flex -translate-x-1/2 gap-[2.4cqw] rounded-[1.4cqw] bg-neutral-900/85 px-[2.4cqw] py-[1.1cqw] font-sans text-[3cqw] font-semibold whitespace-nowrap text-white'
+          span '⌘K'
+          span '⌘↩'
+      # The recording bar.
+      div class: 'absolute bottom-[6%] left-1/2 flex -translate-x-1/2 items-center gap-[2cqw] rounded-[1.8cqw] bg-neutral-900 px-[2.4cqw] py-[1.5cqw] text-[2.6cqw] font-medium whitespace-nowrap text-white shadow-xl'
+        span class: 'flex items-center gap-[1cqw]'
+          span class: 'size-[1.8cqw] animate-pulse rounded-full bg-[#ff3b30]'
+          span class: 'font-mono', '0:07'
+        Icon name: 'arrow-tool', class: 'size-[3cqw] text-white/70'
+        Icon name: 'square', class: 'size-[3cqw] text-white/70'
+        span class: 'rounded-[1cqw] bg-[#ff3b30] px-[2cqw] py-[0.7cqw]', 'Stop (F10)'
+
+# Scrolling capture: an area outlined in blue scrolling by itself, and the one tall picture.
+export Scrolling = component
+  render
+    div class: '@container relative aspect-[4/3] w-full overflow-hidden rounded-[2cqw] bg-muted ring-1 ring-black/5 dark:ring-white/10'
+      # The tall picture taking shape beside the area.
+      div class: 'absolute top-[8%] right-[7%] bottom-[8%] w-[30%] overflow-hidden rounded-[1.4cqw] bg-surface shadow-xl'
+        div class: 'flex animate-[scrollpage_6s_ease-in-out_infinite_alternate] flex-col gap-[2cqw] p-[2.4cqw]'
+          for i in [0...9]
+            div class: 'flex items-center gap-[1.6cqw]'
+              div class: ['size-[4.6cqw] shrink-0 rounded-[1cqw]', if i % 3 is 0 then 'bg-blue-brand/70' else 'bg-tertiary/30']
+              div class: 'flex flex-1 flex-col gap-[1cqw]'
+                div class: 'h-[1.4cqw] w-4/5 rounded-full bg-primary/60'
+                div class: 'h-[1.2cqw] w-3/5 rounded-full bg-tertiary/40'
+      # The area being scrolled, outlined in blue, with its panel.
+      div class: 'absolute top-[14%] left-[7%] h-[58%] w-[50%] overflow-hidden rounded-[1.4cqw] bg-surface shadow-xl ring-[0.5cqw] ring-blue-brand'
+        div class: 'flex animate-[scrollpage_6s_ease-in-out_infinite_alternate] flex-col gap-[2cqw] p-[2.4cqw]'
+          for i in [0...9]
+            div class: 'flex items-center gap-[1.6cqw]'
+              div class: ['size-[4.6cqw] shrink-0 rounded-[1cqw]', if i % 3 is 0 then 'bg-blue-brand/70' else 'bg-tertiary/30']
+              div class: 'flex flex-1 flex-col gap-[1cqw]'
+                div class: 'h-[1.4cqw] w-4/5 rounded-full bg-primary/60'
+                div class: 'h-[1.2cqw] w-3/5 rounded-full bg-tertiary/40'
+      div class: 'absolute top-[78%] left-[7%] flex items-center gap-[2cqw] rounded-[1.6cqw] bg-neutral-900 px-[2.4cqw] py-[1.4cqw] text-[2.4cqw] font-medium whitespace-nowrap text-white shadow-xl'
+        Icon name: 'scroll', class: 'size-[3cqw] text-cyan-brand'
+        span 'Scrolling; F10 stops'
+        span class: 'font-mono text-white/60', '4,812 px'
