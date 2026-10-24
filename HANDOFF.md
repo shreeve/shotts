@@ -8,7 +8,9 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 0.10.0 is the latest release: tag `v0.10.0` on `main`, the GitHub release with its notarized zip
 and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#159), which also links
 `shotts`; installed copies are offered each release through Sparkle. It is the third revamp
-(shreeve/shotts#71); `CHANGELOG.md` has every release. Its release build was launched for five
+(shreeve/shotts#71); `CHANGELOG.md` has every release. The website, https://shreeve.github.io/shotts/, is
+one Rip page in `website/` (its README says how it is built), deployed from the committed
+`website/dist` by the Website workflow; after a release, rebuild and commit it (RELEASING). Its release build was launched for five
 seconds before publishing and stayed up; nothing more of it has been tried by hand. The build
 has no warnings (warnings are errors) and `swift test` passes: 157 Core tests and 129 AppKit
 tests. Shotts has only ever run on macOS 27.
