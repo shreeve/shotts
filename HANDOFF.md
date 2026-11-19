@@ -5,8 +5,8 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.10.0 is the latest release: tag `v0.10.0` on `main`, the GitHub release with its notarized zip
-and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#159), which also links
+0.10.1 is the latest release: tag `v0.10.1` on `main`, the GitHub release with its notarized zip
+and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#235), which also links
 `shotts`; installed copies are offered each release through Sparkle. It is the third revamp
 (shreeve/shotts#71); `CHANGELOG.md` has every release. The website, https://shreeve.github.io/shotts/, is
 one Rip page in `website/` (its README says how it is built), deployed from the committed
