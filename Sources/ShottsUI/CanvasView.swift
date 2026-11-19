@@ -702,8 +702,9 @@ final class TextEntry: NSTextView {
         textContainer?.lineFragmentPadding = 0
         textContainer?.widthTracksTextView = false
         textColor = .clear
-        isHorizontallyResizable = true
-        isVerticallyResizable = true
+        // `place` sizes it at every change; sizing itself would undo the scale its bounds carry.
+        isHorizontallyResizable = false
+        isVerticallyResizable = false
         restyle(style)
     }
 
@@ -713,31 +714,36 @@ final class TextEntry: NSTextView {
     /// Its own undo, so keystrokes never reach the document's history or outlive the entry.
     override var undoManager: UndoManager? { words }
 
+    /// The words are laid out in the picture's pixels, at the font size the renderer draws them
+    /// at, and the view is scaled down to the canvas's zoom (`place`). Laid out at the zoomed size
+    /// instead, they break their lines a little differently, since text does not lay out exactly
+    /// in proportion across sizes: near the wrap width a word would fall to the next line here but
+    /// not in the picture, leaving the caret a line below the words and off to one side.
     func restyle(_ style: Style) {
         self.style = style
-        font = Renderer.font(for: style, scale: scale * zoom)
+        font = Renderer.font(for: style, scale: scale)
         insertionPointColor = NSColor(cgColor: Renderer.cgColor(style.color)) ?? .red
     }
 
-    /// Sits exactly over where the canvas draws the text, and grows with it.
+    /// Sits exactly over where the canvas draws the text, and grows with it. Its bounds are in
+    /// the picture's pixels and its frame in the canvas's points, so it lays the words out as
+    /// the renderer does (`restyle`).
     func place(in picture: CGRect) {
         let outline = Renderer.outlineWidth(style, scale: scale)
-        let pad = outline * zoom
+        // In pixels from here. The caret sits a hair right of where the words end, clear of the
+        // outline that strokes outside the last glyph; the whole view shifts, which moves nothing
+        // visible but the caret. Before any word, it sits where the first will start.
+        let clear = string.isEmpty && layout == nil ? 0 : outline + 2 / zoom
+        var x = origin.x + outline + clear
         var width: CGFloat = 0
-        // The caret sits a hair right of where the words end, clear of the outline that
-        // strokes outside the last glyph; the whole view shifts, which moves nothing visible
-        // but the caret. Before any word, it sits where the first will start.
-        let clear = string.isEmpty && layout == nil ? 0 : pad + 2
-        var x = origin.x * zoom + picture.minX + pad + clear
         if let layout {
             // Wrap where the renderer will: the full wrap width, never the measured box, whose
-            // width at the zoomed font's rounding could be a hair short and fold the last word
-            // onto a phantom line. The view is as wide as the wrap and is slid so the edge the
-            // words align to sits on the measured box's edge; only the caret is drawn, and it
-            // is always inside the box.
-            width = (layout.width - outline * 2) * zoom
+            // width could be a hair short and fold the last word onto a phantom line. The view is
+            // as wide as the wrap and is slid so the edge the words align to sits on the measured
+            // box's edge; only the caret is drawn, and it is always inside the box.
+            width = layout.width - outline * 2
             textContainer?.containerSize = NSSize(width: width, height: 4000)
-            let inner = (box.width - outline * 2) * zoom
+            let inner = box.width - outline * 2
             switch layout.alignment {
             case .left: break
             case .right: x += inner - width
@@ -746,8 +752,10 @@ final class TextEntry: NSTextView {
         }
         layoutManager?.ensureLayout(for: textContainer!)
         let used = layoutManager?.usedRect(for: textContainer!) ?? .zero
-        if layout == nil { width = max(used.width, 4) + 4 }
-        frame = CGRect(x: x, y: origin.y * zoom + picture.minY + pad, width: width, height: max(used.height, font?.pointSize ?? 20))
+        if layout == nil { width = max(used.width, 4 / zoom) + 4 / zoom }
+        let height = max(used.height, font?.pointSize ?? 20 / zoom)
+        frame = CGRect(x: picture.minX + x * zoom, y: picture.minY + (origin.y + outline) * zoom, width: width * zoom, height: height * zoom)
+        bounds = CGRect(x: 0, y: 0, width: width, height: height)
         wordsFrame = CGRect(x: origin.x * zoom + picture.minX, y: origin.y * zoom + picture.minY, width: box.width * zoom, height: box.height * zoom)
     }
 

@@ -5,6 +5,12 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Typing the words of an arrow with text, the caret stays at the end of the words. With the
+  editor showing the picture smaller than its full size, it could sit a line below them and
+  off to one side whenever a line neared the edge of the picture.
+
 ## 0.10.0 — 2026-10-11
 
 Scrolling capture:

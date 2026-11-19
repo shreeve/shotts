@@ -743,9 +743,14 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   (`init(contentRect:styleMask:backing:defer:)`, `init(frame:textContainer:)`): the convenience
   ones call it, and a missing one traps at first use. `TextEntry` builds the text system by hand
   and hands the container in.
-- Sizing the text entry view to the measured width of the words folded the last word onto a
-  phantom line whenever the zoomed font came out a hair wider than the measurement, leaving
-  the caret a line below the words. The view is as wide as the wrap width instead.
+- Text does not lay out exactly in proportion across font sizes: the same words at 24 points
+  in a 254-point width and at 48 pixels in 508 can break their lines differently near the
+  edge. So the text entry lays its words out where the renderer does, in the picture's pixels at
+  the renderer's font size, as wide as the wrap width (never the measured box, a hair short of
+  it), and its bounds scale it down to the canvas's zoom. Laid out at the zoomed size, it broke
+  a line early whenever the words neared the wrap width, and the caret sat a line below the
+  words and off to one side. `theCaretFollowsWrappedWords` types a sentence a letter at a time
+  at four zooms and checks the entry's lines against the renderer's.
 - A blend mode is the wrong way to make a highlighter: multiply vanishes on the dark
   backgrounds screenshots are full of. It is a translucent stroke.
 - A bitmap context's first row in memory is its top row, even though its drawing coordinates
