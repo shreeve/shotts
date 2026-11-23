@@ -169,33 +169,47 @@ import Testing
     /// zoomed font size, the entry broke a line early near the wrap width, and the caret sat a
     /// line below the words and off to one side.
     @Test(arguments: [(0.37, 2.0), (0.5, 2.0), (0.8, 1.0), (1.0, 2.0)]) func theCaretFollowsWrappedWords(_ view: (zoom: CGFloat, scale: Double)) throws {
-        let canvas = canvasInWindow(width: 1600, height: 1000, scale: view.scale, zoom: view.zoom)
-        canvas.style.font = .openSans
-        canvas.style.fontSize = 24
-        canvas.tool = .callout
-        Mouse(canvas: canvas).stroke(CGPoint(x: 1050, y: 700), CGPoint(x: 150, y: 720))
+        // Every font Shotts offers, Open Sans registered as the app registers it, and arrows at a
+        // few places, so the wrap edge falls in many places in the words.
+        #expect(FontTests.registered)
         let words = "how can I prevent the wrapping that I see here?"
-        for n in 1...words.count {
-            let typed = String(words.prefix(n))
-            canvas.typeText(typed)
-            let entry = try #require(canvas.textField), layout = try #require(entry.layout)
-            let manager = try #require(entry.layoutManager), container = try #require(entry.textContainer)
-            var lines = 0
-            manager.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: manager.numberOfGlyphs)) { _, _, _, _, _ in lines += 1 }
-            // The picture's lines, as the renderer measures them.
-            let font = Renderer.font(for: entry.style, scale: view.scale), outline = Renderer.outlineWidth(entry.style, scale: view.scale)
-            let drawn = Renderer.attributedText(typed, style: entry.style, scale: view.scale)
-                .boundingRect(with: CGSize(width: layout.width - outline * 2, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin]).height
-            #expect(lines == Int((drawn / NSLayoutManager().defaultLineHeight(for: font)).rounded()), "\(view) '\(typed)'")
-            // The end of the last word, in the canvas: inside the words' box, but for the hair
-            // the caret keeps clear of the outline.
-            let last = manager.boundingRect(forGlyphRange: NSRange(location: manager.numberOfGlyphs - 1, length: 1), in: container)
-            let end = entry.convert(CGPoint(x: last.maxX, y: last.maxY), to: canvas)
-            let picture = canvas.pictureRect
-            let box = CGRect(x: picture.minX + entry.origin.x * view.zoom, y: picture.minY + entry.origin.y * view.zoom,
-                             width: entry.box.width * view.zoom, height: entry.box.height * view.zoom)
-            #expect(end.y <= box.maxY + 1 && end.x <= box.maxX + outline * view.zoom + 3, "\(view) '\(typed)': \(end) beyond \(box)")
+        for font in [FontChoice.rounded, .system, .openSans] {
+            for tail in [1050.0, 1180.0, 1290.0] {
+                let canvas = canvasInWindow(width: 1600, height: 1000, scale: view.scale, zoom: view.zoom)
+                canvas.style.font = font
+                canvas.style.fontSize = 24
+                canvas.tool = .callout
+                Mouse(canvas: canvas).stroke(CGPoint(x: tail, y: 700), CGPoint(x: 150, y: 720))
+                for n in 1...words.count {
+                    let typed = String(words.prefix(n))
+                    canvas.typeText(typed)
+                    try checkCaret(canvas, typed, "\(view) \(font) \(tail)")
+                }
+            }
         }
+    }
+
+    /// The entry's lines are the renderer's, and the end of the last word is inside the words'
+    /// box, but for the hair the caret keeps clear of the outline.
+    private func checkCaret(_ canvas: CanvasView, _ typed: String, _ label: String) throws {
+        let entry = try #require(canvas.textField), layout = try #require(entry.layout)
+        let manager = try #require(entry.layoutManager), container = try #require(entry.textContainer)
+        let scale = canvas.document.scale, zoom = canvas.zoom
+        var lines = 0
+        manager.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: manager.numberOfGlyphs)) { _, _, _, _, _ in lines += 1 }
+        let font = Renderer.font(for: entry.style, scale: scale), outline = Renderer.outlineWidth(entry.style, scale: scale)
+        let drawn = Renderer.attributedText(typed, style: entry.style, scale: scale)
+            .boundingRect(with: CGSize(width: layout.width - outline * 2, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin]).height
+        #expect(lines == Int((drawn / NSLayoutManager().defaultLineHeight(for: font)).rounded()), "\(label) '\(typed)'")
+        // A space typed after the last word hangs past the wrap edge, in the entry as in the
+        // picture, so it is not the word's end.
+        let word = (typed as NSString).rangeOfCharacter(from: CharacterSet.whitespaces.inverted, options: .backwards)
+        let last = manager.boundingRect(forGlyphRange: NSRange(location: manager.glyphIndexForCharacter(at: word.location), length: 1), in: container)
+        let end = entry.convert(CGPoint(x: last.maxX, y: last.maxY), to: canvas)
+        let picture = canvas.pictureRect
+        let box = CGRect(x: picture.minX + entry.origin.x * zoom, y: picture.minY + entry.origin.y * zoom,
+                         width: entry.box.width * zoom, height: entry.box.height * zoom)
+        #expect(end.y <= box.maxY + 1 && end.x <= box.maxX + outline * zoom + 3, "\(label) '\(typed)': \(end) beyond \(box)")
     }
 
     @Test func editingTextKeepsItsPlaceAndIsOneStep() throws {
