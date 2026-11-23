@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.11.0 — 2026-11-23
 
 - Fast Desktop Switching, in the menu under Start at Login, on macOS 26.6 and later: a
   three-finger swipe or Control-Left/Right moves one desktop at once, without the slide. It
