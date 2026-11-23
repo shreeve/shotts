@@ -5,11 +5,11 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.11.0 is the latest release: tag `v0.11.0` on `main`, the GitHub release with its notarized zip
-and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#236), which also links
-`shotts`; installed copies are offered each release through Sparkle. 0.11.0 adds Fast Desktop
-Switching (`shotts-switcher`, untried on a real screen when it shipped); 0.10.1 fixed the caret
-of an arrow's words when the editor is zoomed out; 0.10.0 was the third revamp (shreeve/shotts#71).
+0.11.1 is the latest release: tag `v0.11.1` on `main`, the GitHub release with its notarized zip
+and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#237), which also links
+`shotts`; installed copies are offered each release through Sparkle. 0.11.1 gives a clicked
+window its whole shadow again; 0.11.0 added Fast Desktop Switching (`shotts-switcher`);
+0.10.0 was the third revamp (shreeve/shotts#71).
 `CHANGELOG.md` has every release. The website, https://shreeve.github.io/shotts/, is
 one Rip page in `website/` (its README says how it is built), deployed from the committed
 `website/dist` by the Website workflow; after a release, rebuild and commit it (RELEASING). 0.10.0's release build was launched for five
