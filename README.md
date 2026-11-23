@@ -46,7 +46,7 @@ Apple. Installed copies update themselves: choose **Check for Updates…** in th
 The first capture asks for Screen Recording permission, once. Three others are asked only
 when a feature first needs them: the microphone, for a recording with Microphone on; Input
 Monitoring, for a recording that shows the shortcuts pressed; and Accessibility, for a
-scrolling capture Shotts scrolls by itself.
+scrolling capture Shotts scrolls by itself or for Fast Desktop Switching.
 
 Or download `Shotts-<version>.zip` from the [latest release](https://github.com/shreeve/shotts/releases/latest)
 and open Shotts: it offers to move itself into Applications, where it can keep itself up to date.
@@ -67,7 +67,9 @@ words and the tail follows; move the head and the arrow reshapes.
 
 Options in the menu bar menu: show the magnifier, dim outside the selection, include the window
 shadow, copy to the clipboard the moment a capture is taken, and open each capture in a new
-window; and Start at Login, to have Shotts in the menu bar after every login and restart.
+window; Start at Login, to have Shotts in the menu bar after every login and restart; and, on
+macOS 26.6 and later, Fast Desktop Switching: a three-finger swipe or Control-Left/Right moves
+one desktop at once, without the slide, handy when switching back and forth to capture.
 
 ## Command line
 
@@ -110,4 +112,6 @@ lists them.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). Fast Desktop Switching (`Switcher/`) comes from
+[noswoosh](https://github.com/mmathys/noswoosh) by Max Mathys, also MIT
+([Switcher/LICENSE](Switcher/LICENSE)).

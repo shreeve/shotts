@@ -27,6 +27,9 @@ flags=()
 if [ "$config" = release ]; then flags=(-Xswiftc -Xfrontend -Xswiftc -internalize-at-link); fi
 swift build -c "$config" --scratch-path "$scratch" ${flags[@]+"${flags[@]}"} >&2
 bin_dir="$(swift build -c "$config" --scratch-path "$scratch" ${flags[@]+"${flags[@]}"} --show-bin-path)"
+# shotts-switcher, Fast Desktop Switching's helper: a package of its own in Switcher/.
+swift build -c "$config" --package-path "$root/Switcher" --scratch-path "$scratch/switcher" ${flags[@]+"${flags[@]}"} >&2
+switcher_dir="$(swift build -c "$config" --package-path "$root/Switcher" --scratch-path "$scratch/switcher" ${flags[@]+"${flags[@]}"} --show-bin-path)"
 app="$scratch/Shotts.app"
 
 rm -rf "$app"
@@ -36,6 +39,7 @@ cp "$bin_dir/Shotts" "$app/Contents/MacOS/Shotts"
 # beside Shotts in the build folder, a file named shotts would be Shotts on a disk that
 # ignores case.
 cp "$bin_dir/ShottsCLI" "$app/Contents/Helpers/shotts"
+cp "$switcher_dir/shotts-switcher" "$app/Contents/Helpers/shotts-switcher"
 cp "$root/Support/Info.plist" "$app/Contents/Info.plist"
 if [ "$config" != release ]; then
     plutil -replace CFBundleIdentifier -string com.github.shreeve.shotts.debug "$app/Contents/Info.plist"
@@ -67,8 +71,10 @@ rm -rf "$framework/Headers" "$framework/PrivateHeaders" "$framework/Modules" \
 if [ "$config" = release ]; then
     dsymutil "$app/Contents/MacOS/Shotts" -o "$scratch/Shotts.app.dSYM" >&2
     dsymutil "$app/Contents/Helpers/shotts" -o "$scratch/shotts.dSYM" >&2
+    dsymutil "$app/Contents/Helpers/shotts-switcher" -o "$scratch/shotts-switcher.dSYM" >&2
     strip "$app/Contents/MacOS/Shotts"
     strip "$app/Contents/Helpers/shotts"
+    strip "$app/Contents/Helpers/shotts-switcher"
 fi
 
 # Every piece is signed with the same identity, inner components first, with the hardened
@@ -85,6 +91,7 @@ resign "$framework/Versions/B/Autoupdate"
 resign "$framework/Versions/B/Updater.app"
 resign "$framework"
 resign --identifier com.github.shreeve.shotts.cli "$app/Contents/Helpers/shotts"
+resign --identifier com.github.shreeve.shotts.switcher "$app/Contents/Helpers/shotts-switcher"
 # The hardened runtime keeps the microphone from an app that does not claim it; the
 # entitlement is the claim, and macOS still asks the user the first time.
 resign --entitlements "$root/Support/Shotts.entitlements" "$app"

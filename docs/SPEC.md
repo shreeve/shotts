@@ -75,8 +75,9 @@ indicator in the menu bar.
 
 The menu bar menu holds About Shotts (the icon, version, copyright, and a link to the project),
 Capture Area, Show Last Capture, Open Image… (a PNG, JPEG, or TIFF into the editor), the
-picker's options, remembered across launches, then Start at Login and Allow Command-Line Capture
-(how Shotts itself runs), Install Command-Line Tool… (until `shotts` is installed), Check for
+picker's options, remembered across launches, then Start at Login, Fast Desktop Switching (on
+macOS 26.6 and later), and Allow Command-Line Capture (how Shotts itself runs), Install
+Command-Line Tool… (until `shotts` is installed), Check for
 Updates…, and Quit Shotts. **Start at Login**, off until turned on,
 makes Shotts a login item, so it is in the menu bar after every login and restart; macOS keeps
 it, in System Settings › General › Login Items, where it can be turned off too, and the
@@ -96,8 +97,9 @@ The first F10 asks macOS for Screen Recording permission with the system's own d
 is granted, later presses explain where to turn it on and capture nothing. Shotts asks for three
 others, each with the system's own dialog and only the first time something needs it: the
 microphone, for a recording with Microphone on; Input Monitoring, for a recording with Keys on;
-and Accessibility, for a scrolling capture, so Shotts can scroll the area. Without any of them,
-the rest works (see Recording and Scrolling capture).
+and Accessibility, for a scrolling capture, so Shotts can scroll the area, or for Fast Desktop
+Switching. Without any of them, the rest works (see Recording, Scrolling capture, and Fast
+Desktop Switching).
 
 Shotts checks for updates once a day without asking, and Check for Updates… checks at once.
 
@@ -208,6 +210,20 @@ and its color space.
 When the editor you are working in closes, the app that was in front when its F10 was pressed
 comes back to the front; with several editors open, each gives focus back to the app its own
 capture came from. A cancelled capture goes back to the app that was in front.
+
+## Fast Desktop Switching
+
+On macOS 26.6 and later, the menu bar menu has Fast Desktop Switching, off until turned on. On,
+a three-finger horizontal swipe or Control-Left/Right moves one desktop at once, without the
+slide, and stops at the first and last rather than bouncing. A swipe moves the desktops of the
+display under the pointer, as macOS's own does; vertical swipes (Mission Control, App Exposé)
+are as ever. Landing on a desktop with no windows stays there, rather than macOS moving on to
+another app's window a moment later.
+
+It needs Accessibility: turned on without it, macOS's own dialog asks, and it starts once
+allowed. It runs only while Shotts does, and macOS's own Control-arrow shortcuts are off only
+while it runs. While noswoosh, which does the same, is running, it waits, and the menu says so.
+It comes from noswoosh by Max Mathys (MIT).
 
 ## Scrolling capture
 

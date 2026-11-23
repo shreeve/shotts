@@ -43,7 +43,11 @@ Next, in order:
    - `shotts` `start`/`stop`, F10 and the timer stopping a scripted recording, F10 doing nothing
      while `shotts` counts down, Install Command-Line Tool, and Start at Login (log out and in;
      Login Items agrees with the checkmark);
-   - a Sparkle update from 0.5.0 or later (0.5.0 is the first to ship Sparkle thinned to arm64).
+   - a Sparkle update from 0.5.0 or later (0.5.0 is the first to ship Sparkle thinned to arm64);
+   - Fast Desktop Switching: turning it on asks for Accessibility only if Shotts lacks it, then
+     a swipe and Control-arrow switch at once, both ways, with Natural scrolling on and off; no
+     switch past the ends; an empty desktop stays; quitting Shotts gives Control-arrow back to
+     macOS's animated switch; and the menu says noswoosh is running while it is.
 2. Check a release on macOS 14, 15, and 26, in virtual machines (UTM runs them on Apple
    silicon). The target is macOS 14, where ScreenCaptureKit gained what Shotts uses (the one-shot
    window capture, `captureResolution`, and the shadow switches); it builds and tests there but
@@ -174,6 +178,9 @@ Deferred, with the reason each waits:
 | | `HotKey.swift` | Registers a Carbon hot key and runs its action: F10 and ⇧⌘2, each with Option, from `ShottsApp`. |
 | | `MoveToApplications.swift` | A release launched outside Applications offers to move itself there. |
 | | `DevSwitches.swift` | The developer switches, compiled into debug builds only. |
+| | `DesktopSwitcher.swift` | Fast Desktop Switching: runs `shotts-switcher` while it is on, waiting for Accessibility, starting it again if it fails, and stopping it as Shotts quits. |
+| Switcher (own package) | `SwitcherCore/DesktopSwitch.swift` | Which macOS has it, how far a switch may go, the posted swipe's progress and velocity, the macOS 27 IOHID payload, and `SwipeTracker`, which decides what becomes of each real swipe event. |
+| | `shotts-switcher/Switcher.swift` | The helper: SkyLight looked up at run time, the posted switch, Control-arrow, the swipe tap, the empty-desktop guard, and quitting with what started it. |
 | ShottsCLI | `main.swift` | `shotts`: parses, checks, connects (starting the Shotts it is inside with `open -g` when nothing listens), prints, exits with the answer's code, and turns Control-C into `stop`, then `abort`. |
 
 Start at Login is not in the defaults: macOS keeps it (`SMAppService.mainApp`, shown in System
@@ -183,7 +190,7 @@ reads it each time the menu opens.
 Settings live in the defaults: the picker options under `selection.*`, `capture.copies`, and
 `export.shadow` (`SelectionOptions.current`, defaults registered in one place);
 `capture.askedPermission` once the system's permission prompt has been shown, `commandLine.allowed` (Allow Command-Line Capture, read from Shotts' own saved settings only), `recording.soundCalibration` (each output device's measured sound loss and when), `editor.newWindows`,
-`recording.microphone`, `recording.clicks`, `recording.keys`, `recording.askedInputMonitoring` (macOS's own Input Monitoring dialog shown), `scroll.askedAccessibility` (its Accessibility dialog shown for scrolling), `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
+`switcher.enabled` (Fast Desktop Switching), `recording.microphone`, `recording.clicks`, `recording.keys`, `recording.askedInputMonitoring` (macOS's own Input Monitoring dialog shown), `scroll.askedAccessibility` (its Accessibility dialog shown for scrolling), `app.skipMoveToApplications` ("Don't ask again" on the move offer); the
 editor's last style as JSON under `editor.style` and its last drawing tool under `editor.tool`.
 
 ## The seam
@@ -400,6 +407,33 @@ match, what a target comes to, the codes) is in Core's `Script.swift`, with test
   is there; a default name never does, but takes " 2", " 3"… as the Finder numbers. The
   recording's folder goes once they are made, as a closed window's does.
 
+## Fast Desktop Switching
+
+`Switcher/` is a Swift package of its own, so it could be a repository of its own:
+`shotts-switcher`, from noswoosh 1.7.8 by Max Mathys (MIT; `Switcher/README.md` has the
+technique and its sources). `Scripts/package-app.sh` builds it and copies it to
+`Contents/Helpers/shotts-switcher`, and Shotts' `DesktopSwitcher` runs it as a child process
+while `switcher.enabled` is on: at launch, and when the menu item turns it on. It quits on
+`SIGTERM`, which `DesktopSwitcher.stop` sends as Shotts quits, and when its parent goes
+(a process source on the parent's exit), so it never outlives Shotts; either way it puts macOS's
+Control-arrow shortcuts (symbolic hot keys 79 and 81, off while it runs) back as the user has
+them in `com.apple.symbolichotkeys`, touching only the live state, never the saved one.
+
+macOS checks Accessibility for the app that started a process, so the helper uses Shotts' own
+grant, the one a scrolling capture asks for: no second entry in System Settings. A process
+reads its grant once, so a helper started without one exits (status 3) and `DesktopSwitcher`
+polls `AXIsProcessTrusted` each second, starting it once allowed; it shows macOS's dialog only
+when the user turns the item on. Status 4 (before macOS 26.6) and 5 (a SkyLight function gone)
+are left alone; anything else starts it again a second later, five times a minute at most. It
+waits while noswoosh runs (both would answer every swipe), and the menu item says so.
+
+Every number in the posted swipe is measured, and `DesktopSwitch.swipe` says what went wrong
+with the alternatives: on macOS 27, progress 1e-4 until the end and 0.1 at the end (0.1
+throughout drew a one-frame jiggle; 1e-4 throughout sometimes landed on a black desktop on
+27.0.1), rightward posted negative though a real rightward swipe reads positive, and flipped
+again with Natural scrolling off. Its tests pin the numbers, the payload's bytes, and what
+`SwipeTracker` does with each phase; the helper itself only moves events, and is tried by hand.
+
 ## Scrolling capture
 
 Option is to scrolling what Command is to recording: each press during a drag flips the
@@ -591,7 +625,7 @@ hit testing at scale 1 and 2, arrow parts and drags, styles, callout layout, the
 layout, the recording rules, the GIF encoder (read back by a GIF decoder of the tests' own),
 the command line's language (parsing, checks, window matching, aim, listing, help, tables),
 the scroll stitcher and auto-scroll pacing, keystrokes, sound calibration, macOS's shortcuts,
-and quitting. `Tests/UI` drives AppKit in windows that are never shown: the editor's gestures, undo,
+and quitting. `swift test --package-path Switcher` covers Fast Desktop Switching's decisions. `Tests/UI` drives AppKit in windows that are never shown: the editor's gestures, undo,
 typing, restyling, closing, and resizing; the renderer (extent, text box, canvas against export);
 export (resolution, color space, obscure, the background copy, file names, the drag file); and
 the picker (the cut, the pointer per display, clipping, cancelling, Command-release); and
@@ -674,6 +708,14 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   Settings. `Scripts/package-app.sh` signs every build with the Developer ID for that reason, and
   gives a debug build an id of its own (`com.github.shreeve.shotts.debug`): signed alike, it would
   share the release's grant, and its developer switches would let any program capture through it.
+- A process that an app starts runs under that app's privacy grants: macOS checks
+  Accessibility for the responsible app, so `shotts-switcher` uses Shotts' grant. Started
+  another way (launchd, `open`), it would need its own.
+- The empty-desktop guard works only from an app with no windows: it makes itself active as a
+  desktop with no windows is landed on, so the app macOS would activate there never orders in
+  a window from another desktop for the Dock to follow. Shotts has windows, so the guard is in
+  the helper, not in Shotts; and it must be on landing, as activating before the switch is
+  undone by it.
 - `UserDefaults.standard` searches the launch arguments first: `-key value` on the command line
   overrides what the user saved. A setting that guards something, such as Allow Command-Line
   Capture, is read from the app's persistent domain alone.

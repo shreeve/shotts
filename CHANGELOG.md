@@ -5,6 +5,13 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
+## Unreleased
+
+- Fast Desktop Switching, in the menu under Start at Login, on macOS 26.6 and later: a
+  three-finger swipe or Control-Left/Right moves one desktop at once, without the slide. It
+  uses Accessibility, asked when you turn it on if Shotts does not have it yet, and runs only
+  while Shotts does. It comes from noswoosh by Max Mathys; turn noswoosh off to use it.
+
 ## 0.10.1 — 2026-11-18
 
 - Typing the words of an arrow with text, the caret stays at the end of the words. With the

@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private let flow = CaptureFlow()
     /// What `shotts` asks for, while Allow Command-Line Capture is on.
     private let script = ScriptRunner()
+    /// Fast Desktop Switching's helper, while it is on.
+    private let switcher = DesktopSwitcher()
     /// Install Command-Line Tool…, shown only until `shotts` is found on the PATH's usual places.
     private var installItem: NSMenuItem?
     /// Reads SUFeedURL and SUPublicEDKey from Info.plist and checks daily, silently
@@ -67,11 +69,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         // from a crash. Not under a developer switch, which another Shotts may be running beside.
         Recording.removeLeftovers()
         script.start()
+        switcher.start()
         updater.startUpdater()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         script.stopListening()
+        switcher.stop()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
@@ -194,6 +198,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let start = NSMenuItem(title: "Start at Login", action: #selector(startAtLoginToggled), keyEquivalent: "")
         start.target = self
         menu.addItem(start)
+        let switching = NSMenuItem(title: "Fast Desktop Switching", action: #selector(fastDesktopSwitchingToggled), keyEquivalent: "")
+        switching.target = self
+        switching.toolTip = "Switches desktops at once, without the slide, on a three-finger swipe or Control-Left/Right. Uses Accessibility."
+        // macOS 26.6 or later only.
+        switching.isHidden = !DesktopSwitcher.isAvailable
+        menu.addItem(switching)
         let allow = NSMenuItem(title: "Allow Command-Line Capture", action: #selector(allowCommandLineToggled), keyEquivalent: "")
         allow.target = self
         allow.toolTip = "Lets the shotts command, and any program you run, take screenshots and recordings through Shotts, with the Mac's sound or the microphone when asked"
@@ -292,6 +302,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         }
         // macOS may want the user to allow it in Login Items first.
         if service.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+    }
+
+    @objc private func fastDesktopSwitchingToggled() {
+        switcher.toggle()
     }
 
     @objc private func allowCommandLineToggled() {
@@ -443,6 +457,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             }
             if item.action == #selector(allowCommandLineToggled) { item.state = ScriptRunner.isAllowed ? .on : .off }
             if item.action == #selector(startAtLoginToggled) { item.state = SMAppService.mainApp.status == .enabled ? .on : .off }
+            if item.action == #selector(fastDesktopSwitchingToggled) {
+                item.state = switcher.isOn ? .on : .off
+                let waiting = switcher.isOn && DesktopSwitcher.noswooshIsRunning
+                item.title = waiting ? "Fast Desktop Switching (noswoosh is running)" : "Fast Desktop Switching"
+                // noswoosh gone since: the helper takes over.
+                if !waiting { switcher.start() }
+            }
         }
         installItem?.isHidden = Self.toolIsInstalled
     }

@@ -26,6 +26,10 @@ read it before changing capture, the selection overlay, the editor, or export.
   or the mouse.
 - `ShottsCLI`: `shotts`, the command line, on ShottsCore alone. It captures nothing: it asks the
   running Shotts over a socket and prints the answer.
+- `Switcher/`: `shotts-switcher`, Fast Desktop Switching's helper, a Swift package of its own
+  with no dependency on Shotts, so it could be a repository of its own. Shotts runs it from its
+  bundle while the menu item is on, and it quits when Shotts does. Its decisions are in
+  `SwitcherCore`, with tests.
 
 ## Rules
 
@@ -73,7 +77,8 @@ read it before changing capture, the selection overlay, the editor, or export.
   time Keys is turned on for a recording, to show the shortcuts pressed; and Accessibility, asked the first time a
   scrolling capture starts, used only while Shotts scrolls one: to send scroll-wheel steps, and
   to hold the pointer still and drop the mouse's own events until it stops (without it, the
-  user scrolls). Keys are watched only while such a recording
+  user scrolls), and by Fast Desktop Switching's helper while that is on (off until the user
+  turns it on), to turn a three-finger swipe or Control-arrow into an instant switch. Keys are watched only while such a recording
   runs, never kept, and only shortcuts show, never typing; macOS sends none while a password is
   typed.
 - Developer switches (`--edit`, `--render`, …) exist only in debug builds. A release build must
@@ -92,6 +97,7 @@ read it before changing capture, the selection overlay, the editor, or export.
 ```bash
 swift build          # warnings are errors
 swift test           # Core, then AppKit in unshown windows
+swift test --package-path Switcher   # Fast Desktop Switching's decisions
 open "$(Scripts/package-app.sh)"
 ```
 
