@@ -5,7 +5,7 @@ section as the GitHub release notes and as the notes Sparkle shows in the update
 refuses to release a version that has no section here. Changes not yet released collect under
 Unreleased, whose heading becomes the version's when it ships.
 
-## Unreleased
+## 0.11.1 — 2026-11-23
 
 - Include Window Shadow works again: a clicked window comes with its whole shadow, at its full
   size. The shadow was cut off, and the window shrunk to make room for what was left of it.
