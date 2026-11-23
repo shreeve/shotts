@@ -14,7 +14,7 @@ of an arrow's words when the editor is zoomed out; 0.10.0 was the third revamp (
 one Rip page in `website/` (its README says how it is built), deployed from the committed
 `website/dist` by the Website workflow; after a release, rebuild and commit it (RELEASING). 0.10.0's release build was launched for five
 seconds before publishing and stayed up; nothing more of it has been tried by hand. The build
-has no warnings (warnings are errors) and `swift test` passes: 157 Core tests and 130 AppKit
+has no warnings (warnings are errors) and `swift test` passes: 160 Core tests and 130 AppKit
 tests. Shotts has only ever run on macOS 27.
 
 Tried by hand on a real screen: capture, the editor and its tools, copy, save, drag, print;
@@ -232,8 +232,11 @@ picker outlines the first window containing the pointer, and a click with no dra
 `.window`; the flow then captures that window on its own through
 `SCContentFilter(desktopIndependentWindow:)` at the filter's `pointPixelScale`, so nothing
 covering it appears. With the option on, `ignoreShadowsSingleWindow` is false and the picture is
-the window with the shadow macOS draws around it, on a transparent margin, sized from the
-filter's `contentRect`; that is the system's own look, which no synthesized shadow matched. A
+the window with the shadow macOS draws around it, on a transparent margin; that is the system's
+own look, which no synthesized shadow matched. The filter's `contentRect` is the window alone, so
+the picture is asked for `WindowShadow.margin` points larger each way and trimmed to what is not
+fully transparent (`WindowShadow.visibleBounds`): it comes out within a few clear pixels of
+`screencapture -l`'s. A
 window that has gone meanwhile falls back to its area of the latest frame.
 
 Only the overlay under the pointer draws the crosshair, magnifier, hints, and window outline, and
@@ -741,6 +744,9 @@ bar. Never do this while someone is at the keyboard: the events land in whatever
   of its own.
 - A filtered display capture leaves window shadows out unless `ignoreShadowsDisplay` is false;
   the old frozen picker's screen looked shadowless for that reason.
+- A window's `SCContentFilter.contentRect` leaves its shadow out, and a picture that size squeezes
+  the window and its shadow into it: the window shrinks about 5% and the shadow is cut. Give the
+  shadow room and trim (`WindowShadow`).
 - A clear window lets clicks through its transparent parts unless `ignoresMouseEvents` is set to
   false explicitly, even though false is what it reads by default; the live overlay sets it.
 - Views do not clip their drawing to their bounds by default, and the rect `draw(_:)` is asked

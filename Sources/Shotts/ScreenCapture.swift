@@ -46,16 +46,41 @@ enum ScreenCapture {
         let filter = SCContentFilter(desktopIndependentWindow: window)
         let configuration = SCStreamConfiguration()
         configuration.ignoreShadowsSingleWindow = !shadow
-        // The filter's content rectangle is the window plus, with the shadow, its margins; its
-        // scale is that of the display holding most of the window, not the one clicked on.
+        // The filter's content rectangle is the window alone; its scale is that of the display
+        // holding most of the window, not the one clicked on. The shadow needs room around it
+        // (`WindowShadow`), and is trimmed to once captured.
+        let margin = shadow ? WindowShadow.margin : 0
         let size = filter.contentRect.size
         let scale = CGFloat(filter.pointPixelScale)
-        configuration.width = Int(size.width * scale)
-        configuration.height = Int(size.height * scale)
+        configuration.width = Int((size.width + margin) * scale)
+        configuration.height = Int((size.height + margin) * scale)
         configuration.captureResolution = .best
         configuration.showsCursor = false
         configuration.scalesToFit = false
-        return (try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration), scale)
+        let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+        return (shadow ? trimmed(image) ?? image : image, scale)
+    }
+
+    /// `image` without the fully transparent margin around a window and its shadow, as a
+    /// picture of its own, so the margin's pixels do not stay behind it.
+    private static func trimmed(_ image: CGImage) -> CGImage? {
+        let w = image.width, h = image.height
+        guard let alpha = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceGray(),
+                                    bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue)
+        else { return nil }
+        alpha.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let data = alpha.data else { return nil }
+        let bytes = UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: alpha.bytesPerRow * h)
+        guard let bounds = WindowShadow.visibleBounds(alpha: bytes, width: w, height: h, bytesPerRow: alpha.bytesPerRow),
+              let crop = image.cropping(to: bounds), let space = image.colorSpace,
+              let copy = CGContext(data: nil, width: crop.width, height: crop.height, bitsPerComponent: image.bitsPerComponent,
+                                   bytesPerRow: 0, space: space, bitmapInfo: image.bitmapInfo.rawValue)
+                ?? CGContext(data: nil, width: crop.width, height: crop.height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        else { return nil }
+        copy.setBlendMode(.copy)
+        copy.draw(crop, in: CGRect(x: 0, y: 0, width: crop.width, height: crop.height))
+        return copy.makeImage()
     }
 
     /// The ordinary windows on screen, front to back, in the window server's space (origin at

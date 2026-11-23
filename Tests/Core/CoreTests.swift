@@ -46,6 +46,40 @@ import Testing
     }
 }
 
+@Suite struct WindowShadowTests {
+    private func bounds(_ rows: [String]) -> CGRect? {
+        // Each character a pixel: "." fully transparent, anything else not; rows padded to 8 bytes.
+        let width = rows.first?.count ?? 0, bytesPerRow = 8
+        var alpha = [UInt8](repeating: 9, count: rows.count * bytesPerRow)
+        for (y, row) in rows.enumerated() {
+            for (x, c) in row.enumerated() { alpha[y * bytesPerRow + x] = c == "." ? 0 : 1 }
+        }
+        return alpha.withUnsafeBufferPointer {
+            WindowShadow.visibleBounds(alpha: $0, width: width, height: rows.count, bytesPerRow: bytesPerRow)
+        }
+    }
+
+    /// The faintest shadow pixel counts, wherever it is, and the padding past each row does not.
+    @Test func trimsToTheFaintestShadow() {
+        #expect(bounds([
+            "......",
+            "..s...",
+            ".sWWs.",
+            "..WW..",
+            "...s..",
+            "......",
+        ]) == CGRect(x: 1, y: 1, width: 4, height: 4))
+    }
+
+    @Test func aPictureWithNoMarginStaysWhole() {
+        #expect(bounds(["WW", "WW"]) == CGRect(x: 0, y: 0, width: 2, height: 2))
+    }
+
+    @Test func aFullyTransparentPictureHasNone() {
+        #expect(bounds(["...", "..."]) == nil)
+    }
+}
+
 @Suite struct HistoryTests {
     @Test func undoRedoRoundTrip() {
         var h = History(1)

@@ -65,3 +65,41 @@ public enum SelectionRule {
         return (bounds, false)
     }
 }
+
+/// A clicked window captured with its shadow. ScreenCaptureKit's `contentRect` for a window is
+/// the window alone, without the shadow around it, and a picture that size gets the window and
+/// its shadow squeezed into it. So the picture is made `margin` points larger each way, which
+/// ScreenCaptureKit fills with the window at its own size and its whole shadow from the top-left
+/// corner, and then trimmed to what is not fully transparent.
+public enum WindowShadow {
+    /// Room for the shadow, in points, added to the window's width and height: macOS's largest
+    /// shadow, the active window's, reaches about 60 points below a window.
+    public static let margin: Double = 200
+
+    /// The smallest rectangle, in pixels from the top-left corner, holding every pixel of the
+    /// picture that is not fully transparent; nil when it is all transparent. `alpha` holds
+    /// `height` rows of `bytesPerRow` bytes, one per pixel, top row first.
+    public static func visibleBounds(alpha: UnsafeBufferPointer<UInt8>, width: Int, height: Int, bytesPerRow: Int) -> CGRect? {
+        func rowIsClear(_ y: Int) -> Bool {
+            let start = y * bytesPerRow
+            for x in 0..<width where alpha[start + x] != 0 { return false }
+            return true
+        }
+        var top = 0
+        while top < height, rowIsClear(top) { top += 1 }
+        guard top < height else { return nil }
+        var bottom = height - 1
+        while rowIsClear(bottom) { bottom -= 1 }
+        var left = width, right = -1
+        for y in top...bottom {
+            let start = y * bytesPerRow
+            var x = 0
+            while x < left, alpha[start + x] == 0 { x += 1 }
+            left = min(left, x)
+            x = width - 1
+            while x > right, alpha[start + x] == 0 { x -= 1 }
+            right = max(right, x)
+        }
+        return CGRect(x: left, y: top, width: right - left + 1, height: bottom - top + 1)
+    }
+}
