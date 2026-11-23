@@ -5,15 +5,16 @@ does, `AGENTS.md` the rules, `docs/RELEASING.md` how a release is made.
 
 ## State
 
-0.10.1 is the latest release: tag `v0.10.1` on `main`, the GitHub release with its notarized zip
-and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#235), which also links
-`shotts`; installed copies are offered each release through Sparkle. 0.10.1 fixes the caret of an
-arrow's words when the editor is zoomed out; 0.10.0 was the third revamp (shreeve/shotts#71).
+0.11.0 is the latest release: tag `v0.11.0` on `main`, the GitHub release with its notarized zip
+and signed `appcast.xml`, and the Homebrew cask (shreeve/homebrew-tap#236), which also links
+`shotts`; installed copies are offered each release through Sparkle. 0.11.0 adds Fast Desktop
+Switching (`shotts-switcher`, untried on a real screen when it shipped); 0.10.1 fixed the caret
+of an arrow's words when the editor is zoomed out; 0.10.0 was the third revamp (shreeve/shotts#71).
 `CHANGELOG.md` has every release. The website, https://shreeve.github.io/shotts/, is
 one Rip page in `website/` (its README says how it is built), deployed from the committed
 `website/dist` by the Website workflow; after a release, rebuild and commit it (RELEASING). 0.10.0's release build was launched for five
 seconds before publishing and stayed up; nothing more of it has been tried by hand. The build
-has no warnings (warnings are errors) and `swift test` passes: 157 Core tests and 129 AppKit
+has no warnings (warnings are errors) and `swift test` passes: 157 Core tests and 130 AppKit
 tests. Shotts has only ever run on macOS 27.
 
 Tried by hand on a real screen: capture, the editor and its tools, copy, save, drag, print;
